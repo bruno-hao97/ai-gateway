@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Env & secrets — never bake into image
+.env
+.env.*
+!.env.example
+
+# Dev artifacts
+*.log
+.DS_Store
+docs/.vitepress/cache
+docs/.vitepress/dist
+
+# Git
+.git
+.github

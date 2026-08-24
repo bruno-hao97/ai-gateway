@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Gateway — Portal</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="inner">
+      <a class="logo" href="index.html">AI <span>Gateway</span></a>
+      <nav>
+        <a href="playground.html">Playground</a>
+        <a href="http://localhost:5173" id="docs-link">Docs</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h1>Gommo AI Gateway</h1>
+      <p>
+        Proxy transparent + REST wrap cho upstream Gommo.
+        Tích hợp Mode B (<code>/gateway/*</code>) hoặc Mode C (pass-through).
+      </p>
+      <a class="btn btn-primary" href="playground.html">Mở API Playground</a>
+    </section>
+
+    <div class="cards">
+      <article class="card">
+        <h2>Developer docs</h2>
+        <p>Quickstart, auth, integration modes, API reference (curl + PowerShell).</p>
+        <a class="btn btn-secondary" id="docs-card-link" href="#">Xem tài liệu</a>
+      </article>
+
+      <article class="card">
+        <h2>Đăng ký tài khoản</h2>
+        <p>Tạo user Gommo để lấy <code>access_token</code> cho API.</p>
+        <a class="btn btn-secondary" href="https://vmedia.ai" target="_blank" rel="noopener noreferrer">
+          Đăng ký vmedia.ai →
+        </a>
+      </article>
+
+      <article class="card">
+        <h2>Chạy local</h2>
+        <p>API + portal cùng port: <code>http://localhost:3001/portal/</code>. Docs riêng khi viết: port <code>5173</code>.</p>
+        <code style="font-size:0.82rem;color:var(--muted)">npm run dev · npm run docs:dev</code>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    Powered by <a href="https://gommo.net" target="_blank" rel="noopener">Gommo</a>
+  </footer>
+
+  <script>
+    const docsUrl = localStorage.getItem('portal_docs_url')
+      || (location.hostname === 'localhost' ? 'http://localhost:5173' : '/');
+    document.getElementById('docs-link').href = docsUrl;
+    document.getElementById('docs-card-link').href = docsUrl;
+  </script>
+</body>
+</html>
