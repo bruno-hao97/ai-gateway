@@ -3,18 +3,25 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "client:build": "npm run build --workspace=@ai-gateway/client",
+    "client:test": "npm run test --workspace=@ai-gateway/client",
+    "client:publish": "npm publish --workspace=@ai-gateway/client --access public",
     "docs:dev": "vitepress dev docs --port 5173",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
-    "portal:dev": "npx --yes serve apps/docs-portal -l 5174",
+    "portal:dev": "npx --yes serve apps/docs-portal -l 5180",
     "web:dev": "npm run dev --prefix apps/web",
     "web:build": "npm run build --prefix apps/web"
   },
   "dependencies": {
+    "@ai-gateway/client": "^0.1.0",
     "@payos/node": "^2.0.5",
     "cors": "^2.8.6",
     "dotenv": "^16.5.0",

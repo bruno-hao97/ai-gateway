@@ -1,3 +1,8 @@
+---
+title: Chat
+description: Agent chat and SSE streaming via /gateway/chat
+---
+
 # Chat
 
 Upstream: `POST https://api.gommo.net/api/v2/chat` (form urlencoded).
@@ -15,21 +20,21 @@ Default env: `GOMMO_CHAT_SERVER=cheap`, `GOMMO_CHAT_MODEL=gpt-5.5::cheap`, `GOMM
 ```json
 {
   "action": "chat",
-  "query": "Xin chào",
+  "query": "Hello",
   "sessionId": "optional-uuid",
   "messages": [
-    { "role": "user", "text": "Xin chào" }
+    { "role": "user", "text": "Hello" }
   ]
 }
 ```
 
 ::: warning
-Upstream `action=chat` yêu cầu **`messages` không rỗng**. Gửi ít nhất một `{ "role": "user", "text": "..." }`.
+Upstream `action=chat` requires **non-empty `messages`**. Send at least one `{ "role": "user", "text": "..." }`.
 :::
 
-`domain` **không cần** trong body REST — gateway dùng `GOMMO_API_DOMAIN`.
+`domain` is **not required** in REST body — gateway uses `GOMMO_API_DOMAIN`.
 
-`action=stream` → response **SSE**, gateway pipe không buffer.
+`action=stream` → **SSE** response; gateway pipes without buffering.
 
 ---
 
@@ -40,14 +45,14 @@ Upstream `action=chat` yêu cầu **`messages` không rỗng**. Gửi ít nhất
 ```bash [curl — REST]
 curl.exe -X POST "http://localhost:3001/gateway/chat" ^
   -H "Authorization: Bearer %TOKEN%" -H "Content-Type: application/json" ^
-  -d "{\"action\":\"chat\",\"query\":\"Xin chao\",\"messages\":[{\"role\":\"user\",\"text\":\"Xin chao\"}]}"
+  -d "{\"action\":\"chat\",\"query\":\"Hello\",\"messages\":[{\"role\":\"user\",\"text\":\"Hello\"}]}"
 ```
 
 ```powershell [PowerShell — REST]
 $body = @{
   action = 'chat'
-  query = 'Xin chao'
-  messages = @(@{ role = 'user'; text = 'Xin chao' })
+  query = 'Hello'
+  messages = @(@{ role = 'user'; text = 'Hello' })
 } | ConvertTo-Json -Depth 5
 Invoke-RestMethod -Method POST -Uri "http://localhost:3001/gateway/chat" `
   -Headers @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type'='application/json' } -Body $body
@@ -56,7 +61,7 @@ Invoke-RestMethod -Method POST -Uri "http://localhost:3001/gateway/chat" `
 ```bash [curl — Proxy]
 curl.exe -X POST "http://localhost:3001/api/v2/chat" ^
   -H "Content-Type: application/x-www-form-urlencoded" ^
-  -d "action=chat&access_token=%TOKEN%&domain=%GOMMO_API_DOMAIN%&query=Xin+chao&..."
+  -d "action=chat&access_token=%TOKEN%&domain=%GOMMO_API_DOMAIN%&query=Hello&..."
 ```
 
 :::
@@ -68,8 +73,8 @@ curl.exe -X POST "http://localhost:3001/api/v2/chat" ^
 ```powershell
 $body = @{
   action = 'stream'
-  query = 'Ke chuyen ngan'
-  messages = @(@{ role = 'user'; text = 'Ke chuyen ngan' })
+  query = 'Tell a short story'
+  messages = @(@{ role = 'user'; text = 'Tell a short story' })
 } | ConvertTo-Json -Depth 5
 curl.exe -N -X POST "http://localhost:3001/gateway/chat" `
   -H "Authorization: Bearer $env:TOKEN" -H "Content-Type: application/json" `

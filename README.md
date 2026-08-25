@@ -15,34 +15,32 @@ Express TypeScript gateway for **[Gommo](https://gommo.net)** — transparent pr
 ```bash
 cp .env.example .env
 npm install
-npm run dev          # http://localhost:3001
+npm run dev          # http://localhost:3001  (+ /portal/ in dev)
 ```
 
 ## Kiến trúc dev / prod
 
 | Dev | Port | Prod |
 |-----|------|------|
-| **ai-gateway** (API + `/portal`) | 3001 | `api.yourdomain.com` |
-| **ai-app** (vanilla SPA, repo riêng) | 5174 | `app.yourdomain.com` |
+| **API** (+ `/portal` playground) | 3001 | `api.yourdomain.com` |
 | **Developer docs** (VitePress) | 5173 | `docs.yourdomain.com` |
 
-CORS cho ai-app: `GATEWAY_CORS_ORIGIN=http://localhost:5174` trong `.env` gateway.
+Playground: **http://localhost:3001/portal/** — same-origin, không cần CORS.
 
-## User web app (`apps/web` — React, optional)
+`GATEWAY_CORS_ORIGIN` — chỉ khi có browser app khác origin (SDK demo, `apps/web`, v.v.).
 
-React 19 + Tailwind — port **5175** (tránh trùng ai-app **5174** và docs **5173**).
+## Optional: `apps/web` (React)
+
+React 19 + Tailwind — port **5175**.
 
 ```bash
-# Terminal 1 — gateway (+ CORS nếu cần)
-npm run dev
-
-# Terminal 2 — React web (legacy/alternate)
-npm run web:dev
+npm run dev      # gateway
+npm run web:dev  # :5175 — cần CORS nếu gọi API cross-origin
 ```
 
 Chi tiết: [`apps/web/README.md`](./apps/web/README.md)
 
-Developer docs (VitePress): `npm run docs:dev` → port **5173**.
+Developer docs: `npm run docs:dev` → port **5173**.
 
 ## Docs portal & playground
 
@@ -56,7 +54,7 @@ Docs khi **viết** vẫn tách: `npm run docs:dev` (port 5173, hot reload).
 Production: portal tắt mặc định (`NODE_ENV=production`). Docs static deploy riêng.
 
 ```bash
-npm run portal:dev   # optional fallback port 5174 — cần GATEWAY_CORS_ORIGIN
+npm run portal:dev   # optional fallback :5180 — static serve docs-portal
 ```
 
 ## Deploy
@@ -103,7 +101,7 @@ Image chạy `node dist/index.js` sau `npm run build`. Health: `GET /health`.
 ```bash
 fly launch --no-deploy    # dùng fly.toml có sẵn, đổi app name nếu cần
 fly secrets set GOMMO_ACCESS_TOKEN=... ADMIN_API_KEY=... GOMMO_API_DOMAIN=79ai.net
-fly secrets set GATEWAY_CORS_ORIGIN=https://app.yourdomain.com
+fly secrets set GATEWAY_CORS_ORIGIN=https://your-frontend.example.com
 fly deploy
 fly certs add api.yourdomain.com
 ```

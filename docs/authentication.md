@@ -1,12 +1,17 @@
+---
+title: Authentication
+description: User tokens, Bearer auth, admin keys, and session checks
+---
+
 # Authentication
 
 ## User token (Mode B & C)
 
-End-user đăng nhập Gommo → nhận **`access_token`**. Dùng cho `/gateway/*` và proxy.
+End users log in to Gommo and receive an **`access_token`**. Use it for `/gateway/*` and proxy routes.
 
-**Domain:** gateway đọc `GOMMO_API_DOMAIN` từ `.env` (default `79ai.net`). Mode B **không bắt buộc** gửi `domain` từ client. Mode C (proxy form) cần field `domain` trong body — dùng cùng giá trị env.
+**Domain:** the gateway reads `GOMMO_API_DOMAIN` from `.env` (default `79ai.net`). Mode B does **not** require the client to send `domain`. Mode C (proxy form) needs `domain` in the body — use the same value as server env.
 
-### Login qua proxy (Mode C)
+### Login via proxy (Mode C)
 
 Gateway mount: `POST /api/apps/go-mmo/auth/login` → `https://api.gommo.net/api/apps/go-mmo/auth/login`
 
@@ -30,7 +35,7 @@ Invoke-RestMethod -Method POST `
 
 :::
 
-Response chứa `access_token` — lưu làm `$TOKEN`.
+Response contains `access_token` — store as `$TOKEN`.
 
 ### Login direct (Mode A)
 
@@ -42,13 +47,13 @@ curl.exe -X POST "https://api.gommo.net/api/apps/go-mmo/auth/login" \
 
 ## Gateway REST auth (Mode B)
 
-Header bắt buộc:
+Required header:
 
 ```
 Authorization: Bearer {access_token}
 ```
 
-`domain` **tùy chọn** — gateway dùng `GOMMO_API_DOMAIN` nếu bỏ qua.
+`domain` is **optional** — the gateway uses `GOMMO_API_DOMAIN` when omitted.
 
 ```powershell
 $headers = @{
@@ -65,19 +70,19 @@ $headers = @{
 ## Platform / chat / audio (form)
 
 - Form field: `access_token={token}`
-- Form field: `domain` — khớp `GOMMO_API_DOMAIN` khi qua proxy
+- Form field: `domain` — must match `GOMMO_API_DOMAIN` when using proxy
 
 ## Admin / merchant (server-only)
 
-Route `/admin/*` **không** dùng Bearer user.
+`/admin/*` routes do **not** use the user Bearer token.
 
-| Header | Env server |
+| Header | Server env |
 |--------|------------|
 | `x-admin-key: {ADMIN_API_KEY}` | `ADMIN_API_KEY` |
 
 → [Admin reference](./reference/admin.md)
 
-## Kiểm tra session
+## Check session
 
 ::: code-group
 

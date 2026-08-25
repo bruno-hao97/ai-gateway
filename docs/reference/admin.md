@@ -1,8 +1,13 @@
+---
+title: Admin (server-only)
+description: Merchant balance, send credits, register users
+---
+
 # Admin (server-only)
 
 ::: danger
-Routes `/admin/*` dùng **`x-admin-key`**, không dùng Bearer user token.
-**`GOMMO_ACCESS_TOKEN`** (merchant) chỉ nằm trong `.env` server.
+`/admin/*` routes use **`x-admin-key`**, not the user Bearer token.
+**`GOMMO_ACCESS_TOKEN`** (merchant) lives in server `.env` only.
 :::
 
 | Operation | Gommo upstream | AI Gateway |
@@ -11,17 +16,17 @@ Routes `/admin/*` dùng **`x-admin-key`**, không dùng Bearer user token.
 | Send credits | `POST .../users/sendBalances` | `POST /admin/credits/send` |
 | Register user | `POST .../auth/register` | `POST /admin/users/register` |
 
-## Env server
+## Server env
 
-| Variable | Mục đích |
-|----------|----------|
+| Variable | Purpose |
+|----------|---------|
 | `GOMMO_ACCESS_TOKEN` | Merchant token |
-| `GOMMO_API_DOMAIN` | Domain merchant (default `79ai.net`) |
-| `GOMMO_MANAGER_ID` | `manager_id` khi register |
-| `TOPUP_MERCHANT_BUFFER_CREDITS` | Buffer trước send (default 300000) |
-| `ADMIN_API_KEY` | Bảo vệ `/admin/*` |
+| `GOMMO_API_DOMAIN` | Merchant domain (default `79ai.net`) |
+| `GOMMO_MANAGER_ID` | `manager_id` for register |
+| `TOPUP_MERCHANT_BUFFER_CREDITS` | Buffer before send (default 300000) |
+| `ADMIN_API_KEY` | Protects `/admin/*` |
 
-Rule Gommo: sau `sendBalances`, merchant phải còn **> 500.000** credits.
+Gommo rule: after `sendBalances`, merchant must retain **> 500,000** credits.
 
 ---
 
@@ -71,7 +76,7 @@ Invoke-RestMethod -Method POST -Uri "http://localhost:3001/admin/credits/send" `
 
 :::
 
-Quyền `sendBalances` do Gommo cấp cho **merchant account** domain.
+`sendBalances` permission is granted by Gommo to the **merchant account** domain.
 
 ---
 

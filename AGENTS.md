@@ -1,9 +1,15 @@
 # AGENTS.md — ai-gateway
 
 ## Stack
-- BE: Express TypeScript — AI gateway proxy + REST wrap
+- BE: Express TypeScript — AI gateway proxy + REST wrap (OpenRouter-style API platform)
 - Upstream: Gommo (`v2.api.gommo.net` + `api.gommo.net`)
 - Spec: `doc/GOMMO-GATEWAY.md` — đọc trước khi thêm endpoint
+- Dev UI: `/portal` (docs-portal), developer docs VitePress `:5173`
+
+## Dev
+- `npm run dev` — API :3001 (+ `/portal/` khi dev)
+- `npm run docs:dev` — VitePress :5173
+- `GATEWAY_CORS_ORIGIN` — chỉ khi browser client khác origin (optional cho API-only)
 
 ## Proxy (implement trước)
 Mount `/v2`, `/ai`, `/api/v2`, `/api/apps/go-mmo` — chi tiết §2 trong spec.

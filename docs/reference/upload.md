@@ -1,3 +1,8 @@
+---
+title: Upload
+description: Image and video upload endpoints
+---
+
 # Upload
 
 | Operation | Gommo (Direct) | Gateway REST | Gateway proxy |
@@ -5,14 +10,14 @@
 | Upload image | `POST https://v2.api.gommo.net/ai/upload/image` | `POST /gateway/upload/image` | `POST /v2/ai/upload/image` |
 | Upload video | `POST https://v2.api.gommo.net/ai/upload/video` | `POST /gateway/upload/video` | `POST /v2/ai/upload/video` |
 
-Auth REST: `Authorization: Bearer {token}`. Domain REST: tùy chọn (multipart field `domain` nếu cần override).
+REST auth: `Authorization: Bearer {token}`. Domain REST: optional (multipart field `domain` to override).
 
 Multipart fields:
 
 | Type | Field |
 |------|-------|
 | Image | `file` (+ optional `fileName`) |
-| Video | `video_file` hoặc `file` |
+| Video | `video_file` or `file` |
 
 ---
 

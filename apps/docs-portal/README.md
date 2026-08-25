@@ -28,5 +28,5 @@ Docs deploy riêng: `npm run docs:build` → static host.
 Nếu không chạy Express, serve folder này riêng:
 
 ```bash
-npm run portal:dev   # http://localhost:5174 — cần CORS trên API
+npm run portal:dev   # http://localhost:5180 — cần CORS trên API nếu gọi :3001
 ```

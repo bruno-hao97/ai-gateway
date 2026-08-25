@@ -1,8 +1,23 @@
+---
+title: Quickstart
+description: Login, list models, create one image job
+---
+
 # Quickstart
 
-Login → lấy models → tạo **1 image job** (có `ratio` từ catalog).
+Login → list models → create **one image job** (with `ratio` from catalog).
 
-Gateway chạy tại `http://localhost:3001`. Domain Gommo lấy từ **`GOMMO_API_DOMAIN`** (`.env`, default `79ai.net`).
+## Prerequisites
+
+| Item | Value |
+|------|--------|
+| Gateway running | `npm run dev` → `http://localhost:3001` |
+| Gommo account | email + password + **registration domain** |
+| Server env | `GOMMO_API_DOMAIN` in `.env` (default `79ai.net`) |
+
+::: tip No CORS for playground
+Try the same flow in browser: [Portal playground](http://localhost:3001/portal/playground.html)
+:::
 
 ## 1. Login
 
@@ -26,7 +41,7 @@ $env:TOKEN = $login.access_token
 
 :::
 
-## 2. Lấy models (không đoán ratio)
+## 2. List models (never guess ratio)
 
 ::: code-group
 
@@ -50,9 +65,13 @@ Write-Host "model=$slug ratio=$ratio"
 
 :::
 
-Lưu `$slug` và `$ratio` — **chỉ dùng giá trị có trong response**.
+Save `$slug` and `$ratio` — **use only values from the response**.
 
-## 3. Tạo image job (wait = poll tới xong)
+::: warning Never guess ratio
+See [Models](./models.md) and [Principles](./principles.md).
+:::
+
+## 3. Create image job (wait = poll until done)
 
 ::: code-group
 
@@ -82,7 +101,7 @@ $job.data.resultUrl
 
 :::
 
-## 4. Cùng flow qua proxy (Mode C)
+## 4. Same flow via proxy (Mode C)
 
 ```powershell
 $domain = if ($env:GOMMO_API_DOMAIN) { $env:GOMMO_API_DOMAIN } else { '79ai.net' }
@@ -106,7 +125,9 @@ Invoke-RestMethod http://localhost:3001/health
 - `scripts/test-gateway.ps1`
 - `scripts/test-admin.ps1`
 
-## Tiếp theo
+## Next
 
+- [Principles](./principles.md)
+- [Models](./models.md)
 - [Authentication](./authentication.md)
 - [Media reference](./reference/media.md)

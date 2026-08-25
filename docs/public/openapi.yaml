@@ -1,0 +1,426 @@
+openapi: 3.0.3
+info:
+  title: AI Gateway API
+  description: REST gateway over Gommo — Mode B endpoints, billing, admin, health
+  version: 0.1.0
+  contact:
+    url: https://github.com/bruno-hao97/ai-gateway
+
+servers:
+  - url: http://localhost:3001
+    description: Local dev
+  - url: https://api.yourdomain.com
+    description: Production
+
+tags:
+  - name: Health
+  - name: Gateway
+  - name: Billing
+  - name: Admin
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /gateway/models:
+    get:
+      tags: [Gateway]
+      summary: List models by type
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            example: image
+      responses:
+        '200':
+          description: Model catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  /gateway/jobs/{type}:
+    post:
+      tags: [Gateway]
+      summary: Create media job
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            example: image
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateJobRequest'
+      responses:
+        '200':
+          description: Job created or completed (wait=true)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  /gateway/jobs/{id}:
+    get:
+      tags: [Gateway]
+      summary: Poll job status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: media
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [image, video, music]
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  /gateway/upload/image:
+    post:
+      tags: [Gateway]
+      summary: Upload image
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Upload URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  /gateway/upload/video:
+    post:
+      tags: [Gateway]
+      summary: Upload video
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                video_file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Upload URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  /gateway/chat:
+    post:
+      tags: [Gateway]
+      summary: Chat agent or stream
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: JSON or SSE stream
+
+  /gateway/audio/voices:
+    post:
+      tags: [Gateway]
+      summary: Search voices
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                server:
+                  type: string
+                page:
+                  type: integer
+      responses:
+        '200':
+          description: Voice list
+
+  /gateway/audio/tts:
+    post:
+      tags: [Gateway]
+      summary: Text-to-speech
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text, voice_id, server]
+              properties:
+                text:
+                  type: string
+                voice_id:
+                  type: string
+                server:
+                  type: string
+                model:
+                  type: string
+      responses:
+        '200':
+          description: TTS file URL
+
+  /gateway/audio/lists:
+    get:
+      tags: [Gateway]
+      summary: Audio history
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Audio lists
+
+  /billing/status:
+    get:
+      tags: [Billing]
+      summary: PayOS and merchant config status
+      responses:
+        '200':
+          description: Status flags
+
+  /billing/packages:
+    get:
+      tags: [Billing]
+      summary: Credit packages
+      responses:
+        '200':
+          description: Package list
+
+  /billing/topup/create:
+    post:
+      tags: [Billing]
+      summary: Create PayOS topup order
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, packageId]
+              properties:
+                username:
+                  type: string
+                packageId:
+                  type: string
+      responses:
+        '200':
+          description: Checkout URL and orderCode
+
+  /billing/topup/orders/{orderCode}:
+    get:
+      tags: [Billing]
+      summary: Get order status
+      parameters:
+        - name: orderCode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order details
+
+  /admin/merchant/balance:
+    get:
+      tags: [Admin]
+      summary: Merchant balance
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Balance
+
+  /admin/credits/send:
+    post:
+      tags: [Admin]
+      summary: Send credits to user
+      security:
+        - adminKey: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, value]
+              properties:
+                username:
+                  type: string
+                value:
+                  type: number
+                message:
+                  type: string
+                type:
+                  type: string
+      responses:
+        '200':
+          description: Credits sent
+
+  /admin/users/register:
+    post:
+      tags: [Admin]
+      summary: Register Gommo user (merchant)
+      security:
+        - adminKey: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+                phone:
+                  type: string
+      responses:
+        '200':
+          description: User registered
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Gommo access_token
+    adminKey:
+      type: apiKey
+      in: header
+      name: x-admin-key
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            ok:
+              type: boolean
+            merchantConfigured:
+              type: boolean
+            adminConfigured:
+              type: boolean
+
+    SuccessEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+        message:
+          type: string
+        code:
+          type: string
+
+    ErrorEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+        code:
+          type: string
+          enum:
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - VALIDATION_ERROR
+            - NOT_CONFIGURED
+            - UPSTREAM_ERROR
+            - RATE_LIMITED
+            - INSUFFICIENT_CREDITS
+            - INTERNAL_ERROR
+
+    CreateJobRequest:
+      type: object
+      required: [modelSlug, fields]
+      properties:
+        modelSlug:
+          type: string
+        wait:
+          type: boolean
+          default: false
+        fields:
+          type: object
+          additionalProperties: true
+
+    ChatRequest:
+      type: object
+      required: [action, messages]
+      properties:
+        action:
+          type: string
+          enum: [chat, stream, set_model]
+        query:
+          type: string
+        sessionId:
+          type: string
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+              text:
+                type: string

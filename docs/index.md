@@ -1,61 +1,50 @@
-# AI Gateway
+---
+layout: home
 
-**Powered by [Gommo](https://gommo.net)**
+title: AI Gateway
+titleTemplate: false
 
-AI Gateway là lớp trung gian Express TypeScript: **proxy transparent** tới upstream Gommo + **REST wrap** cho client không muốn gọi URL upstream trực tiếp.
+hero:
+  name: AI Gateway
+  text: The unified interface for Gommo AI APIs
+  tagline: Express TypeScript gateway — transparent proxy + REST wrap (OpenRouter-style API platform)
+  actions:
+    - theme: brand
+      text: Quickstart
+      link: /quickstart
+    - theme: alt
+      text: API Reference
+      link: /reference/media
+    - theme: alt
+      text: Cookbook
+      link: /cookbook/
+    - theme: alt
+      text: Client SDKs
+      link: /sdk/
+    - theme: alt
+      text: OpenAPI
+      link: /reference/openapi
+    - theme: alt
+      text: Playground
+      link: http://localhost:3001/portal/playground.html
+      target: _blank
 
-Domain Gommo được cấu hình ngầm qua env **`GOMMO_API_DOMAIN`** trên server (default `79ai.net`). Client REST **không cần** gửi `domain` nếu dùng Mode B.
+features:
+  - title: One base URL
+    details: Hide v2.api.gommo.net + api.gommo.net behind a single deployable API.
+  - title: REST + proxy
+    details: Mode B JSON with wait:true polling, or Mode C drop-in Gommo paths.
+  - title: Server-side secrets
+    details: Merchant token and PayOS keys stay on the gateway — never in the browser.
+  - title: Bilingual docs
+    details: English and Tiếng Việt — Overview, routing, features, and API reference.
+---
 
-## Upstream bases
+## Hard rules (Gommo)
 
-| Host | Mục đích |
-|------|----------|
-| `https://v2.api.gommo.net` | Jobs media V2 (image, video, …) |
-| `https://api.gommo.net` | Auth, chat, audio, feed |
+1. **Never guess** `ratio`, `mode`, `resolution`, or `duration` — read from the models list.
+2. Jobs are **async** — poll 3.5s, max 80 attempts; no webhook.
+3. V2 jobs use `Authorization: Bearer {access_token}`.
+4. Merchant token **never** in the browser.
 
-## Ba cách tích hợp
-
-| Mode | Ai dùng | Mô tả ngắn |
-|------|---------|------------|
-| **[A — Direct Gommo](./integration-modes.md#mode-a-direct-gommo)** | Backend tin cậy, mobile native | Gọi thẳng URL upstream |
-| **[B — Gateway REST](./integration-modes.md#mode-b-gateway-rest)** | App/SPA, script | JSON `/gateway/*`, Bearer user token |
-| **[C — Gateway proxy](./integration-modes.md#mode-c-gateway-proxy)** | FE drop-in | Pass-through `/v2`, `/ai`, `/api/v2`, `/api/apps/go-mmo` |
-
-```
-Client ──► AI Gateway (localhost:3001)
-              ├── /gateway/*     REST wrap (Mode B) — domain từ env
-              ├── /v2/*          ──► v2.api.gommo.net (Mode C)
-              ├── /ai/*          ──► api.gommo.net
-              ├── /api/v2/*      ──► api.gommo.net
-              └── /api/apps/go-mmo/*  ──► api.gommo.net
-```
-
-## Quy tắc Gommo (bắt buộc)
-
-1. **Không đoán** `ratio` / `mode` / `resolution` / `duration` — lấy từ **models list**.
-2. Job async: poll **3.5s**, tối đa **80 lần** (~5 phút); Gommo không webhook.
-3. Mọi call upstream cần `domain` — **Mode B** gateway tự điền từ `GOMMO_API_DOMAIN`.
-4. V2 jobs: header `Authorization: Bearer {access_token}`; platform API thêm form `access_token`.
-5. **`GOMMO_ACCESS_TOKEN`** (merchant) chỉ server — route `/admin/*`, không expose browser.
-
-## Bắt đầu nhanh
-
-→ [Quickstart: login → 1 image job](./quickstart.md)
-
-## Chạy gateway local
-
-```bash
-cp .env.example .env   # GOMMO_API_DOMAIN=79ai.net
-npm install
-npm run dev            # http://localhost:3001
-npm run docs:dev       # preview docs (port 5173)
-```
-
-## Production & deploy
-
-- **API:** `api.yourdomain.com` — Docker / Railway / Fly ([README deploy](../README.md#deploy))
-- **Docs:** `docs.yourdomain.com` — `npm run docs:build` → Vercel hoặc GitHub Pages
-- **Portal (dev):** `http://localhost:3001/portal/` — landing + playground (gom API)
-- **Health:** `GET /health` → `{ ok, merchantConfigured, adminConfigured }`
-- **CORS:** `GATEWAY_CORS_ORIGIN` (comma-separated origins)
-- **Errors:** `{ success: false, message, code? }`
+→ [Principles](./principles.md) · [Models & routing](./routing/) · [Deploy](./deploy/)

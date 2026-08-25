@@ -6,3 +6,5 @@ data/
 .DS_Store
 docs/.vitepress/cache
 docs/.vitepress/dist
+apps/web/node_modules
+apps/web/dist

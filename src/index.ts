@@ -14,6 +14,14 @@ import { sendError } from './utils/errors.js';
 
 const app = express();
 
+// Portal static — mount TRƯỚC CORS (ES module scripts send Origin; must not 403 same-origin).
+if (isPortalEnabled()) {
+  app.use('/portal', portalRoutes);
+  app.get('/', (_req, res) => {
+    res.redirect('/portal/');
+  });
+}
+
 const corsMiddleware = gatewayCors();
 if (corsMiddleware) {
   app.use(corsMiddleware);
@@ -47,13 +55,6 @@ app.use('/gateway', gatewayRateLimit, gatewayMount);
 app.use('/admin', adminRateLimit, adminRoutes);
 
 app.use('/billing', billingRateLimit, billingRoutes);
-
-if (isPortalEnabled()) {
-  app.use('/portal', portalRoutes);
-  app.get('/', (_req, res) => {
-    res.redirect('/portal/');
-  });
-}
 
 app.use((_req, res) => {
   sendError(res, 404, 'Not found');

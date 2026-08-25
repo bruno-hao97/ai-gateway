@@ -1,8 +1,13 @@
+---
+title: Media & jobs
+description: List models, create jobs, poll — REST, proxy, and direct
+---
+
 # Media & jobs
 
-Poll interval gateway: **3500ms**, max **80** attempts khi `wait: true`.
+Gateway poll interval: **3500ms**, max **80** attempts when `wait: true`.
 
-Mode B: **`domain` tùy chọn** — gateway dùng `GOMMO_API_DOMAIN`. Mode A/C: gửi `domain` trong form (cùng giá trị env).
+Mode B: **`domain` optional** — gateway uses `GOMMO_API_DOMAIN`. Mode A/C: send `domain` in form (same value as env).
 
 ## Endpoint map
 
@@ -67,8 +72,8 @@ Invoke-RestMethod -Method POST `
 }
 ```
 
-- `wait: true` → gateway poll tới done/timeout (~5 phút).
-- `fields.ratio` (và `mode`, `resolution`, `duration`) **phải** khớp catalog models.
+- `wait: true` → gateway polls until done or timeout (~5 min).
+- `fields.ratio` (and `mode`, `resolution`, `duration`) **must** match the model catalog.
 
 ::: code-group
 
@@ -131,7 +136,7 @@ curl.exe -X POST "https://v2.api.gommo.net/ai/jobs/JOB_ID?media=image" ^
 
 :::
 
-Kết quả: `data.result_url` hoặc `raw.imageInfo.result_url` khi success.
+On success: `data.resultUrl` or `raw.imageInfo.result_url`.
 
 ---
 

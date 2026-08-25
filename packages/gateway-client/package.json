@@ -1,0 +1,57 @@
+{
+  "name": "@ai-gateway/client",
+  "version": "0.1.0",
+  "description": "TypeScript client for AI Gateway REST API (/gateway, /billing)",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "node --import tsx --test test/poll.test.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai-gateway",
+    "gommo",
+    "api-client"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bruno-hao97/ai-gateway.git",
+    "directory": "packages/gateway-client"
+  },
+  "bugs": {
+    "url": "https://github.com/bruno-hao97/ai-gateway/issues"
+  },
+  "homepage": "https://github.com/bruno-hao97/ai-gateway#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,3 +1,8 @@
+---
+title: Audio
+description: Voice search, TTS, and audio history
+---
+
 # Audio
 
 Upstream: `POST https://api.gommo.net/ai/audio`.
@@ -10,7 +15,7 @@ Upstream: `POST https://api.gommo.net/ai/audio`.
 
 **Voice servers:** `elevenlabs_cheap` | `minimaxai_cheap` | `omnivoice_local`
 
-Auth REST: `Authorization: Bearer {user_token}`. Domain: tùy chọn (gateway env).
+REST auth: `Authorization: Bearer {user_token}`. Domain: optional (gateway env).
 
 ---
 
@@ -45,7 +50,7 @@ Invoke-RestMethod -Method POST -Uri "http://localhost:3001/ai/audio" `
 
 :::
 
-Chọn `voice_id` từ `data.voices[]`.
+Pick `voice_id` from `data.voices[]`.
 
 ---
 
@@ -53,7 +58,7 @@ Chọn `voice_id` từ `data.voices[]`.
 
 ```json
 {
-  "text": "Xin chào",
+  "text": "Hello",
   "voice_id": "VOICE_ID_FROM_SEARCH",
   "server": "elevenlabs_cheap",
   "model": "eleven_multilingual_v2"
@@ -65,12 +70,12 @@ Chọn `voice_id` từ `data.voices[]`.
 ```bash [curl — REST]
 curl.exe -X POST "http://localhost:3001/gateway/audio/tts" ^
   -H "Authorization: Bearer %TOKEN%" -H "Content-Type: application/json" ^
-  -d "{\"text\":\"Xin chao\",\"voice_id\":\"VOICE_ID\",\"server\":\"elevenlabs_cheap\",\"model\":\"eleven_multilingual_v2\"}"
+  -d "{\"text\":\"Hello\",\"voice_id\":\"VOICE_ID\",\"server\":\"elevenlabs_cheap\",\"model\":\"eleven_multilingual_v2\"}"
 ```
 
 ```powershell [PowerShell — REST]
 $body = @{
-  text = 'Xin chao'
+  text = 'Hello'
   voice_id = $voiceId
   server = 'elevenlabs_cheap'
   model = 'eleven_multilingual_v2'
