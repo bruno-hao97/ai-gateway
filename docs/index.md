@@ -13,6 +13,9 @@ hero:
       text: Quickstart
       link: /quickstart
     - theme: alt
+      text: Models
+      link: /models/
+    - theme: alt
       text: API Reference
       link: /reference/media
     - theme: alt

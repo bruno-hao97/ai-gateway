@@ -81,7 +81,7 @@ Form cần `domain`, `project_id=default`.
 
 ## API đầy đủ
 
-→ [Media reference](../reference/media.md) · [Models](../models.md)
+→ [Media reference](../reference/media.md) · [Models](../models/)
 
 ## Tiếp theo
 

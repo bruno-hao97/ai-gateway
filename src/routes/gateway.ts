@@ -2,8 +2,13 @@ import { Router, type Request, type Response } from 'express';
 import {
   clientFromReq,
   gatewayAuth,
+  gatewayAuthOptional,
+  readDomain,
+  readOptionalBearerToken,
   sendGommoError,
 } from '../middleware/gatewayAuth.js';
+import { fetchModelsCatalog } from '../services/gommoClient.js';
+import { enrichModelsCatalogLanguage } from '../services/catalogLang.js';
 import { createJobAndPoll } from '../services/polling.js';
 import type { JobType, PollMedia } from '../types/gommo.js';
 import { sendError } from '../utils/errors.js';
@@ -25,22 +30,29 @@ const JOB_TYPES = new Set<JobType>([
 const POLL_MEDIA = new Set<PollMedia>(['image', 'video', 'music']);
 
 const router = Router();
-router.use(gatewayAuth);
 
-/** GET /gateway/models?type=image — domain optional (default GOMMO_API_DOMAIN) */
-router.get('/models', async (req, res) => {
+/** GET /gateway/models?type=image&lang=en — Bearer optional; lang=en merges EN descriptions from cache */
+router.get('/models', gatewayAuthOptional, async (req, res) => {
   try {
     const type = String(req.query.type || '') as JobType;
     if (!JOB_TYPES.has(type)) {
       sendError(res, 400, 'Query type không hợp lệ', 'VALIDATION_ERROR');
       return;
     }
-    const envelope = await clientFromReq(req).fetchModels(type);
+    const lang = String(req.query.lang || '').toLowerCase();
+    if (lang && lang !== 'en' && lang !== 'vi') {
+      sendError(res, 400, 'Query lang chỉ hỗ trợ en hoặc vi', 'VALIDATION_ERROR');
+      return;
+    }
+    const envelope = await fetchModelsCatalog(type, readDomain(req), readOptionalBearerToken(req));
+    await enrichModelsCatalogLanguage(envelope, lang === 'en' ? 'en' : undefined);
     res.json(envelope);
   } catch (err) {
     sendGommoError(res, err);
   }
 });
+
+router.use(gatewayAuth);
 
 /** POST /gateway/jobs/:type — body: { modelSlug, fields, wait?: boolean, domain?: string } */
 router.post('/jobs/:type', async (req, res) => {

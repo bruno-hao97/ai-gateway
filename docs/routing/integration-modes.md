@@ -150,4 +150,4 @@ All three modes:
 
 ## Next
 
-→ [Choosing a mode](./choosing-a-mode.md) · [Endpoint map](./endpoint-map.md) · [Models overview](../models.md)
+→ [Choosing a mode](./choosing-a-mode.md) · [Endpoint map](./endpoint-map.md) · [Models overview](../models/)

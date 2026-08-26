@@ -16,7 +16,7 @@ GET /gateway/models?type=image
 Authorization: Bearer {token}
 ```
 
-→ [Models](../models.md) · [Media jobs](../features/media-jobs.md)
+→ [Models](../models/) · [Media jobs](../features/media-jobs.md)
 
 ## 2. Chọn chiến lược poll rõ ràng
 

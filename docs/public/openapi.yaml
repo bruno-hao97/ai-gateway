@@ -34,9 +34,11 @@ paths:
   /gateway/models:
     get:
       tags: [Gateway]
-      summary: List models by type
-      security:
-        - bearerAuth: []
+      summary: List models by type (public catalog — Bearer optional)
+      description: |
+        OpenRouter-style public browse. No Authorization required when upstream allows it;
+        gateway may fall back to server merchant token. Create jobs still require Bearer.
+      security: []
       parameters:
         - name: type
           in: query
@@ -44,6 +46,18 @@ paths:
           schema:
             type: string
             example: image
+        - name: lang
+          in: query
+          required: false
+          description: |
+            `en` merges English descriptions from `cache/catalog-descriptions.en.json`.
+            Warm cache offline with `npm run catalog:translate` (Gommo chat + `GOMMO_ACCESS_TOKEN`).
+            Live translate on cache miss only when `CATALOG_TRANSLATE_ON_REQUEST=true`.
+            Omit or `vi` returns upstream Vietnamese text only.
+          schema:
+            type: string
+            enum: [en, vi]
+            example: en
       responses:
         '200':
           description: Model catalog

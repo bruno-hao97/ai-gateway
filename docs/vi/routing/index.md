@@ -44,7 +44,7 @@ Mọi tích hợp media đều theo thứ tự:
 3. **Create job** — không đoán tham số
 4. **Poll** — gateway (`wait: true`) hoặc client (`GET /gateway/jobs/:id`)
 
-Chi tiết catalog → [Models overview](../models.md).
+Chi tiết catalog → [Models overview](../models/).
 
 ## Tách upstream
 
@@ -79,4 +79,4 @@ Bảng đầy đủ → [Endpoint map](./endpoint-map.md).
 
 ## Tiếp theo
 
-→ [Models](../models.md) · [Media reference](../reference/media.md) · [Quickstart](../quickstart.md)
+→ [Models](../models/) · [Media reference](../reference/media.md) · [Quickstart](../quickstart.md)

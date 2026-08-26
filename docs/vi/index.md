@@ -13,6 +13,9 @@ hero:
       text: Quickstart
       link: /vi/quickstart
     - theme: alt
+      text: Models
+      link: /vi/models/
+    - theme: alt
       text: API Reference
       link: /vi/reference/media
     - theme: alt

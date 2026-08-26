@@ -47,7 +47,7 @@ curl.exe -X POST "https://api.gommo.net/api/apps/go-mmo/auth/login" \
 
 ## Gateway REST auth (Mode B)
 
-Header bắt buộc:
+Header bắt buộc cho **jobs, upload, chat, audio** (không áp dụng list models public):
 
 ```
 Authorization: Bearer {access_token}

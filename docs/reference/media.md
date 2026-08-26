@@ -25,9 +25,19 @@ Mode B: **`domain` optional** — gateway uses `GOMMO_API_DOMAIN`. Mode A/C: sen
 
 ## List models
 
+::: tip Public catalog
+`GET /gateway/models` does **not** require Bearer — browse models like OpenRouter. Optional user token or server-side fallback may apply. **Create job / poll** still require auth.
+
+Add `?lang=en` for English descriptions from `cache/catalog-descriptions.en.json` (warm with `npm run catalog:translate` using `GOMMO_ACCESS_TOKEN`). Runtime does not call external APIs unless `CATALOG_TRANSLATE_ON_REQUEST=true`.
+:::
+
 ::: code-group
 
-```bash [curl — REST]
+```bash [curl — REST (no auth)]
+curl.exe "http://localhost:3001/gateway/models?type=image"
+```
+
+```bash [curl — REST (with token)]
 curl.exe "http://localhost:3001/gateway/models?type=image" ^
   -H "Authorization: Bearer %TOKEN%"
 ```

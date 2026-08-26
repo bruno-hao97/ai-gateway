@@ -18,7 +18,7 @@ Authorization: Bearer {token}
 
 Use values from **that model's** response arrays. Wrong values cause upstream rejection or poor output.
 
-→ [Models](../models.md) · [Media jobs](../features/media-jobs.md)
+→ [Models](../models/) · [Media jobs](../features/media-jobs.md)
 
 ## 2. Choose polling strategy explicitly
 

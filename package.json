@@ -16,6 +16,7 @@
     "docs:dev": "vitepress dev docs --port 5173",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
+    "catalog:translate": "tsx scripts/catalog-translate.ts",
     "portal:dev": "npx --yes serve apps/docs-portal -l 5180",
     "web:dev": "npm run dev --prefix apps/web",
     "web:build": "npm run build --prefix apps/web"

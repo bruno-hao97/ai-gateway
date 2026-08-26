@@ -40,7 +40,11 @@ export class GommoClient {
   }
 
   headers(extra: Record<string, string> = {}): Record<string, string> {
-    return { Authorization: `Bearer ${this.accessToken}`, ...extra };
+    const h: Record<string, string> = { ...extra };
+    if (this.accessToken) {
+      h.Authorization = `Bearer ${this.accessToken}`;
+    }
+    return h;
   }
 
   async parseResponse(res: Response): Promise<GommoEnvelope> {
@@ -249,6 +253,44 @@ export class GommoClient {
       ...(media === 'music' ? { project_id: this.projectId } : {}),
     });
   }
+}
+
+/** Public catalog — user token → no auth → merchant token (server-only fallback). */
+export async function fetchModelsCatalog(
+  type: JobType,
+  domain: string,
+  userAccessToken?: string | null,
+): Promise<GommoEnvelope> {
+  const candidates: (string | null)[] = [];
+  const user = userAccessToken?.trim();
+  if (user) candidates.push(user);
+  candidates.push(null);
+  const merchant = config.gommo.accessToken;
+  if (merchant && merchant !== user) candidates.push(merchant);
+
+  const seen = new Set<string>();
+  const tokens = candidates.filter((t) => {
+    const key = t ?? '__public__';
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  let lastError: GommoApiError | null = null;
+  for (const token of tokens) {
+    try {
+      const client = new GommoClient({ accessToken: token ?? '', domain });
+      return await client.fetchModels(type);
+    } catch (err) {
+      if (err instanceof GommoApiError && (err.status === 401 || err.status === 403)) {
+        lastError = err;
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw lastError ?? new GommoApiError('Could not fetch models catalog');
 }
 
 function sleep(ms: number): Promise<void> {

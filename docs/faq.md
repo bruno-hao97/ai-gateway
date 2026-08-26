@@ -64,7 +64,7 @@ Dev only: **http://localhost:3001/portal/** — same origin as API, no CORS setu
 <details>
 <summary>Why did my job fail with invalid ratio/mode?</summary>
 
-You guessed parameters. Always list models first and use values from the catalog. See [Models](./models.md).
+You guessed parameters. Always list models first and use values from the catalog. See [Models](./models/).
 
 </details>
 

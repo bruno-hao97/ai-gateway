@@ -117,7 +117,7 @@ Mode C returns Gommo native shape (`raw.imageInfo`, etc.).
 
 ## Full API
 
-→ [Media & jobs reference](../reference/media.md) · [Models overview](../models.md) · [Endpoint map](../routing/endpoint-map.md)
+→ [Media & jobs reference](../reference/media.md) · [Models overview](../models/) · [Endpoint map](../routing/endpoint-map.md)
 
 ## Next
 

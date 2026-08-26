@@ -12,7 +12,9 @@ function readBearerToken(req: Request): string | null {
   const header = req.headers.authorization;
   if (!header) return null;
   const match = /^Bearer\s+(.+)$/i.exec(header);
-  return match?.[1]?.trim() || null;
+  const token = match?.[1]?.trim() || null;
+  if (!token || token === 'undefined' || token === 'null') return null;
+  return token;
 }
 
 export function readDomain(req: Request): string {
@@ -33,6 +35,22 @@ export function gatewayAuth(req: Request, res: Response, next: NextFunction): vo
     domain: readDomain(req),
   };
   next();
+}
+
+/** Sets gatewayAuth when Bearer present; otherwise continues (public catalog). */
+export function gatewayAuthOptional(req: Request, _res: Response, next: NextFunction): void {
+  const accessToken = readBearerToken(req);
+  if (accessToken) {
+    (req as Request & { gatewayAuth?: GatewayAuth }).gatewayAuth = {
+      accessToken,
+      domain: readDomain(req),
+    };
+  }
+  next();
+}
+
+export function readOptionalBearerToken(req: Request): string | null {
+  return readBearerToken(req);
 }
 
 export function getGatewayAuth(req: Request): GatewayAuth {

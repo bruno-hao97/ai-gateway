@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Models — AI Gateway</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/models.css" />
+</head>
+<body class="mc-body">
+  <header class="mc-topbar">
+    <a class="logo" href="index.html">AI <span>Gateway</span></a>
+    <nav class="mc-topnav">
+      <a href="models.html" class="active" aria-current="page">Models</a>
+      <a href="playground.html">Playground</a>
+      <a href="#" id="docs-nav">Docs</a>
+    </nav>
+  </header>
+
+  <main class="mc-main">
+    <div class="mc-header">
+      <h1>Models</h1>
+      <p>Browse the live Gommo catalog — no login required. Use Playground to run jobs.</p>
+    </div>
+
+    <div class="mc-toolbar">
+      <input id="search" class="mc-search" type="search" placeholder="Search by name or slug…" autocomplete="off" />
+      <button type="button" class="btn btn-secondary" id="btnFetch">Refresh</button>
+      <a class="btn btn-primary" href="playground.html">Run in Playground</a>
+    </div>
+
+    <div class="mc-type-tabs" id="typeTabs" role="tablist" aria-label="Job type"></div>
+
+    <div class="mc-meta">
+      <span id="resultCount">Loading…</span>
+      <span id="lastFetch"></span>
+    </div>
+
+    <div class="mc-grid" id="modelGrid" aria-live="polite"></div>
+
+    <details class="mc-auth-details">
+      <summary>Login (optional — for Playground jobs)</summary>
+      <section class="mc-auth-bar" aria-label="Connection">
+        <label>
+          Gateway base URL
+          <input id="baseUrl" type="url" autocomplete="off" />
+        </label>
+        <label>
+          Bearer token
+          <input id="token" type="password" class="mono" placeholder="access_token from login" autocomplete="off" />
+        </label>
+        <label>
+          Login email
+          <input id="loginEmail" type="email" autocomplete="username" />
+        </label>
+        <label>
+          Password
+          <input id="loginPassword" type="password" autocomplete="current-password" />
+        </label>
+        <label>
+          Domain
+          <input id="loginDomain" type="text" value="79ai.net" />
+        </label>
+        <div class="mc-auth-actions">
+          <button type="button" class="btn btn-secondary" id="btnLogin">Login</button>
+        </div>
+        <p class="mc-status" id="authStatus">Token shared with Playground on this browser.</p>
+      </section>
+    </details>
+  </main>
+
+  <script type="module" src="js/models.js"></script>
+</body>
+</html>

@@ -25,9 +25,17 @@ Mode B: **`domain` tùy chọn** — gateway dùng `GOMMO_API_DOMAIN`. Mode A/C:
 
 ## List models
 
+::: tip Catalog public
+`GET /gateway/models` **không bắt buộc** Bearer — browse model kiểu OpenRouter. **Tạo job / poll** vẫn cần auth.
+:::
+
 ::: code-group
 
-```bash [curl — REST]
+```bash [curl — REST (không auth)]
+curl.exe "http://localhost:3001/gateway/models?type=image"
+```
+
+```bash [curl — REST (có token)]
 curl.exe "http://localhost:3001/gateway/models?type=image" ^
   -H "Authorization: Bearer %TOKEN%"
 ```

@@ -36,7 +36,7 @@ GET /gateway/models?type=image
 Authorization: Bearer {user_token}
 ```
 
-Đoán giá trị sẽ bị upstream từ chối hoặc chất lượng kém. Xem [Models](./models.md).
+Đoán giá trị sẽ bị upstream từ chối hoặc chất lượng kém. Xem [Models](./models/).
 
 ### 3. Job async, poll rõ ràng
 
@@ -86,4 +86,4 @@ Code thường gặp: `UNAUTHORIZED`, `UPSTREAM_ERROR`, `RATE_LIMITED`, `NOT_CON
 
 ## Tiếp theo
 
-→ [Models](./models.md) · [Quickstart](./quickstart.md) · [MCP & agents](./mcp.md)
+→ [Models](./models/) · [Quickstart](./quickstart.md) · [MCP & agents](./mcp.md)

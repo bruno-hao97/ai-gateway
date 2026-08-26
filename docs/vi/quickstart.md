@@ -68,7 +68,7 @@ Write-Host "model=$slug ratio=$ratio"
 Lưu `$slug` và `$ratio` — **chỉ dùng giá trị có trong response**.
 
 ::: warning Không đoán ratio
-Xem [Models](./models.md) và [Nguyên tắc](./principles.md).
+Xem [Models](./models/) và [Nguyên tắc](./principles.md).
 :::
 
 ## 3. Tạo image job (wait = poll tới xong)
@@ -128,6 +128,6 @@ Invoke-RestMethod http://localhost:3001/health
 ## Tiếp theo
 
 - [Nguyên tắc](./principles.md)
-- [Models](./models.md)
+- [Models](./models/)
 - [Authentication](./authentication.md)
 - [Media reference](./reference/media.md)

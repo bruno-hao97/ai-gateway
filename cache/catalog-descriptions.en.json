@@ -1,1 +1,262 @@
-{}
+{
+  "seedream_4_0": {
+    "hash": "5f85fff8ad74fbab",
+    "en": "Best For Edit",
+    "updatedAt": "2026-08-26T06:05:17.854Z"
+  },
+  "google_image_gen_banana": {
+    "hash": "3e91d592ec614ad8",
+    "en": "Best For Fast Edit",
+    "updatedAt": "2026-08-26T06:05:17.854Z"
+  },
+  "google_image_gen_4_5": {
+    "hash": "8a9a706fa6be3d9f",
+    "en": "Smart & Fast",
+    "updatedAt": "2026-08-26T06:05:17.854Z"
+  },
+  "google_image_gen_3_5": {
+    "hash": "94c123595ae0ef07",
+    "en": "Best Quality",
+    "updatedAt": "2026-08-26T06:05:17.854Z"
+  },
+  "kling_video_2_6": {
+    "hash": "519e54f4a37b26c9",
+    "en": "See the Sound, Hear the Visual",
+    "updatedAt": "2026-08-26T06:05:19.024Z"
+  },
+  "kling_video_2_5": {
+    "hash": "1f0dea719f68076a",
+    "en": "Max Creativity with Exceptional Value",
+    "updatedAt": "2026-08-26T06:05:19.024Z"
+  },
+  "imagegen_2_0": {
+    "hash": "7247c0f93a76d1a8",
+    "en": "GPT Image 2 is a next-generation AI image generation model with accurate prompt understanding, sharp images, high detail, and natural composition. Ideal for professional portraits, advertising, products, art, and creative content.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "grok_imagine": {
+    "hash": "75d0c2ebae3a5e7a",
+    "en": "A fast, realistic image generation model from Grok AI with affordable pricing and rapid completion.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "google_image_gen_banana_2": {
+    "hash": "07443a97e383ae5d",
+    "en": "Nano 2 is Google's fast AI model for image generation and understanding, part of the Gemini Flash Image family. It delivers high speed and low cost, enabling image generation/editing from text descriptions or image content analysis.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "midjourney_8_0": {
+    "hash": "e70e872be4ee8c10",
+    "en": "[4 images per generation] MidJourney V8 is a new AI image generation version offering exceptional quality, sharp details, realistic lighting, improved prompt understanding, and diverse styles from artistic to real photography.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "google_image_gen_banana_2_cheap": {
+    "hash": "07443a97e383ae5d",
+    "en": "Nano 2 is Google's fast AI model for image generation and understanding, part of the Gemini Flash Image family. It delivers high speed and low cost, enabling image generation/editing from text descriptions or image content analysis.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "seedream_5_0": {
+    "hash": "558b2b93efdf17bb",
+    "en": "The latest image generation model from BytePlus (part of ByteDance), featuring real-time web connectivity for up-to-date, contextually accurate images. It offers major upgrades in complex prompt understanding, reference image consistency, global knowledge, and professional scene generation, making it suitable for enterprise-grade creative workflows.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "3.0-omni": {
+    "hash": "ab163686684bf842",
+    "en": "Advanced storytelling expression, native ultra-sharp 2K/4K output, and sequential image sequence generation.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "google_image_gen_banana_pro": {
+    "hash": "346a36c30bb86b9a",
+    "en": "Google Nano Banana Pro enables image editing and text-to-image generation with high-quality 1k, 2k, and 4k output. Supports Vietnamese fonts.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "generative_upscale_v2": {
+    "hash": "802e395a68eda357",
+    "en": "Generative Upscale - Fast, high-end upscaling with detail reconstruction, quality enhancement, versatile options, affordable pricing, and support for high-volume use.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "google_image_gen_banana_pro_cheap": {
+    "hash": "ff07d58bd69783d4",
+    "en": "Google Nano Banana Pro x Cheap, an optimized low-cost server suitable for backup use or applications with moderate availability requirements.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "google_image_gen_banana_pro_reason": {
+    "hash": "c855815ab99b5b39",
+    "en": "Google Nano Banana Pro x Reason enables image editing and text-to-image generation through an analytical reasoning layer that professionally restructures prompts. Supports 1k and 2k.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "seedream_4_5": {
+    "hash": "9811e5308c5d9562",
+    "en": "ByteDance's latest 2k and 4k image model.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "o1": {
+    "hash": "68cda99d8312575f",
+    "en": "Highly consistent performance with precise detailed editing and accurate style transformation.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "z_image": {
+    "hash": "a4b540b0de3201bb",
+    "en": "Fast image generation with Alibaba's latest quality.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "midjourney_7_0": {
+    "hash": "c740d824afddb19e",
+    "en": "[4 images per generation] MidJourney is a text-to-image AI model known for diverse artistic styles, stunning details, and the ability to transform ideas into vivid visuals.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "veo_omni_edit": {
+    "hash": "4384a29d1f18dd7d",
+    "en": "VEO Omni Edit video model specialized in video editing tasks up to 30s.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "minimax_h3": {
+    "hash": "094ef365b1dbb3af",
+    "en": "MiniMax H3 — MiniMax's next-generation AI video model, supporting Text-to-Video, Image-to-Video, and Reference-to-Video. Combines image, video, and audio references to create realistic motion while maintaining character and scene consistency. Supports videos up to 15 seconds, resolutions up to 2K, and native stereo audio.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "flux_3": {
+    "hash": "28abc4ae396a73cc",
+    "en": "FLUX 3 is the next step from Black Forest Labs, aiming to create a unified creative AI platform where images, video, and audio are generated from one model instead of separate systems.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "seedance_25_omni": {
+    "hash": "c3fa453eba3c768e",
+    "en": "A model specialized in generating video from multiple images, video, and audio. Unlimited creativity.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "seedance_20_mini": {
+    "hash": "c3fa453eba3c768e",
+    "en": "A model specialized in generating video from multiple images, video, and audio. Unlimited creativity.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "veo_omni": {
+    "hash": "b6daa76755a9fb21",
+    "en": "VEO Omni is a next-generation video generation model from google, supporting multimodal inputs of up to 15S.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "happy_horse_1": {
+    "hash": "a5fcb963f9fb56bd",
+    "en": "Happy Horse 1.0 is an AI model for generating video from a start frame and component images, enabling smooth motion, stable characters, and multiple visual elements in one scene. Ideal for short videos, product animation, and social content from existing assets.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "video_upscale_1_0": {
+    "hash": "3faf57441bf80600",
+    "en": "A specialized model for professional video Upscale, reconstructing details and enhancing quality with AI.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "kling_video_motion_3": {
+    "hash": "0cf60cb5205ffd23",
+    "en": "Kling 3.0 model specialized in motion replication and character replacement.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "kling_video_3_0_edit": {
+    "hash": "f7fd33d90ed0ceca",
+    "en": "Advanced Kling model specialized in video editing",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "seedance_20_pro_edit": {
+    "hash": "c3fa453eba3c768e",
+    "en": "Model specialized in creating videos from multiple images, videos, and audio. Unlimited creativity.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "seedance_20_pro": {
+    "hash": "3405e8f8c5c565f5",
+    "en": "Seedance 2.0 is a next-generation AI video tool that transforms text, images, and audio into smooth, high-quality videos with natural motion, sound, and storytelling—ideal for short videos, social media content, or creative trailers.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "kling_video_3_0": {
+    "hash": "47c593508f12de72",
+    "en": "All-in-one multimodal input, voice-controlled characters, and native audio output with storyboards.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "grok_video_heavy": {
+    "hash": "a1edbf7aea681a8f",
+    "en": "Fast, convenient, affordable, up to 15s–30 fps. Supports audio and multiple scenes.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "kling_video_o1_edit": {
+    "hash": "18ad95d7be367f2a",
+    "en": "Kling AI's advanced premium model for editing videos and changing characters, objects, backgrounds, and more.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "kling_video_motion": {
+    "hash": "47dabb2be952b4c5",
+    "en": "Kling 2.6 model specialized in motion replication and character replacement",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "kling_video_o1": {
+    "hash": "62a02daf8c47d386",
+    "en": "Unified video model with all-in-one multimodal guidance and exceptional consistency.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "hailuo_2_3": {
+    "hash": "3987d7faf7cca0d5",
+    "en": "Hailuo 2.3 is a premium AI video model for text-to-video and image-to-video, supporting high resolutions (768p/1080p) and optimized for realistic motion, dynamic cameras, and complex simulated physics—ideal for cinematic videos, ads, and quick social clips.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "omnihuman_1_5": {
+    "hash": "79d3532e6bff4a56",
+    "en": "Professional lipsync",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "wan_2_2": {
+    "hash": "b831b0342dabcc69",
+    "en": "Motion simulation and character replacement model for natural, lifelike animation.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "omnivoice_v1": {
+    "hash": "70d501684da0a1f0",
+    "en": "Multilingual TTS via OmniVoice GPU, with voice design, cloning, and TTS using reference audio.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "minimax_speech_2_8_hd": {
+    "hash": "4e956991edab7447",
+    "en": "Refined audio nuances with maximum timbre similarity.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "minimax_speech_2_8_turbo": {
+    "hash": "17e6032725bf145e",
+    "en": "Faster and more cost-efficient, with refined audio nuances.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "eleven_v3": {
+    "hash": "bcc90646547a917a",
+    "en": "Next-generation realism with near-human voice quality and highly detailed control over intonation, emotion, and speed. Supports multiple unique characters and voices, optimized for film, games, and advanced conversational applications.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "eleven_flash_v2_5": {
+    "hash": "3043e24df67f0145",
+    "en": "An upgrade from 2.0, delivering more natural speech, smoother emotional expression, and better pacing. Supports more languages and is suitable for high-quality videos, podcasts, and digital content with fast voice generation.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "minimax_speech_2_6_hd": {
+    "hash": "200bdff6716284d7",
+    "en": "Premium voice quality with rich emotion and detail, suitable for professional recording.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "minimax_speech_2_6_turbo": {
+    "hash": "6c2d05156775a011",
+    "en": "Fast speed, optimized for realtime processing and high-volume workloads, with good natural quality.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "autoai_speech_1": {
+    "hash": "2899cd612f41901d",
+    "en": "Fast speed, optimized for auto processing, Clone voice, change voice",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "suno-v5.5": {
+    "hash": "922331be8ef7804a",
+    "en": "Premium vocals, Custom Model, and My Taste",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "suno-v5.0": {
+    "hash": "b59110a4baa5d7b5",
+    "en": "Realistic vocals, superior sound quality, and improved control",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "suno-v4.5": {
+    "hash": "0bdb43846eed9763",
+    "en": "Stable version for high-quality music with clear melodies, solid harmonies, and natural vocals. Ideal for quick composition, demos, or basic commercial background music.",
+    "updatedAt": "2026-08-26T06:06:29.808Z"
+  }
+}

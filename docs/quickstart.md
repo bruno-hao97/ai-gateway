@@ -68,7 +68,7 @@ Write-Host "model=$slug ratio=$ratio"
 Save `$slug` and `$ratio` — **use only values from the response**.
 
 ::: warning Never guess ratio
-See [Models](./models.md) and [Principles](./principles.md).
+See [Models](./models/) and [Principles](./principles.md).
 :::
 
 ## 3. Create image job (wait = poll until done)
@@ -128,6 +128,6 @@ Invoke-RestMethod http://localhost:3001/health
 ## Next
 
 - [Principles](./principles.md)
-- [Models](./models.md)
+- [Models](./models/)
 - [Authentication](./authentication.md)
 - [Media reference](./reference/media.md)

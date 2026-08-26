@@ -20,6 +20,7 @@ RUN npm ci --omit=dev
 
 COPY --from=build /app/dist ./dist
 COPY apps/docs-portal ./apps/docs-portal
+COPY cache ./cache
 
 EXPOSE 3001
 

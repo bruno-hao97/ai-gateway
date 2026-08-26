@@ -17,7 +17,7 @@ Step-by-step recipes for **Mode B** (`/gateway/*`). Each page is one complete ta
 |------|--------|
 | Gateway | `npm run dev` → `http://localhost:3001` |
 | Token | Gommo user `access_token` — [Authentication](../authentication.md) |
-| Catalog | Never guess `ratio` / `mode` / `resolution` / `duration` — [Models](../models.md) |
+| Catalog | Never guess `ratio` / `mode` / `resolution` / `duration` — [Models](../models/) |
 
 ```powershell
 $env:TOKEN = "<access_token>"

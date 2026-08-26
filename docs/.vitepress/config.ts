@@ -1,12 +1,12 @@
 import { defineConfig } from 'vitepress';
 
-const playgroundLink = 'http://localhost:3001/portal/';
+const playgroundLink = 'http://localhost:3001/portal/playground.html';
 
 const overviewSidebarEn = [
   { text: 'Introduction', link: '/' },
   { text: 'Quickstart', link: '/quickstart' },
+  { text: 'Authentication', link: '/authentication' },
   { text: 'Principles', link: '/principles' },
-  { text: 'Models', link: '/models' },
   { text: 'MCP & agents', link: '/mcp' },
   { text: 'Billing & credits', link: '/guides/billing-credits' },
   { text: 'FAQ', link: '/faq' },
@@ -16,8 +16,8 @@ const overviewSidebarEn = [
 const overviewSidebarVi = [
   { text: 'Giới thiệu', link: '/vi/' },
   { text: 'Quickstart', link: '/vi/quickstart' },
+  { text: 'Authentication', link: '/vi/authentication' },
   { text: 'Nguyên tắc', link: '/vi/principles' },
-  { text: 'Models', link: '/vi/models' },
   { text: 'MCP & agents', link: '/vi/mcp' },
   { text: 'Billing & credits', link: '/vi/guides/billing-credits' },
   { text: 'FAQ', link: '/vi/faq' },
@@ -38,6 +38,34 @@ const routingSidebarVi = [
   { text: 'Integration modes', link: '/vi/routing/integration-modes' },
   { text: 'Endpoint map', link: '/vi/routing/endpoint-map' },
   { text: 'Choosing a mode', link: '/vi/routing/choosing-a-mode' },
+];
+
+const modelsSidebarEn = [
+  { text: 'Catalog', link: '/models/' },
+  { text: 'Compare', link: '/models/compare/' },
+  { text: 'Integration guide', link: '/models/guide' },
+  { text: 'Job types', link: '/models/job-types' },
+  { text: 'Parameters', link: '/models/parameters' },
+  { text: 'Playground', link: playgroundLink, target: '_blank' },
+];
+
+const modelsSidebarVi = [
+  { text: 'Catalog', link: '/vi/models/' },
+  { text: 'So sánh', link: '/vi/models/compare/' },
+  { text: 'Hướng dẫn tích hợp', link: '/vi/models/guide' },
+  { text: 'Job types', link: '/vi/models/job-types' },
+  { text: 'Parameters', link: '/vi/models/parameters' },
+  { text: 'Playground', link: playgroundLink, target: '_blank' },
+];
+
+const modelsSectionSidebarEn = [
+  { text: 'Models', items: modelsSidebarEn },
+  { text: 'Routing', items: routingSidebarEn },
+];
+
+const modelsSectionSidebarVi = [
+  { text: 'Models', items: modelsSidebarVi },
+  { text: 'Routing', items: routingSidebarVi },
 ];
 
 const featuresSidebarEn = [
@@ -76,10 +104,6 @@ const opsSidebarVi = [
   { text: 'Deploy & ops', link: '/vi/deploy/' },
 ];
 
-const guideSidebarEn = [
-  { text: 'Authentication', link: '/authentication' },
-];
-
 const referenceSidebarEn = [
   { text: 'OpenAPI', link: '/reference/openapi' },
   { text: 'Media & jobs', link: '/reference/media' },
@@ -88,10 +112,6 @@ const referenceSidebarEn = [
   { text: 'Audio', link: '/reference/audio' },
   { text: 'Billing (PayOS)', link: '/reference/billing' },
   { text: 'Admin (server-only)', link: '/reference/admin' },
-];
-
-const guideSidebarVi = [
-  { text: 'Authentication', link: '/vi/authentication' },
 ];
 
 const referenceSidebarVi = [
@@ -170,62 +190,57 @@ const sdkSidebarVi = [
   },
 ];
 
-const sidebarEn = [
+/** Default sidebar — excludes sections that have their own top nav tab. */
+const docsSidebarEn = [
   { text: 'Overview', items: overviewSidebarEn },
-  { text: 'Models & routing', items: routingSidebarEn },
   { text: 'Features', items: featuresSidebarEn },
-  { text: 'Guides', items: guideSidebarEn },
-  { text: 'API Reference', items: referenceSidebarEn },
   { text: 'Privacy & ops', items: opsSidebarEn },
   { text: 'Community', items: communitySidebarEn },
 ];
 
-const sidebarVi = [
+const docsSidebarVi = [
   { text: 'Overview', items: overviewSidebarVi },
-  { text: 'Models & routing', items: routingSidebarVi },
   { text: 'Features', items: featuresSidebarVi },
-  { text: 'Guides', items: guideSidebarVi },
-  { text: 'API Reference', items: referenceSidebarVi },
   { text: 'Privacy & ops', items: opsSidebarVi },
   { text: 'Community', items: communitySidebarVi },
 ];
 
 const navEn = [
   { text: 'Quickstart', link: '/quickstart' },
+  { text: 'Models', link: '/models/' },
+  { text: 'Compare', link: '/models/compare/' },
   { text: 'API Reference', link: '/reference/media' },
   { text: 'Cookbook', link: '/cookbook/' },
   { text: 'Client SDKs', link: '/sdk/' },
-  { text: 'OpenAPI', link: '/reference/openapi' },
   { text: 'Playground', link: playgroundLink, target: '_blank' },
 ];
 
 const navVi = [
   { text: 'Quickstart', link: '/vi/quickstart' },
+  { text: 'Models', link: '/vi/models/' },
+  { text: 'So sánh', link: '/vi/models/compare/' },
   { text: 'API Reference', link: '/vi/reference/media' },
   { text: 'Cookbook', link: '/vi/cookbook/' },
   { text: 'Client SDKs', link: '/vi/sdk/' },
-  { text: 'OpenAPI', link: '/vi/reference/openapi' },
   { text: 'Playground', link: playgroundLink, target: '_blank' },
 ];
 
 const pathSidebarEn = {
   '/cookbook/': [{ text: 'Cookbook', items: cookbookSidebarEn }],
   '/sdk/': [{ text: 'Client SDKs', items: sdkSidebarEn }],
-  '/reference/': [
-    { text: 'Guides', items: guideSidebarEn },
-    { text: 'API Reference', items: referenceSidebarEn },
-  ],
-  '/': sidebarEn,
+  '/reference/': [{ text: 'API Reference', items: referenceSidebarEn }],
+  '/models/': modelsSectionSidebarEn,
+  '/routing/': modelsSectionSidebarEn,
+  '/': docsSidebarEn,
 };
 
 const pathSidebarVi = {
   '/vi/cookbook/': [{ text: 'Cookbook', items: cookbookSidebarVi }],
   '/vi/sdk/': [{ text: 'Client SDKs', items: sdkSidebarVi }],
-  '/vi/reference/': [
-    { text: 'Guides', items: guideSidebarVi },
-    { text: 'API Reference', items: referenceSidebarVi },
-  ],
-  '/vi/': sidebarVi,
+  '/vi/reference/': [{ text: 'API Reference', items: referenceSidebarVi }],
+  '/vi/models/': modelsSectionSidebarVi,
+  '/vi/routing/': modelsSectionSidebarVi,
+  '/vi/': docsSidebarVi,
 };
 
 export default defineConfig({
@@ -235,6 +250,16 @@ export default defineConfig({
   appearance: 'dark',
   lastUpdated: true,
   ignoreDeadLinks: [/^https?:\/\/localhost/, /README/],
+  vite: {
+    server: {
+      proxy: {
+        '/gateway': {
+          target: 'http://localhost:3001',
+          changeOrigin: true,
+        },
+      },
+    },
+  },
   locales: {
     root: {
       label: 'English',

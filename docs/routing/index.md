@@ -44,7 +44,7 @@ Every media integration follows the same sequence — regardless of mode:
 3. **Create job** — never guess parameters
 4. **Poll** — gateway (`wait: true`) or client (`GET /gateway/jobs/:id`)
 
-See [Models overview](../models.md) for catalog details.
+See [Models overview](../models/) for catalog details.
 
 ## Upstream split
 
@@ -82,4 +82,4 @@ Full tables → [Endpoint map](./endpoint-map.md).
 
 ## Next
 
-→ [Models overview](../models.md) · [Media reference](../reference/media.md) · [Quickstart](../quickstart.md)
+→ [Models overview](../models/) · [Media reference](../reference/media.md) · [Quickstart](../quickstart.md)

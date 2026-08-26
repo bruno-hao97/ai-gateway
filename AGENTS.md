@@ -32,6 +32,11 @@ Raw body 50MB. Stream pipe khi URL có `/chat` hoặc `text/event-stream`.
 ## Env
 Xem `.env.example`. Không commit `.env` / `GOMMO_ACCESS_TOKEN`.
 
+## Catalog EN (`?lang=en`)
+- Cache file: `cache/catalog-descriptions.en.json` — docs + portal + `GET /gateway/models?lang=en`
+- Warm offline: `npm run catalog:translate` (dùng **Gommo chat** + `GOMMO_ACCESS_TOKEN`, không cần OpenRouter)
+- Runtime mặc định **chỉ đọc cache** (`CATALOG_TRANSLATE_ON_REQUEST` không set hoặc `false`)
+
 ## Không làm
 - Copy FE site-ai (studio, workflow)
 - Nhầm Cursor MCP `gommo_*` với HTTP gateway runtime

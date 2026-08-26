@@ -47,7 +47,7 @@ curl.exe -X POST "https://api.gommo.net/api/apps/go-mmo/auth/login" \
 
 ## Gateway REST auth (Mode B)
 
-Required header:
+Required header for **jobs, upload, chat, audio** (not for public model catalog):
 
 ```
 Authorization: Bearer {access_token}

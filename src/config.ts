@@ -46,6 +46,17 @@ export const config = {
     adminMax: Number(process.env.ADMIN_RATE_LIMIT_MAX) || 30,
     billingMax: Number(process.env.BILLING_RATE_LIMIT_MAX) || 60,
   },
+  catalog: {
+    descriptionCacheFile:
+      process.env.CATALOG_DESCRIPTION_CACHE_FILE ||
+      path.join(process.cwd(), 'cache', 'catalog-descriptions.en.json'),
+    translateApiKey: (process.env.OPENROUTER_API_KEY || process.env.CATALOG_TRANSLATE_API_KEY || '').trim(),
+    translateBaseUrl: (process.env.CATALOG_TRANSLATE_BASE_URL || 'https://openrouter.ai/api/v1').trim(),
+    translateModel: (process.env.CATALOG_TRANSLATE_MODEL || 'google/gemini-2.0-flash-001').trim(),
+    translateBatchSize: Number(process.env.CATALOG_TRANSLATE_BATCH_SIZE) || 25,
+    /** Live translate cache misses on GET /gateway/models?lang=en (default off — warm cache offline) */
+    translateOnRequest: process.env.CATALOG_TRANSLATE_ON_REQUEST === 'true',
+  },
 };
 
 export function isGommoMerchantConfigured(): boolean {

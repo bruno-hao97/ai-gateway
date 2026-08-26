@@ -36,7 +36,7 @@ GET /gateway/models?type=image
 Authorization: Bearer {user_token}
 ```
 
-Guessing values causes upstream rejection or silent quality issues. See [Models](./models.md).
+Guessing values causes upstream rejection or silent quality issues. See [Models](./models/).
 
 ### 3. Async jobs, explicit polling
 
@@ -86,4 +86,4 @@ Common codes: `UNAUTHORIZED`, `UPSTREAM_ERROR`, `RATE_LIMITED`, `NOT_CONFIGURED`
 
 ## Next
 
-→ [Models](./models.md) · [Quickstart](./quickstart.md) · [MCP & agents](./mcp.md)
+→ [Models](./models/) · [Quickstart](./quickstart.md) · [MCP & agents](./mcp.md)

@@ -64,7 +64,7 @@ Chỉ dev: **http://localhost:3001/portal/** — cùng origin API, không cần 
 <details>
 <summary>Job fail vì ratio/mode không hợp lệ?</summary>
 
-Bạn đoán tham số. Luôn list models trước và dùng giá trị từ catalog. Xem [Models](./models.md).
+Bạn đoán tham số. Luôn list models trước và dùng giá trị từ catalog. Xem [Models](./models/).
 
 </details>
 

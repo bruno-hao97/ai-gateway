@@ -27,5 +27,5 @@ const ratio = pickFirstRatio(first); // never hard-code ratio
 `type` matches gateway job types: `image`, `video`, `music`, `tts`, `image-upscale`, `remove-bg`, `video-upscale`, …
 
 ::: warning
-`ratio`, `mode`, `resolution`, `duration` must come from **this** model entry — see [Models guide](../../models.md).
+`ratio`, `mode`, `resolution`, `duration` must come from **this** model entry — see [Models guide](../../models/).
 :::

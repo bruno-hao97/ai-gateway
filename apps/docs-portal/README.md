@@ -8,6 +8,7 @@ Landing + API playground, served từ Express tại **`/portal`** (dev).
 # API + portal (1 port)
 npm run dev
 # → http://localhost:3001/portal/
+# → http://localhost:3001/portal/models.html
 # → http://localhost:3001/portal/playground.html
 
 # Chỉ khi viết/sửa markdown docs

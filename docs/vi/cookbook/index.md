@@ -17,7 +17,7 @@ Các công thức từng bước cho **Mode B** (`/gateway/*`). Mỗi trang là 
 |-----|---------|
 | Gateway | `npm run dev` → `http://localhost:3001` |
 | Token | Gommo user `access_token` — [Authentication](../authentication.md) |
-| Catalog | Không đoán `ratio` / `mode` / `resolution` / `duration` — [Models](../models.md) |
+| Catalog | Không đoán `ratio` / `mode` / `resolution` / `duration` — [Models](../models/) |
 
 ```powershell
 $env:TOKEN = "<access_token>"
