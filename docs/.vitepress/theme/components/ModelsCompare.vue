@@ -91,6 +91,12 @@ const compareRows = computed(() => {
   return buildCompareRows(slotA.value, slotB.value, isVi.value);
 });
 
+const compareSpecRows = computed(() =>
+  compareRows.value.filter((row) => row.key !== 'credits' && row.key !== 'slug'),
+);
+
+const showSlotPicker = computed(() => !(slotA.value && slotB.value));
+
 const presetCards = computed(() =>
   COMPARE_PRESETS.map((preset) => ({
     preset,
@@ -165,6 +171,20 @@ function clearSlot(target: 'a' | 'b') {
 }
 
 function onPresetClick(preset: ComparePreset) {
+  const picks = applyComparePreset(allModels.value, preset);
+  if (picks.length >= 2) {
+    slotA.value = picks[0];
+    slotB.value = picks[1];
+    syncUrl();
+    return;
+  }
+  if (picks.length === 1) {
+    slotA.value = picks[0];
+    slotB.value = null;
+    syncUrl();
+    openModal('b', preset);
+    return;
+  }
   openModal('a', preset);
 }
 
@@ -246,7 +266,7 @@ onMounted(() => {
       <p v-if="error" class="or-status or-status-err">{{ error }}</p>
       <p v-else-if="loading" class="or-status">{{ isVi ? 'Đang tải…' : 'Loading…' }}</p>
 
-      <div v-else class="or-compare-slots">
+      <div v-else-if="showSlotPicker" class="or-compare-slots">
         <div class="or-compare-slot">
           <button
             v-if="!slotA"
@@ -322,16 +342,25 @@ onMounted(() => {
                   rel="noopener"
                   class="or-compare-play-btn"
                 >
-                  {{ isVi ? 'Playground' : 'Playground' }}
+                  Playground
                 </a>
+                <button
+                  type="button"
+                  class="or-link or-compare-clear"
+                  :aria-label="isVi ? 'Xóa' : 'Clear'"
+                  @click="clearSlot(idx === 0 ? 'a' : 'b')"
+                >
+                  ×
+                </button>
               </div>
             </div>
           </article>
+          <span class="or-compare-vs" aria-hidden="true">vs</span>
         </div>
 
         <div class="or-compare-specs">
           <div
-            v-for="row in compareRows"
+            v-for="row in compareSpecRows"
             :key="row.key"
             class="or-compare-spec"
             :class="{ 'or-compare-spec--diff': row.diff }"

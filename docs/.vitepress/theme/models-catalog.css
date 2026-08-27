@@ -996,6 +996,25 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
   border-bottom: 1px solid var(--or-border);
+  position: relative;
+}
+
+.or-compare-vs {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--or-border);
+  border-radius: 999px;
+  background: var(--or-bg);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--or-text-dim);
+  pointer-events: none;
 }
 
 .or-compare-col-head {
@@ -1368,6 +1387,10 @@
   .or-compare-col-head + .or-compare-col-head {
     border-left: none;
     border-top: 1px solid var(--or-border);
+  }
+
+  .or-compare-vs {
+    display: none;
   }
 
   .or-compare-spec-val + .or-compare-spec-val {

@@ -1,0 +1,436 @@
+/* App dashboard — extends or-catalog layout tokens */
+
+.or-app.or-catalog {
+  --or-sidebar-w: 240px;
+}
+
+.VPDoc:has(.or-app) {
+  background: var(--vp-c-bg);
+}
+
+.or-app-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem 1rem;
+  border-bottom: 1px solid var(--or-border);
+  margin-bottom: 0.5rem;
+}
+
+.or-app-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  background: var(--or-accent);
+  color: var(--vp-c-bg, #000);
+  font-size: 1rem;
+}
+
+.or-app-brand-title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--or-text);
+}
+
+.or-app-brand-sub {
+  margin: 0;
+  font-size: 0.6875rem;
+  color: var(--or-text-dim);
+}
+
+.or-app-nav {
+  padding: 0 0.5rem 1rem;
+}
+
+.or-app-nav-label {
+  margin: 0.75rem 0.5rem 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--or-text-dim);
+}
+
+.or-app-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--or-text-muted);
+  text-decoration: none;
+  transition: background 0.12s, color 0.12s;
+}
+
+.or-app-nav-link:hover {
+  background: var(--or-bg-hover);
+  color: var(--or-text);
+}
+
+.or-app-nav-link.active {
+  background: color-mix(in srgb, var(--or-accent) 18%, transparent);
+  color: var(--or-text);
+}
+
+.or-app-ext {
+  margin-left: auto;
+  font-size: 0.75rem;
+  opacity: 0.6;
+}
+
+.or-app-user {
+  margin-top: auto;
+  padding: 1rem;
+  border-top: 1px solid var(--or-border);
+}
+
+.or-app-user-name {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--or-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.or-app-user-credits {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--or-accent);
+}
+
+.or-app-user-meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.6875rem;
+  color: var(--or-text-dim);
+}
+
+.or-sidebar:has(.or-app-nav) {
+  display: flex;
+  flex-direction: column;
+}
+
+.or-app-main {
+  padding: 1.25rem 1.5rem 2.5rem;
+  overflow-x: hidden;
+}
+
+.or-app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--or-border);
+}
+
+.or-app-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--or-text);
+}
+
+.or-app-subtitle {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
+  color: var(--or-text-muted);
+  max-width: 42rem;
+}
+
+.or-app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.or-app-credits-pill {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--or-accent) 15%, transparent);
+  color: var(--or-text);
+  border: 1px solid color-mix(in srgb, var(--or-accent) 35%, transparent);
+}
+
+.or-app-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: inherit;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity 0.12s;
+}
+
+.or-app-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.or-app-btn-primary {
+  background: var(--or-accent);
+  color: var(--vp-c-bg, #000);
+}
+
+.or-app-btn-primary:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.or-app-btn-ghost {
+  background: transparent;
+  color: var(--or-text-muted);
+  border-color: var(--or-border);
+}
+
+.or-app-btn-ghost:hover:not(:disabled) {
+  color: var(--or-text);
+  border-color: var(--or-text-dim);
+}
+
+.or-app-loading,
+.or-app-muted {
+  font-size: 0.875rem;
+  color: var(--or-text-muted);
+}
+
+.or-app-alert {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  background: color-mix(in srgb, var(--or-danger) 12%, transparent);
+  color: var(--or-danger);
+  border: 1px solid color-mix(in srgb, var(--or-danger) 25%, transparent);
+  margin-bottom: 1rem;
+}
+
+.or-app-alert-warn {
+  background: color-mix(in srgb, var(--or-accent) 10%, transparent);
+  color: var(--or-text);
+  border-color: color-mix(in srgb, var(--or-accent) 25%, transparent);
+}
+
+.or-app-hero {
+  margin-bottom: 1.5rem;
+}
+
+.or-app-hero-kicker {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--or-text-muted);
+}
+
+.or-app-hero-name {
+  margin: 0.25rem 0 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.or-app-hero-balance {
+  margin: 0.5rem 0 0;
+  font-size: 1rem;
+  color: var(--or-text-muted);
+}
+
+.or-app-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.85rem;
+}
+
+.or-app-card {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid var(--or-border);
+  background: var(--or-bg-elevated);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.or-app-card:hover {
+  border-color: color-mix(in srgb, var(--or-accent) 40%, var(--or-border));
+  background: var(--or-bg-hover);
+}
+
+.or-app-card h3 {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.or-app-card p {
+  margin: 0.4rem 0 0;
+  flex: 1;
+  font-size: 0.8125rem;
+  color: var(--or-text-muted);
+  line-height: 1.45;
+}
+
+.or-app-card-cta {
+  margin-top: 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--or-accent);
+}
+
+.or-app-panel {
+  padding: 1.1rem 1.25rem;
+  border-radius: 12px;
+  border: 1px solid var(--or-border);
+  background: var(--or-bg-elevated);
+  margin-bottom: 1rem;
+}
+
+.or-app-panel-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.or-app-panel-desc {
+  margin: 0 0 1rem;
+  font-size: 0.8125rem;
+  color: var(--or-text-muted);
+}
+
+.or-app-token-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.or-app-token-value {
+  flex: 1;
+  min-width: 12rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  background: var(--or-input-bg);
+  border: 1px solid var(--or-border);
+  font-size: 0.8125rem;
+  word-break: break-all;
+}
+
+.or-app-code {
+  margin: 0 0 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  background: var(--or-input-bg);
+  border: 1px solid var(--or-border);
+  overflow-x: auto;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.or-app-empty {
+  text-align: center;
+  color: var(--or-text-muted);
+  font-size: 0.875rem;
+}
+
+.or-app-pkg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.or-app-pkg {
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid var(--or-border);
+  background: var(--or-bg-elevated);
+}
+
+.or-app-pkg.featured {
+  border-color: color-mix(in srgb, var(--or-accent) 45%, var(--or-border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--or-accent) 15%, transparent);
+}
+
+.or-app-pkg-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.or-app-pkg-head h3 {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.or-app-pkg-badge {
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--or-accent) 20%, transparent);
+  color: var(--or-text);
+}
+
+.or-app-pkg-meta {
+  margin: 0.35rem 0 0.85rem;
+  font-size: 0.8125rem;
+  color: var(--or-text-muted);
+}
+
+.or-app-pkg .or-app-btn {
+  width: 100%;
+}
+
+.or-app-qr {
+  display: block;
+  max-width: 220px;
+  margin: 0.75rem auto;
+  border-radius: 8px;
+  border: 1px solid var(--or-border);
+}
+
+.or-app-pay-link {
+  display: flex;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.or-app-bank {
+  text-align: center;
+  margin-top: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .or-app.or-catalog {
+    grid-template-columns: 1fr;
+  }
+
+  .or-app .or-sidebar {
+    position: static;
+    max-height: none;
+    border-right: none;
+    border-bottom: 1px solid var(--or-border);
+  }
+
+  .or-app-main {
+    padding: 1rem;
+  }
+}

@@ -1,5 +1,5 @@
 ---
-title: AI Gateway
+title: Overview
 layout: page
 sidebar: false
 outline: false
@@ -7,4 +7,4 @@ prev: false
 next: false
 ---
 
-<LandingPage />
+<AppDashboard view="overview" />

@@ -208,7 +208,6 @@ const docsSidebarVi = [
 const navEn = [
   { text: 'Quickstart', link: '/quickstart' },
   { text: 'Models', link: '/models/' },
-  { text: 'Compare', link: '/models/compare/' },
   { text: 'API Reference', link: '/reference/media' },
   { text: 'Cookbook', link: '/cookbook/' },
   { text: 'Client SDKs', link: '/sdk/' },
@@ -218,7 +217,6 @@ const navEn = [
 const navVi = [
   { text: 'Quickstart', link: '/vi/quickstart' },
   { text: 'Models', link: '/vi/models/' },
-  { text: 'So sánh', link: '/vi/models/compare/' },
   { text: 'API Reference', link: '/vi/reference/media' },
   { text: 'Cookbook', link: '/vi/cookbook/' },
   { text: 'Client SDKs', link: '/vi/sdk/' },
@@ -254,6 +252,14 @@ export default defineConfig({
     server: {
       proxy: {
         '/gateway': {
+          target: 'http://localhost:3001',
+          changeOrigin: true,
+        },
+        '/ai': {
+          target: 'http://localhost:3001',
+          changeOrigin: true,
+        },
+        '/billing': {
           target: 'http://localhost:3001',
           changeOrigin: true,
         },

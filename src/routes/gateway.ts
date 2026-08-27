@@ -9,6 +9,8 @@ import {
 } from '../middleware/gatewayAuth.js';
 import { fetchModelsCatalog } from '../services/gommoClient.js';
 import { enrichModelsCatalogLanguage } from '../services/catalogLang.js';
+import { loginGommoUser, GommoAuthError } from '../services/gommoAuth.js';
+import { GommoRegisterError, registerGommoUser } from '../services/merchantRegister.js';
 import { createJobAndPoll } from '../services/polling.js';
 import type { JobType, PollMedia } from '../types/gommo.js';
 import { sendError } from '../utils/errors.js';
@@ -30,6 +32,58 @@ const JOB_TYPES = new Set<JobType>([
 const POLL_MEDIA = new Set<PollMedia>(['image', 'video', 'music']);
 
 const router = Router();
+
+/** POST /gateway/auth/login — body: { email, password, domain? } */
+router.post('/auth/login', async (req, res) => {
+  try {
+    const { email, password, domain } = req.body ?? {};
+    if (!email || !password) {
+      sendError(res, 400, 'email and password are required', 'VALIDATION_ERROR');
+      return;
+    }
+    const result = await loginGommoUser(String(email), String(password), readDomain(req));
+    res.json({
+      success: true,
+      data: { access_token: result.accessToken },
+      message: result.message,
+    });
+  } catch (err) {
+    if (err instanceof GommoAuthError) {
+      sendError(res, err.status, err.message, 'UNAUTHORIZED');
+      return;
+    }
+    sendGommoError(res, err);
+  }
+});
+
+/** POST /gateway/auth/register — body: { email, password, phone, name?, note? } */
+router.post('/auth/register', async (req, res) => {
+  try {
+    const { name, email, password, phone, note } = req.body ?? {};
+    if (!email || !password || !phone) {
+      sendError(res, 400, 'email, password, and phone are required', 'VALIDATION_ERROR');
+      return;
+    }
+    const result = await registerGommoUser({
+      name: typeof name === 'string' ? name : undefined,
+      email: String(email),
+      password: String(password),
+      phone: String(phone),
+      note: typeof note === 'string' ? note : undefined,
+    });
+    res.json({
+      success: true,
+      data: { access_token: result.accessToken },
+      message: result.message,
+    });
+  } catch (err) {
+    if (err instanceof GommoRegisterError) {
+      sendError(res, err.status, err.message, 'UPSTREAM_ERROR');
+      return;
+    }
+    sendGommoError(res, err);
+  }
+});
 
 /** GET /gateway/models?type=image&lang=en — Bearer optional; lang=en merges EN descriptions from cache */
 router.get('/models', gatewayAuthOptional, async (req, res) => {
