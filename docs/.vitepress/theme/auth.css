@@ -54,6 +54,98 @@
   border-color: var(--vp-c-text-3);
 }
 
+/* Docs sub-nav — aligned with VitePress docs frame (matches VPSidebar / VPNavBar) */
+:root {
+  --gw-docs-subnav-height: 2.75rem;
+  --gw-docs-frame-left: 24px;
+  --gw-docs-frame-right: 8px;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --gw-docs-frame-left: 32px;
+    --gw-docs-frame-right: 32px;
+  }
+}
+
+@media (min-width: 1440px) {
+  :root {
+    --gw-docs-frame-left: max(32px, calc((100% - (var(--vp-layout-max-width) - 64px)) / 2));
+    --gw-docs-frame-right: calc((100vw - var(--vp-layout-max-width)) / 2 + 32px);
+  }
+}
+
+.gw-docs-subnav {
+  position: sticky;
+  top: var(--vp-nav-height, 64px);
+  z-index: 25;
+  width: 100%;
+  height: var(--gw-docs-subnav-height);
+  border-bottom: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg);
+}
+
+.gw-docs-subnav-inner {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 var(--gw-docs-frame-right) 0 var(--gw-docs-frame-left);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.gw-docs-subnav-inner::-webkit-scrollbar {
+  display: none;
+}
+
+.gw-docs-subnav-link {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--vp-c-text-2);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: color 0.12s, border-color 0.12s;
+}
+
+.gw-docs-subnav-link:hover {
+  color: var(--vp-c-text-1);
+}
+
+.gw-docs-subnav-link.active {
+  color: var(--vp-c-text-1);
+  border-bottom-color: var(--vp-c-brand-1);
+}
+
+body.gw-has-docs-subnav .VPNavBar.has-sidebar {
+  border-bottom: none;
+}
+
+body.gw-has-docs-subnav .VPLocalNav {
+  top: calc(var(--vp-nav-height, 64px) + var(--gw-docs-subnav-height));
+}
+
+body.gw-has-docs-subnav .VPSidebar {
+  top: calc(var(--vp-nav-height, 64px) + var(--gw-docs-subnav-height));
+  height: calc(100vh - var(--vp-nav-height, 64px) - var(--gw-docs-subnav-height));
+}
+
+body.gw-has-docs-subnav .VPContent.has-sidebar {
+  padding-top: var(--gw-docs-subnav-height);
+}
+
+@media (max-width: 959px) {
+  .gw-docs-subnav-inner {
+    padding-left: 24px;
+    padding-right: 16px;
+  }
+}
+
 .VPDoc:has(.gw-auth) .container,
 .VPDoc:has(.gw-auth) .content-container {
   max-width: none !important;

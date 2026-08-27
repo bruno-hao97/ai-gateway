@@ -80,6 +80,55 @@ function updateTokenBadge() {
   }
 }
 
+const urlParams = new URLSearchParams(window.location.search);
+const isEmbed = urlParams.get('embed') === '1';
+
+const EMBED_PARENT_ORIGINS = new Set([
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
+]);
+
+function isAllowedEmbedParent(origin) {
+  if (!origin) return false;
+  if (EMBED_PARENT_ORIGINS.has(origin)) return true;
+  if (origin === window.location.origin) return true;
+  try {
+    const u = new URL(origin);
+    return u.hostname === 'localhost' || u.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
+let pendingDeepLink = null;
+
+function applyEmbedChrome() {
+  if (!isEmbed) return;
+  document.body.classList.add('pg-embed');
+}
+
+function handleEmbedTokenMessage(event) {
+  if (!isEmbed || !isAllowedEmbedParent(event.origin)) return;
+  const data = event.data;
+  if (!data || data.type !== 'ai-gateway-token') return;
+  const token = typeof data.token === 'string' ? data.token.trim() : '';
+  if (!token) return;
+  saveToken(token);
+  if (data.domain && typeof data.domain === 'string') {
+    const domain = data.domain.trim();
+    if ($('loginDomain')) $('loginDomain').value = domain;
+    localStorage.setItem(STORAGE_DOMAIN, domain);
+  }
+  runPendingDeepLink();
+}
+
+if (isEmbed) {
+  applyEmbedChrome();
+  window.addEventListener('message', handleEmbedTokenMessage);
+}
+
 function baseUrl() {
   const v = baseUrlEl.value.trim().replace(/\/$/, '');
   if (!v) throw new Error('Set Gateway base URL (e.g. http://localhost:3001)');
@@ -1306,3 +1355,53 @@ if (sessionStorage.getItem(STORAGE_VOICES)) {
     /* ignore */
   }
 }
+
+function openPanelById(panelId) {
+  const btn = document.querySelector(`.pg-nav-item[data-panel="${panelId}"]:not([disabled])`);
+  if (btn) {
+    btn.click();
+    return;
+  }
+  document.querySelectorAll('.pg-panel').forEach((p) => {
+    p.classList.toggle('active', p.dataset.panel === panelId);
+  });
+  document.querySelectorAll('.pg-nav-item').forEach((b) => {
+    b.classList.toggle('active', b.dataset.panel === panelId && !b.dataset.jobType);
+  });
+}
+
+function runPendingDeepLink() {
+  if (!pendingDeepLink) return;
+  const { type, model, panel } = pendingDeepLink;
+  pendingDeepLink = null;
+
+  if (panel && panel !== 'media-job') {
+    openPanelById(panel);
+    return;
+  }
+
+  if (!type) return;
+
+  openMediaJobPanel(type);
+  if (model && $('mediaModelSelect')) {
+    const sel = $('mediaModelSelect');
+    const has = [...sel.options].some((o) => o.value === model);
+    if (!has) {
+      sel.appendChild(new Option(model, model));
+    }
+    sel.value = model;
+    onMediaModelChange();
+  }
+}
+
+function captureDeepLinkFromUrl() {
+  if (!isEmbed) return;
+  const type = urlParams.get('type');
+  const model = urlParams.get('model');
+  const panel = urlParams.get('panel');
+  if (!type && !model && !panel) return;
+  pendingDeepLink = { type, model, panel };
+  if (tokenEl.value.trim()) runPendingDeepLink();
+}
+
+captureDeepLinkFromUrl();

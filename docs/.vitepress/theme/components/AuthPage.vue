@@ -9,6 +9,7 @@ import {
   setStoredDomain,
   setStoredToken,
 } from '../models/auth-api';
+import { fetchMe } from '../models/user-api';
 
 const props = defineProps<{
   mode: 'login' | 'signup';
@@ -37,6 +38,14 @@ const pasteToken = ref(getStoredToken());
 
 const isSignup = computed(() => props.mode === 'signup');
 
+async function prefetchProfile() {
+  try {
+    await fetchMe();
+  } catch {
+    /* Overview will retry — avoid blocking redirect */
+  }
+}
+
 async function onSubmit() {
   error.value = '';
   loading.value = true;
@@ -46,6 +55,7 @@ async function onSubmit() {
       if (!t) throw new Error(isVi.value ? 'Nhập token' : 'Enter a token');
       setStoredToken(t);
       setStoredDomain(DEFAULT_DOMAIN);
+      await prefetchProfile();
       window.location.href = appLink.value;
       return;
     }
@@ -64,6 +74,7 @@ async function onSubmit() {
     } else {
       await loginWithEmail(email.value, password.value);
     }
+    await prefetchProfile();
     window.location.href = appLink.value;
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);

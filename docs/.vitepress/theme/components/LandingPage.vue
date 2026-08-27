@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useData } from 'vitepress';
+import { getStoredToken } from '../models/auth-api';
 import {
   JOB_TYPES,
   catalogProviders,
@@ -19,6 +20,7 @@ const isVi = computed(() => lang.value === 'vi-VN');
 const catalogLang = computed((): CatalogLang | undefined => (isVi.value ? 'vi' : 'en'));
 
 const prefix = computed(() => (isVi.value ? '/vi' : ''));
+const appLink = computed(() => `${prefix.value}/app/`);
 const quickstartLink = computed(() => `${prefix.value}/quickstart`);
 const loginLink = computed(() => `${prefix.value}/login/`);
 const signupLink = computed(() => `${prefix.value}/signup/`);
@@ -201,6 +203,10 @@ function jobTypeLabel(id: string): string {
 }
 
 onMounted(async () => {
+  if (getStoredToken()) {
+    window.location.href = appLink.value;
+    return;
+  }
   try {
     allModels.value = await fetchAllModels(catalogLang.value);
   } catch {

@@ -78,6 +78,14 @@ export function getUsername(me?: MeResponse | null): string {
   return me?.userInfo?.username?.trim() || '';
 }
 
+export function getEmail(me?: MeResponse | null): string {
+  return me?.userInfo?.email?.trim() || '';
+}
+
+export function getAvatarUrl(me?: MeResponse | null): string {
+  return me?.userInfo?.avatar?.trim() || '';
+}
+
 export function getCredits(me?: MeResponse | null): number {
   return me?.balancesInfo?.credits_ai ?? 0;
 }

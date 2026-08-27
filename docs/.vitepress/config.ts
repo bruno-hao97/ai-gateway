@@ -3,7 +3,6 @@ import { defineConfig } from 'vitepress';
 const playgroundLink = 'http://localhost:3001/portal/playground.html';
 
 const overviewSidebarEn = [
-  { text: 'Introduction', link: '/' },
   { text: 'Quickstart', link: '/quickstart' },
   { text: 'Authentication', link: '/authentication' },
   { text: 'Principles', link: '/principles' },
@@ -14,7 +13,6 @@ const overviewSidebarEn = [
 ];
 
 const overviewSidebarVi = [
-  { text: 'Giới thiệu', link: '/vi/' },
   { text: 'Quickstart', link: '/vi/quickstart' },
   { text: 'Authentication', link: '/vi/authentication' },
   { text: 'Nguyên tắc', link: '/vi/principles' },
@@ -24,48 +22,26 @@ const overviewSidebarVi = [
   { text: 'Góp ý', link: '/vi/report-feedback' },
 ];
 
-const routingSidebarEn = [
-  { text: 'Overview', link: '/routing/' },
+const modelsRoutingInDocsEn = [
+  { text: 'Integration guide', link: '/models/guide' },
+  { text: 'Job types', link: '/models/job-types' },
+  { text: 'Parameters', link: '/models/parameters' },
+  { text: 'Routing overview', link: '/routing/' },
   { text: 'Upstream hosts', link: '/routing/upstream-hosts' },
   { text: 'Integration modes', link: '/routing/integration-modes' },
   { text: 'Endpoint map', link: '/routing/endpoint-map' },
   { text: 'Choosing a mode', link: '/routing/choosing-a-mode' },
 ];
 
-const routingSidebarVi = [
-  { text: 'Tổng quan', link: '/vi/routing/' },
+const modelsRoutingInDocsVi = [
+  { text: 'Hướng dẫn tích hợp', link: '/vi/models/guide' },
+  { text: 'Job types', link: '/vi/models/job-types' },
+  { text: 'Parameters', link: '/vi/models/parameters' },
+  { text: 'Routing overview', link: '/vi/routing/' },
   { text: 'Upstream hosts', link: '/vi/routing/upstream-hosts' },
   { text: 'Integration modes', link: '/vi/routing/integration-modes' },
   { text: 'Endpoint map', link: '/vi/routing/endpoint-map' },
   { text: 'Choosing a mode', link: '/vi/routing/choosing-a-mode' },
-];
-
-const modelsSidebarEn = [
-  { text: 'Catalog', link: '/models/' },
-  { text: 'Compare', link: '/models/compare/' },
-  { text: 'Integration guide', link: '/models/guide' },
-  { text: 'Job types', link: '/models/job-types' },
-  { text: 'Parameters', link: '/models/parameters' },
-  { text: 'Playground', link: playgroundLink, target: '_blank' },
-];
-
-const modelsSidebarVi = [
-  { text: 'Catalog', link: '/vi/models/' },
-  { text: 'So sánh', link: '/vi/models/compare/' },
-  { text: 'Hướng dẫn tích hợp', link: '/vi/models/guide' },
-  { text: 'Job types', link: '/vi/models/job-types' },
-  { text: 'Parameters', link: '/vi/models/parameters' },
-  { text: 'Playground', link: playgroundLink, target: '_blank' },
-];
-
-const modelsSectionSidebarEn = [
-  { text: 'Models', items: modelsSidebarEn },
-  { text: 'Routing', items: routingSidebarEn },
-];
-
-const modelsSectionSidebarVi = [
-  { text: 'Models', items: modelsSidebarVi },
-  { text: 'Routing', items: routingSidebarVi },
 ];
 
 const featuresSidebarEn = [
@@ -190,10 +166,11 @@ const sdkSidebarVi = [
   },
 ];
 
-/** Default sidebar — excludes sections that have their own top nav tab. */
+/** Docs guide sidebar (tab Docs). */
 const docsSidebarEn = [
   { text: 'Overview', items: overviewSidebarEn },
   { text: 'Features', items: featuresSidebarEn },
+  { text: 'Models & routing', items: modelsRoutingInDocsEn },
   { text: 'Privacy & ops', items: opsSidebarEn },
   { text: 'Community', items: communitySidebarEn },
 ];
@@ -201,44 +178,74 @@ const docsSidebarEn = [
 const docsSidebarVi = [
   { text: 'Overview', items: overviewSidebarVi },
   { text: 'Features', items: featuresSidebarVi },
+  { text: 'Models & routing', items: modelsRoutingInDocsVi },
   { text: 'Privacy & ops', items: opsSidebarVi },
   { text: 'Community', items: communitySidebarVi },
 ];
 
 const navEn = [
-  { text: 'Quickstart', link: '/quickstart' },
   { text: 'Models', link: '/models/' },
-  { text: 'API Reference', link: '/reference/media' },
-  { text: 'Cookbook', link: '/cookbook/' },
-  { text: 'Client SDKs', link: '/sdk/' },
   { text: 'Playground', link: playgroundLink, target: '_blank' },
+  { text: 'Docs', link: '/quickstart' },
 ];
 
 const navVi = [
-  { text: 'Quickstart', link: '/vi/quickstart' },
   { text: 'Models', link: '/vi/models/' },
-  { text: 'API Reference', link: '/vi/reference/media' },
-  { text: 'Cookbook', link: '/vi/cookbook/' },
-  { text: 'Client SDKs', link: '/vi/sdk/' },
   { text: 'Playground', link: playgroundLink, target: '_blank' },
+  { text: 'Docs', link: '/vi/quickstart' },
 ];
 
 const pathSidebarEn = {
   '/cookbook/': [{ text: 'Cookbook', items: cookbookSidebarEn }],
   '/sdk/': [{ text: 'Client SDKs', items: sdkSidebarEn }],
   '/reference/': [{ text: 'API Reference', items: referenceSidebarEn }],
-  '/models/': modelsSectionSidebarEn,
-  '/routing/': modelsSectionSidebarEn,
-  '/': docsSidebarEn,
 };
 
 const pathSidebarVi = {
   '/vi/cookbook/': [{ text: 'Cookbook', items: cookbookSidebarVi }],
   '/vi/sdk/': [{ text: 'Client SDKs', items: sdkSidebarVi }],
   '/vi/reference/': [{ text: 'API Reference', items: referenceSidebarVi }],
-  '/vi/models/': modelsSectionSidebarVi,
-  '/vi/routing/': modelsSectionSidebarVi,
-  '/vi/': docsSidebarVi,
+};
+
+/** Docs guide sidebar keys — models doc pages + routing stay in Docs zone (not catalog sidebar). */
+const docsGuideSidebarEn = {
+  '/quickstart': docsSidebarEn,
+  '/authentication': docsSidebarEn,
+  '/principles': docsSidebarEn,
+  '/mcp': docsSidebarEn,
+  '/faq': docsSidebarEn,
+  '/report-feedback': docsSidebarEn,
+  '/guides/': docsSidebarEn,
+  '/features/': docsSidebarEn,
+  '/privacy/': docsSidebarEn,
+  '/best-practices/': docsSidebarEn,
+  '/deploy/': docsSidebarEn,
+  '/community/': docsSidebarEn,
+  '/integration-modes': docsSidebarEn,
+  '/models/guide': docsSidebarEn,
+  '/models/job-types': docsSidebarEn,
+  '/models/parameters': docsSidebarEn,
+  '/routing/': docsSidebarEn,
+};
+
+const docsGuideSidebarVi = {
+  '/vi/quickstart': docsSidebarVi,
+  '/vi/authentication': docsSidebarVi,
+  '/vi/principles': docsSidebarVi,
+  '/vi/mcp': docsSidebarVi,
+  '/vi/faq': docsSidebarVi,
+  '/vi/report-feedback': docsSidebarVi,
+  '/vi/guides/': docsSidebarVi,
+  '/vi/features/': docsSidebarVi,
+  '/vi/privacy/': docsSidebarVi,
+  '/vi/best-practices/': docsSidebarVi,
+  '/vi/deploy/': docsSidebarVi,
+  '/vi/community/': docsSidebarVi,
+  '/vi/integration-modes': docsSidebarVi,
+  '/vi/models/guide': docsSidebarVi,
+  '/vi/models/job-types': docsSidebarVi,
+  '/vi/models/parameters': docsSidebarVi,
+  '/vi/routing/': docsSidebarVi,
 };
 
 export default defineConfig({
@@ -274,7 +281,10 @@ export default defineConfig({
       description: 'Developer docs — Gommo proxy + REST gateway',
       themeConfig: {
         nav: navEn,
-        sidebar: pathSidebarEn,
+        sidebar: {
+          ...pathSidebarEn,
+          ...docsGuideSidebarEn,
+        },
         outline: { level: [2, 3] },
         docFooter: { prev: 'Previous', next: 'Next' },
         darkModeSwitchLabel: 'Appearance',
@@ -291,7 +301,10 @@ export default defineConfig({
       description: 'Tài liệu developer — proxy + REST gateway Gommo',
       themeConfig: {
         nav: navVi,
-        sidebar: pathSidebarVi,
+        sidebar: {
+          ...pathSidebarVi,
+          ...docsGuideSidebarVi,
+        },
         outline: { level: [2, 3] },
         docFooter: { prev: 'Trước', next: 'Tiếp' },
         darkModeSwitchLabel: 'Giao diện',

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useData } from 'vitepress';
-import { getStoredToken } from '../models/auth-api';
-import { playgroundUrl } from '../models/gateway-base';
+import { getStoredToken, getStoredDomain } from '../models/auth-api';
+import { playgroundEmbedUrl, playgroundOrigin, playgroundUrl } from '../models/gateway-base';
 import {
   createTopup,
   fetchBillingPackages,
@@ -12,6 +12,8 @@ import {
   getCachedMe,
   getCredits,
   getDisplayName,
+  getEmail,
+  getAvatarUrl,
   getUsername,
   type CreditPackage,
   type MeResponse,
@@ -19,7 +21,7 @@ import {
 } from '../models/user-api';
 
 const props = defineProps<{
-  view: 'overview' | 'token' | 'credits';
+  view: 'overview' | 'profile' | 'playground' | 'token' | 'credits';
 }>();
 
 const { lang } = useData();
@@ -37,10 +39,23 @@ const packagesError = ref('');
 const billingReady = ref(true);
 const paying = ref<string | null>(null);
 const payment = ref<TopupPayment | null>(null);
+const playgroundFrame = ref<HTMLIFrameElement | null>(null);
+
+const embedSrc = computed(() => playgroundEmbedUrl());
+const playgroundExternalUrl = computed(() => playgroundUrl());
 
 const credits = computed(() => getCredits(me.value));
 const displayName = computed(() => getDisplayName(me.value));
 const username = computed(() => getUsername(me.value));
+const email = computed(() => getEmail(me.value));
+const avatarUrl = computed(() => getAvatarUrl(me.value));
+const loginDomain = computed(() => getStoredDomain());
+const profileInitials = computed(() => {
+  const name = displayName.value;
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return `${parts[0]![0]}${parts[1]![0]}`.toUpperCase();
+  return name.slice(0, 2).toUpperCase() || '?';
+});
 const token = computed(() => getStoredToken());
 const maskedToken = computed(() => {
   const t = token.value;
@@ -50,6 +65,8 @@ const maskedToken = computed(() => {
 
 const navMain = computed(() => [
   { id: 'overview', label: isVi.value ? 'Tổng quan' : 'Overview', href: `${prefix.value}/app/` },
+  { id: 'profile', label: isVi.value ? 'Hồ sơ' : 'Profile', href: `${prefix.value}/app/profile/` },
+  { id: 'playground', label: 'Playground', href: `${prefix.value}/app/playground/` },
   { id: 'token', label: isVi.value ? 'Access token' : 'Access token', href: `${prefix.value}/app/token/` },
   { id: 'credits', label: isVi.value ? 'Credits' : 'Credits', href: `${prefix.value}/app/credits/` },
 ]);
@@ -57,9 +74,7 @@ const navMain = computed(() => [
 const navLinks = computed(() => [
   { label: isVi.value ? 'Models' : 'Models', href: `${prefix.value}/models/` },
   { label: isVi.value ? 'So sánh' : 'Compare', href: `${prefix.value}/models/compare/` },
-  { label: 'Playground', href: playgroundUrl(), external: true },
-  { label: isVi.value ? 'Quickstart' : 'Quickstart', href: `${prefix.value}/quickstart` },
-  { label: isVi.value ? 'Billing docs' : 'Billing docs', href: `${prefix.value}/guides/billing-credits` },
+  { label: isVi.value ? 'Documentation' : 'Documentation', href: `${prefix.value}/quickstart` },
 ]);
 
 const curlSnippet = computed(() => {
@@ -148,6 +163,22 @@ async function copySnippet() {
   }
 }
 
+function sendTokenToPlayground() {
+  const iframe = playgroundFrame.value;
+  const origin = playgroundOrigin();
+  const t = getStoredToken();
+  if (!iframe?.contentWindow || !origin || !t) return;
+  iframe.contentWindow.postMessage(
+    { type: 'ai-gateway-token', token: t, domain: getStoredDomain() },
+    origin,
+  );
+}
+
+function onPlaygroundLoad() {
+  sendTokenToPlayground();
+  window.setTimeout(sendTokenToPlayground, 300);
+}
+
 onMounted(async () => {
   if (!getStoredToken()) {
     window.location.href = `${prefix.value}/login/`;
@@ -162,7 +193,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="or-catalog or-app">
+  <div class="or-catalog or-app" :class="{ 'or-app-has-playground': view === 'playground' }">
     <aside class="or-sidebar">
       <div class="or-app-brand">
         <span class="or-app-logo">⬡</span>
@@ -198,27 +229,36 @@ onMounted(async () => {
         </a>
       </nav>
 
-      <div class="or-app-user">
+      <a :href="`${prefix}/app/profile/`" class="or-app-user">
         <p class="or-app-user-name">{{ displayName }}</p>
         <p class="or-app-user-credits">{{ formatCredits(credits) }} credits</p>
         <p v-if="username" class="or-app-user-meta">@{{ username }}</p>
-      </div>
+      </a>
     </aside>
 
-    <div class="or-main or-app-main">
+    <div class="or-main or-app-main" :class="{ 'or-app-main-playground': view === 'playground' }">
       <header class="or-app-header">
         <div>
           <h1 class="or-app-title">
             <template v-if="view === 'overview'">{{ isVi ? 'Tổng quan' : 'Overview' }}</template>
+            <template v-else-if="view === 'profile'">{{ isVi ? 'Hồ sơ' : 'Profile' }}</template>
+            <template v-else-if="view === 'playground'">Playground</template>
             <template v-else-if="view === 'token'">Access token</template>
             <template v-else>{{ isVi ? 'Credits' : 'Credits' }}</template>
           </h1>
-          <p class="or-app-subtitle">
+          <p v-if="view !== 'playground'" class="or-app-subtitle">
             <template v-if="view === 'overview'">
               {{
                 isVi
                   ? 'Quản lý tài khoản và truy cập nhanh tới models, playground, billing.'
                   : 'Manage your account and jump to models, playground, and billing.'
+              }}
+            </template>
+            <template v-else-if="view === 'profile'">
+              {{
+                isVi
+                  ? 'Thông tin tài khoản Gommo từ /ai/me.'
+                  : 'Your Gommo account details from /ai/me.'
               }}
             </template>
             <template v-else-if="view === 'token'">
@@ -236,10 +276,31 @@ onMounted(async () => {
               }}
             </template>
           </p>
+          <p v-else class="or-app-subtitle">
+            {{
+              isVi
+                ? 'Thử jobs, chat, upload — token được đồng bộ từ dashboard.'
+                : 'Try jobs, chat, upload — token syncs from your dashboard session.'
+            }}
+          </p>
         </div>
         <div class="or-app-header-actions">
-          <span class="or-app-credits-pill">{{ formatCredits(credits) }} credits</span>
-          <button type="button" class="or-app-btn or-app-btn-ghost" @click="refreshProfile">
+          <a
+            v-if="view === 'playground'"
+            :href="playgroundExternalUrl"
+            target="_blank"
+            rel="noreferrer"
+            class="or-app-btn or-app-btn-ghost"
+          >
+            {{ isVi ? 'Mở tab mới' : 'Open in new tab' }} ↗
+          </a>
+          <span v-if="view !== 'playground'" class="or-app-credits-pill">{{ formatCredits(credits) }} credits</span>
+          <button
+            v-if="view !== 'playground'"
+            type="button"
+            class="or-app-btn or-app-btn-ghost"
+            @click="refreshProfile"
+          >
             {{ isVi ? 'Làm mới' : 'Refresh' }}
           </button>
         </div>
@@ -249,11 +310,22 @@ onMounted(async () => {
         {{ isVi ? 'Đang tải…' : 'Loading…' }}
       </div>
 
-      <div v-else-if="loadError" class="or-app-alert">{{ loadError }}</div>
+      <div v-else-if="loadError && view !== 'playground'" class="or-app-alert">{{ loadError }}</div>
 
       <template v-else>
+        <!-- Playground embed -->
+        <section v-if="view === 'playground'" class="or-app-playground-wrap">
+          <iframe
+            ref="playgroundFrame"
+            :src="embedSrc"
+            class="or-app-playground-frame"
+            title="AI Gateway Playground"
+            @load="onPlaygroundLoad"
+          />
+        </section>
+
         <!-- Overview -->
-        <section v-if="view === 'overview'" class="or-app-section">
+        <section v-else-if="view === 'overview'" class="or-app-section">
           <div class="or-app-hero">
             <p class="or-app-hero-kicker">{{ isVi ? 'Xin chào' : 'Welcome back' }}</p>
             <h2 class="or-app-hero-name">{{ displayName }}</h2>
@@ -274,10 +346,10 @@ onMounted(async () => {
               <p>{{ isVi ? 'Credits và metadata side-by-side.' : 'Credits and metadata side-by-side.' }}</p>
               <span class="or-app-card-cta">{{ isVi ? 'So sánh' : 'Compare' }} →</span>
             </a>
-            <a :href="playgroundUrl()" target="_blank" rel="noreferrer" class="or-app-card">
+            <a :href="`${prefix}/app/playground/`" class="or-app-card">
               <h3>Playground</h3>
               <p>{{ isVi ? 'Thử job, chat, upload trong portal.' : 'Try jobs, chat, upload in the portal.' }}</p>
-              <span class="or-app-card-cta">Open ↗</span>
+              <span class="or-app-card-cta">{{ isVi ? 'Mở playground' : 'Open playground' }} →</span>
             </a>
             <a :href="`${prefix}/app/credits/`" class="or-app-card">
               <h3>{{ isVi ? 'Nạp credits' : 'Top up credits' }}</h3>
@@ -289,10 +361,67 @@ onMounted(async () => {
               <p>{{ isVi ? 'Copy Bearer cho API client.' : 'Copy Bearer for your API client.' }}</p>
               <span class="or-app-card-cta">{{ isVi ? 'Xem token' : 'View token' }} →</span>
             </a>
+            <a :href="`${prefix}/app/profile/`" class="or-app-card">
+              <h3>{{ isVi ? 'Hồ sơ' : 'Profile' }}</h3>
+              <p>{{ isVi ? 'Email, username và số dư credit.' : 'Email, username, and credit balance.' }}</p>
+              <span class="or-app-card-cta">{{ isVi ? 'Xem hồ sơ' : 'View profile' }} →</span>
+            </a>
             <a :href="`${prefix}/quickstart`" class="or-app-card">
               <h3>Quickstart</h3>
               <p>{{ isVi ? 'Hướng dẫn tích hợp gateway REST.' : 'Gateway REST integration guide.' }}</p>
               <span class="or-app-card-cta">{{ isVi ? 'Đọc docs' : 'Read docs' }} →</span>
+            </a>
+          </div>
+        </section>
+
+        <!-- Profile -->
+        <section v-else-if="view === 'profile'" class="or-app-section">
+          <div class="or-app-profile-head">
+            <img
+              v-if="avatarUrl"
+              :src="avatarUrl"
+              alt=""
+              class="or-app-profile-avatar or-app-profile-avatar-img"
+            />
+            <div v-else class="or-app-profile-avatar">{{ profileInitials }}</div>
+            <div>
+              <h2 class="or-app-profile-name">{{ displayName }}</h2>
+              <p v-if="username" class="or-app-muted">@{{ username }}</p>
+            </div>
+          </div>
+
+          <dl class="or-app-profile-dl">
+            <div class="or-app-profile-row">
+              <dt>{{ isVi ? 'Email' : 'Email' }}</dt>
+              <dd>{{ email || '—' }}</dd>
+            </div>
+            <div class="or-app-profile-row">
+              <dt>{{ isVi ? 'Username' : 'Username' }}</dt>
+              <dd>{{ username || '—' }}</dd>
+            </div>
+            <div class="or-app-profile-row">
+              <dt>{{ isVi ? 'Tên hiển thị' : 'Display name' }}</dt>
+              <dd>{{ displayName }}</dd>
+            </div>
+            <div class="or-app-profile-row">
+              <dt>{{ isVi ? 'Credits' : 'Credits' }}</dt>
+              <dd>{{ formatCredits(credits) }}</dd>
+            </div>
+            <div class="or-app-profile-row">
+              <dt>{{ isVi ? 'Domain Gommo' : 'Gommo domain' }}</dt>
+              <dd><code>{{ loginDomain }}</code></dd>
+            </div>
+          </dl>
+
+          <div class="or-app-profile-actions">
+            <a :href="`${prefix}/app/credits/`" class="or-app-btn or-app-btn-primary">
+              {{ isVi ? 'Nạp credits' : 'Top up credits' }}
+            </a>
+            <a :href="`${prefix}/app/token/`" class="or-app-btn or-app-btn-ghost">
+              Access token
+            </a>
+            <a :href="`${prefix}/authentication`" class="or-app-btn or-app-btn-ghost">
+              {{ isVi ? 'Tài liệu auth' : 'Auth docs' }}
             </a>
           </div>
         </section>
@@ -326,7 +455,7 @@ onMounted(async () => {
         </section>
 
         <!-- Credits -->
-        <section v-else class="or-app-section">
+        <section v-else-if="view === 'credits'" class="or-app-section">
           <p v-if="!billingReady" class="or-app-alert or-app-alert-warn">
             {{
               isVi
