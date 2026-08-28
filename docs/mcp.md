@@ -31,7 +31,7 @@ Use **HTTP**:
 - Mode C: proxy `/v2`, `/api/v2`, …
 - Auth: [Authentication](./authentication.md)
 
-Test interactively: [Playground](http://localhost:3001/portal/playground.html) (same origin as API in dev).
+Test interactively: [Playground](/app/playground/) (sign in; gateway API on `:3001` in dev).
 
 ### Using Cursor while developing gateway code
 

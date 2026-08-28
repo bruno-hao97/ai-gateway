@@ -15,7 +15,7 @@ Help us improve AI Gateway docs and API behavior.
    curl http://localhost:3001/health
    ```
 
-2. **Reproduce minimally** — [Quickstart](./quickstart.md) or [Playground](http://localhost:3001/portal/playground.html).
+2. **Reproduce minimally** — [Quickstart](./quickstart.md) or [Playground](/app/playground/).
 
 3. **Capture** — HTTP status, response body `{ success, message, code }`, gateway version/commit.
 

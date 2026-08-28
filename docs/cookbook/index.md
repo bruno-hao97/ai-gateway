@@ -8,7 +8,7 @@ description: Task-oriented recipes — copy, run, ship
 Step-by-step recipes for **Mode B** (`/gateway/*`). Each page is one complete task with curl + PowerShell.
 
 ::: tip Try in browser first
-[Playground](http://localhost:3001/portal/playground.html) — same origin, no CORS.
+[Playground](/app/playground/) — embedded on the docs site; sign in to run jobs.
 :::
 
 ## Prerequisites (all recipes)

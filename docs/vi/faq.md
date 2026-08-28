@@ -31,7 +31,9 @@ Câu hỏi phổ biến về AI Gateway và Gommo upstream.
 <details>
 <summary>API playground ở đâu?</summary>
 
-Chỉ dev: **http://localhost:3001/portal/** — cùng origin API, không cần CORS.
+[/vi/app/playground/](/vi/app/playground/) — đăng nhập trên docs; playground nhúng portal và tự truyền token.
+
+Dev: docs `:5173`, API gateway `:3001`.
 
 </details>
 

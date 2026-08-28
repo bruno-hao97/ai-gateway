@@ -1,3 +1,5 @@
+import { playgroundAppPath, type LocalePrefix } from './gateway-base';
+
 export const JOB_TYPES = [
   { id: 'image', label: 'Image', group: 'media' as const },
   { id: 'video', label: 'Video', group: 'media' as const },
@@ -475,12 +477,11 @@ export function sortModels(models: CatalogModel[], sort: SortKey): CatalogModel[
   }
 }
 
-export function playgroundUrl(model?: CatalogModel): string {
-  const base = import.meta.env.DEV
-    ? 'http://localhost:3001/portal/playground.html'
-    : '/portal/playground.html';
-  if (!model?.slug) return base;
-  return `${base}?model=${encodeURIComponent(model.slug)}&type=${encodeURIComponent(model.jobType)}`;
+export function playgroundUrl(model?: CatalogModel, localePrefix: LocalePrefix = ''): string {
+  return playgroundAppPath(
+    localePrefix,
+    model ? { slug: model.slug, jobType: model.jobType } : undefined,
+  );
 }
 
 export function findCatalogModel(models: CatalogModel[], slug: string): CatalogModel | undefined {

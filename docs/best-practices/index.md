@@ -140,7 +140,7 @@ Use `/billing/*` for PayOS topup — not `/gateway`. Keeps payment webhooks and 
 
 Same-origin dev tests avoid CORS setup:
 
-[http://localhost:3001/portal/playground.html](http://localhost:3001/portal/playground.html)
+[/app/playground/](/app/playground/) — sign in on the docs site.
 
 Then integrate from your app with the same token flow as [Quickstart](../quickstart.md).
 

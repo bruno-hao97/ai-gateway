@@ -31,7 +31,7 @@ Dùng **HTTP**:
 - Mode C: proxy `/v2`, `/api/v2`, …
 - Auth: [Authentication](../authentication.md)
 
-Test tương tác: [Playground](http://localhost:3001/portal/playground.html) (cùng origin API khi dev).
+Test tương tác: [Playground](/vi/app/playground/) (đăng nhập; API gateway `:3001` khi dev).
 
 ### Dùng Cursor khi phát triển gateway
 

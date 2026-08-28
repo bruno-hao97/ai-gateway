@@ -5,7 +5,7 @@ description: Create job without wait, then poll until resultUrl
 
 # Async job + poll loop
 
-Use when you want the job id immediately and poll from your app (or [Playground poll loop](http://localhost:3001/portal/playground.html)).
+Use when you want the job id immediately and poll from your app (or [Playground poll loop](/app/playground/)).
 
 Gateway poll interval upstream: **3500ms**, max **80** attempts when using `wait: true` on create. Manual poll = one status check per `GET`.
 

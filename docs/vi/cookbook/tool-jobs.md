@@ -62,7 +62,7 @@ $job.data.resultUrl
 ```
 
 ::: tip Tên field
-Nếu catalog dùng key khác (`url`, `image`, …), dùng đúng key đó — kiểm tra `GET /gateway/models?type=…` hoặc RESPONSE trên [Playground](http://localhost:3001/portal/playground.html).
+Nếu catalog dùng key khác (`url`, `image`, …), dùng đúng key đó — kiểm tra `GET /gateway/models?type=…` hoặc RESPONSE trên [Playground](/vi/app/playground/).
 :::
 
 ## 4. Async + poll

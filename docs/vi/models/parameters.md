@@ -47,7 +47,7 @@ Upstream có thể dùng `model`, `slug`, `model_id`, hoặc `id`. Mode B REST c
 
 ## Tool jobs
 
-Một số tool model dùng key khác (`url`, `image`, …). Kiểm tra `GET /gateway/models?type=…` hoặc RESPONSE trên [Playground](http://localhost:3001/portal/playground.html).
+Một số tool model dùng key khác (`url`, `image`, …). Kiểm tra `GET /gateway/models?type=…` hoặc RESPONSE trên [Playground](/vi/app/playground/).
 
 ## Tiếp theo
 

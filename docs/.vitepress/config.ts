@@ -1,7 +1,5 @@
 import { defineConfig } from 'vitepress';
 
-const playgroundLink = 'http://localhost:3001/portal/playground.html';
-
 const overviewSidebarEn = [
   { text: 'Quickstart', link: '/quickstart' },
   { text: 'Authentication', link: '/authentication' },
@@ -185,13 +183,13 @@ const docsSidebarVi = [
 
 const navEn = [
   { text: 'Models', link: '/models/' },
-  { text: 'Playground', link: playgroundLink, target: '_blank' },
+  { text: 'Playground', link: '/app/playground/' },
   { text: 'Docs', link: '/quickstart' },
 ];
 
 const navVi = [
   { text: 'Models', link: '/vi/models/' },
-  { text: 'Playground', link: playgroundLink, target: '_blank' },
+  { text: 'Playground', link: '/vi/app/playground/' },
   { text: 'Docs', link: '/vi/quickstart' },
 ];
 

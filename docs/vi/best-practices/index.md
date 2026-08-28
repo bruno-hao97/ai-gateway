@@ -101,7 +101,7 @@ PayOS ở `/billing/*`, không gắn dưới `/gateway`.
 
 ## 12. Test playground trước
 
-[http://localhost:3001/portal/playground.html](http://localhost:3001/portal/playground.html) — không cần CORS.
+[/vi/app/playground/](/vi/app/playground/) — đăng nhập trên docs.
 
 ## Tiếp theo
 

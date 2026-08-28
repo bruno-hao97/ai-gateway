@@ -143,30 +143,73 @@ Log `code` + path for alerts. Upstream 502 from proxy indicates Gommo connectivi
 
 Docs are **static** — not served by the API process in production.
 
-### Vercel
+In dev, VitePress proxies `/gateway`, `/ai`, and `/billing` to `:3001`. In production there is no proxy — the site must know your API URL at **build time**.
+
+### `VITE_GATEWAY_URL` (required for production docs)
+
+Set this when running `npm run docs:build`. It is embedded into the static bundle (not a runtime secret).
+
+| Feature | Uses `VITE_GATEWAY_URL` |
+|---------|-------------------------|
+| Models catalog / compare | `GET /gateway/models` |
+| Sign in / sign up | `POST /gateway/auth/*` |
+| Dashboard `/app/*` | `POST /ai/me`, `/billing/*` |
+| Playground embed | `{API}/portal/playground.html?embed=1` (iframe + postMessage) |
+
+**Dev** — leave unset; VitePress proxy handles API calls on `:5173`.
+
+**Production build:**
+
+```bash
+VITE_GATEWAY_URL=https://api.yourdomain.com npm run docs:build
+npm run docs:preview   # optional — serve dist locally
+```
+
+If unset at build time, the bundle falls back to `https://api.yourdomain.com` — replace that placeholder before shipping.
+
+#### GitHub Pages
+
+Workflow [`.github/workflows/docs-pages.yml`](../../.github/workflows/docs-pages.yml) passes `VITE_GATEWAY_URL` from a repository variable:
+
+1. Repo **Settings → Secrets and variables → Actions → Variables**
+2. Add **`VITE_GATEWAY_URL`** = `https://api.yourdomain.com` (no trailing slash)
+3. **Settings → Pages → Source:** GitHub Actions
+4. CNAME `docs.yourdomain.com` in DNS
+
+Push to `main` (paths under `docs/**`) triggers build + deploy.
+
+#### Vercel
 
 1. Import repo on Vercel.
-2. Build: `npm run docs:build`
-3. Output: `docs/.vitepress/dist`
+2. Build: `npm run docs:build` · Output: `docs/.vitepress/dist` (see `vercel.json`)
+3. **Environment variables:** `VITE_GATEWAY_URL` = `https://api.yourdomain.com` (Production)
 4. Custom domain: `docs.yourdomain.com`
 
-### GitHub Pages
+#### API side when docs are on another origin
 
-Workflow `.github/workflows/docs-pages.yml` deploys on push to `main` when `docs/**` changes.
+| API variable | Why |
+|--------------|-----|
+| `GATEWAY_CORS_ORIGIN` | Include `https://docs.yourdomain.com` — browser calls from catalog, login, `/app/` |
+| `GATEWAY_PORTAL=true` | Enable `/portal/playground.html` for the embedded playground on `/app/playground/` |
 
-1. Repo **Settings → Pages → Source:** GitHub Actions.
-2. CNAME `docs.yourdomain.com` in DNS.
+Example:
 
-Local preview: `npm run docs:dev` → `:5173`.
+```env
+GATEWAY_CORS_ORIGIN=https://docs.yourdomain.com
+GATEWAY_PORTAL=true
+```
+
+Local preview (dev server with hot reload): `npm run docs:dev` → `:5173`.
 
 ## Ops checklist
 
 - [ ] `GET /health` returns 200 with expected flags
 - [ ] Secrets set on platform (not in git)
-- [ ] `GATEWAY_CORS_ORIGIN` set if browser SPA uses API
+- [ ] **`VITE_GATEWAY_URL`** set on docs build (GitHub variable or Vercel env)
+- [ ] **`GATEWAY_CORS_ORIGIN`** includes docs origin (`https://docs.…`)
+- [ ] **`GATEWAY_PORTAL=true`** if using `/app/playground/` embed in prod
 - [ ] PayOS webhook URL registered and HTTPS
 - [ ] Merchant buffer credits sufficient for topup fulfillment
-- [ ] Portal disabled in prod (unless intentional)
 - [ ] Rate limits appropriate for traffic
 
 ## Next

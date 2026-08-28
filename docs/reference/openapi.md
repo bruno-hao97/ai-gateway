@@ -30,6 +30,7 @@ Or import the local file from `docs/public/openapi.yaml`.
 | Prefix | Description |
 |--------|-------------|
 | `GET /health` | Uptime and config flags |
+| `/gateway/auth/*` | Login and register (no Bearer required) |
 | `/gateway/*` | Models, jobs, upload, chat, audio (Bearer user token) |
 | `/billing/*` | PayOS topup (user Bearer on create) |
 | `/admin/*` | Merchant ops (`x-admin-key`) |

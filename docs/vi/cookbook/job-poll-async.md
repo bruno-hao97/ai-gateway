@@ -5,7 +5,7 @@ description: Tạo job không wait, rồi poll đến resultUrl
 
 # Job async + poll loop
 
-Dùng khi bạn cần job id ngay và poll từ app (hoặc [Playground poll loop](http://localhost:3001/portal/playground.html)).
+Dùng khi bạn cần job id ngay và poll từ app (hoặc [Playground poll loop](/vi/app/playground/)).
 
 Gateway poll upstream: **3500ms**, tối đa **80** lần khi `wait: true` lúc create. Poll thủ công = một lần check status mỗi `GET`.
 

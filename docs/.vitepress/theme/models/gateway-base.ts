@@ -6,11 +6,33 @@ export function apiBase(): string {
   return 'https://api.yourdomain.com';
 }
 
-export function playgroundUrl(model?: { slug?: string; jobType?: string }): string {
+export type LocalePrefix = '' | '/vi';
+
+export interface PlaygroundModelRef {
+  slug?: string;
+  jobType?: string;
+}
+
+/** Docs app route — auth guard redirects guests to login. */
+export function playgroundAppPath(
+  localePrefix: LocalePrefix = '',
+  model?: PlaygroundModelRef,
+): string {
+  const base = `${localePrefix}/app/playground/`;
+  if (!model?.slug && !model?.jobType) return base;
+  const params = new URLSearchParams();
+  if (model.jobType) params.set('type', model.jobType);
+  if (model.slug) params.set('model', model.slug);
+  const q = params.toString();
+  return q ? `${base}?${q}` : base;
+}
+
+/** Full portal tab (topbar) — dev tool / open in new tab. */
+export function playgroundUrl(model?: PlaygroundModelRef): string {
   const base = rawPlaygroundBase();
-  if (!model?.slug) return base;
+  if (!model?.slug && !model?.jobType) return base;
   const u = new URL(base);
-  u.searchParams.set('model', model.slug);
+  if (model.slug) u.searchParams.set('model', model.slug);
   if (model.jobType) u.searchParams.set('type', model.jobType);
   return u.toString();
 }

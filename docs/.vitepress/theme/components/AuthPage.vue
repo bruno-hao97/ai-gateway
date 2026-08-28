@@ -8,6 +8,7 @@ import {
   registerAccount,
   setStoredDomain,
   setStoredToken,
+  readRedirectFromLocation,
 } from '../models/auth-api';
 import { fetchMe } from '../models/user-api';
 
@@ -23,6 +24,10 @@ const homeLink = computed(() => `${prefix.value}/`);
 const loginLink = computed(() => `${prefix.value}/login/`);
 const signupLink = computed(() => `${prefix.value}/signup/`);
 const appLink = computed(() => `${prefix.value}/app/`);
+
+function afterAuthRedirect() {
+  return readRedirectFromLocation(appLink.value);
+}
 
 const email = ref('');
 const password = ref('');
@@ -56,7 +61,7 @@ async function onSubmit() {
       setStoredToken(t);
       setStoredDomain(DEFAULT_DOMAIN);
       await prefetchProfile();
-      window.location.href = appLink.value;
+      window.location.href = afterAuthRedirect();
       return;
     }
 
@@ -75,7 +80,7 @@ async function onSubmit() {
       await loginWithEmail(email.value, password.value);
     }
     await prefetchProfile();
-    window.location.href = appLink.value;
+    window.location.href = afterAuthRedirect();
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
   } finally {

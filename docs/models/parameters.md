@@ -47,7 +47,7 @@ Upstream may use `model`, `slug`, `model_id`, or `id`. Mode B REST expects **`mo
 
 ## Tool jobs
 
-Some tool models expect different input keys (`url`, `image`, …). Check `GET /gateway/models?type=…` or the RESPONSE panel in [Playground](http://localhost:3001/portal/playground.html).
+Some tool models expect different input keys (`url`, `image`, …). Check `GET /gateway/models?type=…` or the RESPONSE panel in [Playground](/app/playground/).
 
 ## Next
 

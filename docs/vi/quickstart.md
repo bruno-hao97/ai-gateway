@@ -16,7 +16,7 @@ Login → list models → tạo **một image job** (có `ratio` từ catalog).
 | Env server | `GOMMO_API_DOMAIN` trong `.env` (mặc định `79ai.net`) |
 
 ::: tip Playground không cần CORS
-Thử cùng flow trên browser: [Portal playground](http://localhost:3001/portal/playground.html)
+Thử cùng flow trên browser: [Playground](/vi/app/playground/) (cần đăng nhập).
 :::
 
 ## 1. Login

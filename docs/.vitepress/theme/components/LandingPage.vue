@@ -20,6 +20,7 @@ const isVi = computed(() => lang.value === 'vi-VN');
 const catalogLang = computed((): CatalogLang | undefined => (isVi.value ? 'vi' : 'en'));
 
 const prefix = computed(() => (isVi.value ? '/vi' : ''));
+const localePrefix = computed((): '' | '/vi' => (isVi.value ? '/vi' : ''));
 const appLink = computed(() => `${prefix.value}/app/`);
 const quickstartLink = computed(() => `${prefix.value}/quickstart`);
 const loginLink = computed(() => `${prefix.value}/login/`);
@@ -249,8 +250,8 @@ onMounted(async () => {
           <a :href="loginLink" class="gw-btn gw-btn-ghost">{{
             isVi ? 'Đăng nhập' : 'Sign in'
           }}</a>
-          <a :href="playgroundUrl()" target="_blank" rel="noopener" class="gw-btn gw-btn-ghost"
-            >Playground ↗</a
+          <a :href="playgroundUrl(undefined, localePrefix)" class="gw-btn gw-btn-ghost"
+            >Playground</a
           >
         </div>
       </div>
@@ -317,9 +318,7 @@ onMounted(async () => {
           <a
             v-for="m in featured"
             :key="m.slug"
-            :href="playgroundUrl(m)"
-            target="_blank"
-            rel="noopener"
+            :href="playgroundUrl(m, localePrefix)"
             class="gw-model-card"
           >
             <div class="gw-model-card-head">

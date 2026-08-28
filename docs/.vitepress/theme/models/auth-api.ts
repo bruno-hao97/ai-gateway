@@ -36,6 +36,27 @@ export function clearAuth(): void {
   clearCachedMe();
 }
 
+/** Same-site path only — blocks open redirects. */
+export function sanitizeRedirectPath(path: string | null | undefined): string | null {
+  if (!path || typeof path !== 'string') return null;
+  const p = path.trim();
+  if (!p.startsWith('/') || p.startsWith('//')) return null;
+  return p;
+}
+
+export function loginUrlWithRedirect(returnPath: string, localePrefix: '' | '/vi' = ''): string {
+  const safe = sanitizeRedirectPath(returnPath);
+  const base = `${localePrefix}/login/`;
+  if (!safe) return base;
+  return `${base}?redirect=${encodeURIComponent(safe)}`;
+}
+
+export function readRedirectFromLocation(fallback: string): string {
+  if (typeof window === 'undefined') return fallback;
+  const raw = new URLSearchParams(window.location.search).get('redirect');
+  return sanitizeRedirectPath(raw) ?? fallback;
+}
+
 function extractToken(payload: unknown): string {
   if (!payload || typeof payload !== 'object') return '';
   const p = payload as Record<string, unknown>;

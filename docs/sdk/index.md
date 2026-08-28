@@ -97,4 +97,4 @@ console.log(job.data?.resultUrl);
 
 - [Cookbook](../cookbook/) — task recipes
 - [API Reference](../reference/media.md) — HTTP spec
-- [Playground](http://localhost:3001/portal/playground.html)
+- [Playground](/app/playground/)

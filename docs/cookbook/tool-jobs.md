@@ -64,7 +64,7 @@ $job.data.resultUrl
 ```
 
 ::: tip Field names
-If the catalog expects a different key (`url`, `image`, …), use that exact key from upstream — check `GET /gateway/models?type=…` or the RESPONSE in [Playground](http://localhost:3001/portal/playground.html).
+If the catalog expects a different key (`url`, `image`, …), use that exact key from upstream — check `GET /gateway/models?type=…` or the RESPONSE in [Playground](/app/playground/).
 :::
 
 ## 4. Async + poll

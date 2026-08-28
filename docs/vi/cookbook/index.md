@@ -8,7 +8,7 @@ description: Công thức theo từng task — copy, chạy, ship
 Các công thức từng bước cho **Mode B** (`/gateway/*`). Mỗi trang là một task hoàn chỉnh với curl + PowerShell.
 
 ::: tip Thử trên trình duyệt trước
-[Playground](http://localhost:3001/portal/playground.html) — cùng origin, không CORS.
+[Playground](/vi/app/playground/) — nhúng trên docs; cần đăng nhập để chạy job.
 :::
 
 ## Chuẩn bị (mọi recipe)

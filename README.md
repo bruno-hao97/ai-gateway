@@ -25,9 +25,9 @@ npm run dev          # http://localhost:3001  (+ /portal/ in dev)
 | **API** (+ `/portal` playground) | 3001 | `api.yourdomain.com` |
 | **Developer docs** (VitePress) | 5173 | `docs.yourdomain.com` |
 
-Playground: **http://localhost:3001/portal/** — same-origin, không cần CORS.
+Playground (signed-in): **`/app/playground/`** on docs (`:5173`) — embeds `:3001/portal/playground.html`.
 
-`GATEWAY_CORS_ORIGIN` — chỉ khi có browser app khác origin (SDK demo, `apps/web`, v.v.).
+`GATEWAY_CORS_ORIGIN` — khi browser client khác origin (docs prod, `apps/web`, v.v.).
 
 ## Optional: `apps/web` (React)
 
@@ -136,12 +136,13 @@ Codes: `UNAUTHORIZED`, `FORBIDDEN`, `VALIDATION_ERROR`, `NOT_CONFIGURED`, `UPSTR
 2. `vercel.json` đã set:
    - **Build:** `npm run docs:build`
    - **Output:** `docs/.vitepress/dist`
-3. Add custom domain `docs.yourdomain.com`.
+3. **Env (Production):** `VITE_GATEWAY_URL=https://api.yourdomain.com`
+4. Add custom domain `docs.yourdomain.com`.
 
 CLI:
 
 ```bash
-npm run docs:build
+VITE_GATEWAY_URL=https://api.yourdomain.com npm run docs:build
 npx vercel --prod
 ```
 
@@ -149,9 +150,12 @@ npx vercel --prod
 
 Workflow [`.github/workflows/docs-pages.yml`](./.github/workflows/docs-pages.yml) build + deploy khi push `main` (path `docs/**`).
 
-1. Repo **Settings → Pages → Source:** GitHub Actions.
-2. Custom domain `docs.yourdomain.com` (CNAME trong DNS).
-3. `docs/.vitepress/config.ts` giữ `base: '/'` cho custom domain.
+1. Repo **Settings → Secrets and variables → Actions → Variables** → `VITE_GATEWAY_URL=https://api.yourdomain.com`
+2. **Settings → Pages → Source:** GitHub Actions.
+3. Custom domain `docs.yourdomain.com` (CNAME trong DNS).
+4. API: `GATEWAY_CORS_ORIGIN` gồm docs origin; `GATEWAY_PORTAL=true` nếu dùng playground embed.
+
+Chi tiết: [docs/deploy/](docs/deploy/index.md).
 
 ## Spec
 

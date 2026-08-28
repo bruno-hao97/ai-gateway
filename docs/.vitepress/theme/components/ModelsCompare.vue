@@ -28,6 +28,7 @@ import {
 
 const { lang } = useData();
 const isVi = computed(() => lang.value === 'vi-VN');
+const localePrefix = computed((): '' | '/vi' => (isVi.value ? '/vi' : ''));
 const catalogLang = computed((): CatalogLang | undefined => (isVi.value ? 'vi' : 'en'));
 
 const homeLink = computed(() => (isVi.value ? '/vi/' : '/'));
@@ -337,7 +338,7 @@ onMounted(() => {
                   {{ isVi ? 'Đổi' : 'Change' }}
                 </button>
                 <a
-                  :href="playgroundUrl(model)"
+                  :href="playgroundUrl(model, localePrefix)"
                   target="_blank"
                   rel="noopener"
                   class="or-compare-play-btn"

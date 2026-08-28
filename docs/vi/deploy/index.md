@@ -111,19 +111,68 @@ Bỏ trống nếu chỉ server-side.
 
 Static — không chạy trong process API.
 
-- **Vercel:** `npm run docs:build` → output `docs/.vitepress/dist`
-- **GitHub Pages:** workflow `docs-pages.yml`
+Dev: VitePress proxy `/gateway`, `/ai`, `/billing` → `:3001`. Prod: **không có proxy** — cần biết URL API lúc **build**.
 
-Local: `npm run docs:dev` → `:5173`.
+### `VITE_GATEWAY_URL` (bắt buộc cho docs production)
+
+Set khi chạy `npm run docs:build`. Giá trị được bake vào bundle static.
+
+| Tính năng | Dùng `VITE_GATEWAY_URL` |
+|-----------|-------------------------|
+| Catalog / compare | `GET /gateway/models` |
+| Đăng nhập / đăng ký | `POST /gateway/auth/*` |
+| Dashboard `/app/*` | `POST /ai/me`, `/billing/*` |
+| Playground embed | `{API}/portal/playground.html?embed=1` |
+
+**Dev** — không cần set; proxy VitePress trên `:5173`.
+
+**Build production:**
+
+```bash
+VITE_GATEWAY_URL=https://api.yourdomain.com npm run docs:build
+npm run docs:preview
+```
+
+Nếu không set, bundle fallback `https://api.yourdomain.com` — đổi trước khi ship.
+
+#### GitHub Pages
+
+Workflow `docs-pages.yml` đọc biến repo:
+
+1. **Settings → Secrets and variables → Actions → Variables**
+2. Thêm **`VITE_GATEWAY_URL`** = `https://api.yourdomain.com`
+3. **Settings → Pages → Source:** GitHub Actions
+4. CNAME `docs.yourdomain.com`
+
+#### Vercel
+
+1. Build `npm run docs:build` · output `docs/.vitepress/dist`
+2. Env **Production:** `VITE_GATEWAY_URL=https://api.yourdomain.com`
+3. Domain `docs.yourdomain.com`
+
+#### API khi docs khác origin
+
+| Biến API | Lý do |
+|----------|-------|
+| `GATEWAY_CORS_ORIGIN` | Thêm `https://docs.yourdomain.com` |
+| `GATEWAY_PORTAL=true` | Bật playground embed trên `/app/playground/` |
+
+```env
+GATEWAY_CORS_ORIGIN=https://docs.yourdomain.com
+GATEWAY_PORTAL=true
+```
+
+Local dev: `npm run docs:dev` → `:5173`.
 
 ## Checklist ops
 
 - [ ] `/health` 200 + flags đúng
 - [ ] Secrets trên platform
-- [ ] CORS nếu SPA browser
+- [ ] **`VITE_GATEWAY_URL`** trên docs build (GitHub variable / Vercel env)
+- [ ] **`GATEWAY_CORS_ORIGIN`** gồm origin docs
+- [ ] **`GATEWAY_PORTAL=true`** nếu dùng playground embed prod
 - [ ] Webhook PayOS HTTPS
 - [ ] Merchant buffer đủ credit
-- [ ] Portal tắt prod (trừ khi cố ý)
 
 ## Tiếp theo
 

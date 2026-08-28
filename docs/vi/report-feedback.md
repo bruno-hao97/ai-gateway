@@ -15,7 +15,7 @@ Giúp cải thiện docs và hành vi API AI Gateway.
    curl http://localhost:3001/health
    ```
 
-2. **Tái hiện tối thiểu** — [Quickstart](./quickstart.md) hoặc [Playground](http://localhost:3001/portal/playground.html).
+2. **Tái hiện tối thiểu** — [Quickstart](./quickstart.md) hoặc [Playground](/vi/app/playground/).
 
 3. **Ghi lại** — HTTP status, body `{ success, message, code }`, version/commit gateway.
 

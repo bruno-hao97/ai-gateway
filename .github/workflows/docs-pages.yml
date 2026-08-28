@@ -31,7 +31,12 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npm run docs:build
+      - name: Build VitePress docs
+        run: npm run docs:build
+        env:
+          # Repository variable (Settings → Secrets and variables → Actions → Variables)
+          # Example: https://api.yourdomain.com — baked into catalog, auth, billing, playground embed
+          VITE_GATEWAY_URL: ${{ vars.VITE_GATEWAY_URL }}
 
       - uses: actions/upload-pages-artifact@v3
         with:

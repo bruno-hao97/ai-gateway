@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
-import { useData } from 'vitepress';
-import { getStoredToken, getStoredDomain } from '../models/auth-api';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useData, useRoute } from 'vitepress';
+import { getStoredToken, getStoredDomain, loginUrlWithRedirect } from '../models/auth-api';
 import { playgroundEmbedUrl, playgroundOrigin, playgroundUrl } from '../models/gateway-base';
 import {
   createTopup,
@@ -25,8 +25,21 @@ const props = defineProps<{
 }>();
 
 const { lang } = useData();
+const route = useRoute();
 const isVi = computed(() => lang.value === 'vi-VN');
 const prefix = computed(() => (isVi.value ? '/vi' : ''));
+
+function readEmbedQueryFromLocation(): { type?: string; model?: string; panel?: string } {
+  if (typeof window === 'undefined') return {};
+  const q = new URLSearchParams(window.location.search);
+  return {
+    type: q.get('type') || undefined,
+    model: q.get('model') || undefined,
+    panel: q.get('panel') || undefined,
+  };
+}
+
+const embedQuery = ref(readEmbedQueryFromLocation());
 
 const ready = ref(false);
 const me = ref<MeResponse | null>(getCachedMe());
@@ -41,7 +54,7 @@ const paying = ref<string | null>(null);
 const payment = ref<TopupPayment | null>(null);
 const playgroundFrame = ref<HTMLIFrameElement | null>(null);
 
-const embedSrc = computed(() => playgroundEmbedUrl());
+const embedSrc = computed(() => playgroundEmbedUrl(embedQuery.value));
 const playgroundExternalUrl = computed(() => playgroundUrl());
 
 const credits = computed(() => getCredits(me.value));
@@ -180,8 +193,12 @@ function onPlaygroundLoad() {
 }
 
 onMounted(async () => {
+  if (props.view === 'playground') {
+    embedQuery.value = readEmbedQueryFromLocation();
+  }
   if (!getStoredToken()) {
-    window.location.href = `${prefix.value}/login/`;
+    const returnPath = route.path + (typeof window !== 'undefined' ? window.location.search : '');
+    window.location.href = loginUrlWithRedirect(returnPath, prefix.value as '' | '/vi');
     return;
   }
   await refreshProfile();
@@ -190,6 +207,15 @@ onMounted(async () => {
   }
   ready.value = true;
 });
+
+watch(
+  () => route.fullPath,
+  () => {
+    if (props.view === 'playground') {
+      embedQuery.value = readEmbedQueryFromLocation();
+    }
+  },
+);
 </script>
 
 <template>

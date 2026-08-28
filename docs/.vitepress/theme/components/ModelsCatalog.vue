@@ -32,6 +32,7 @@ import {
 
 const { lang } = useData();
 const isVi = computed(() => lang.value === 'vi-VN');
+const localePrefix = computed((): '' | '/vi' => (isVi.value ? '/vi' : ''));
 
 const LIST_LIMIT = 6;
 
@@ -478,7 +479,7 @@ watch(activeTab, (tab) => {
                 <code class="or-row-slug">{{ m.slug }}</code>
                 <span class="or-row-actions">
                   <a
-                    :href="playgroundUrl(m)"
+                    :href="playgroundUrl(m, localePrefix)"
                     target="_blank"
                     rel="noopener"
                     class="or-link"
@@ -520,7 +521,7 @@ watch(activeTab, (tab) => {
               <td>{{ m.creditsLabel }}</td>
               <td>
                 <a
-                  :href="playgroundUrl(m)"
+                  :href="playgroundUrl(m, localePrefix)"
                   target="_blank"
                   rel="noopener"
                   class="or-link"

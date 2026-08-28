@@ -31,6 +31,56 @@ paths:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
 
+  /gateway/auth/login:
+    post:
+      tags: [Gateway]
+      summary: Login with Gommo email and password
+      description: |
+        Returns a Gommo `access_token` for `Authorization: Bearer` on `/gateway/*`.
+        `domain` is optional — server uses `GOMMO_API_DOMAIN` when omitted.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthLoginRequest'
+      responses:
+        '200':
+          description: Login success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '401':
+          description: Invalid credentials
+
+  /gateway/auth/register:
+    post:
+      tags: [Gateway]
+      summary: Register Gommo user
+      description: |
+        Creates a Gommo account via merchant credentials on the server
+        (`GOMMO_ACCESS_TOKEN`, `GOMMO_MANAGER_ID`). Returns `access_token` on success.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRegisterRequest'
+      responses:
+        '200':
+          description: Registration success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '400':
+          description: Validation error
+        '502':
+          description: Upstream registration error
+
   /gateway/models:
     get:
       tags: [Gateway]
@@ -358,6 +408,51 @@ components:
       name: x-admin-key
 
   schemas:
+    AuthLoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        domain:
+          type: string
+          description: Optional Gommo domain; server default when omitted
+
+    AuthRegisterRequest:
+      type: object
+      required: [email, password, phone]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        phone:
+          type: string
+        name:
+          type: string
+        note:
+          type: string
+
+    AuthTokenResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            access_token:
+              type: string
+        message:
+          type: string
+
     HealthResponse:
       type: object
       properties:

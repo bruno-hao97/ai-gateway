@@ -24,6 +24,7 @@ Swagger Editor tải spec và hiển thị schema, thử request trực tiếp (
 | Prefix | Mục đích |
 |--------|----------|
 | `/health` | Health check — không auth |
+| `/gateway/auth/*` | Đăng nhập, đăng ký — không cần Bearer |
 | `/gateway/*` | REST wrap: models, jobs, upload, chat, audio — auth `Authorization: Bearer` user |
 | `/billing/*` | PayOS topup, packages, webhook — tách khỏi gateway |
 | `/admin/*` | Merchant balance, send credits, register user — auth `x-admin-key` (chỉ server) |

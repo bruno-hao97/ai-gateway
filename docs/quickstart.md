@@ -16,7 +16,7 @@ Login → list models → create **one image job** (with `ratio` from catalog).
 | Server env | `GOMMO_API_DOMAIN` in `.env` (default `79ai.net`) |
 
 ::: tip No CORS for playground
-Try the same flow in browser: [Portal playground](http://localhost:3001/portal/playground.html)
+Try the same flow in browser: [Playground](/app/playground/) (sign in required).
 :::
 
 ## 1. Login
