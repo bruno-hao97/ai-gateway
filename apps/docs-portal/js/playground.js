@@ -649,6 +649,82 @@ function isPollFailed(data) {
   return /fail|error|cancel|reject|nsfw|blocked|denied/i.test(extractPollStatus(data));
 }
 
+const STORAGE_USAGE = 'gw_usage_history';
+const MAX_USAGE_RECORDS = 500;
+
+function appendUsageLocal(record) {
+  try {
+    const raw = localStorage.getItem(STORAGE_USAGE);
+    const list = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(list)) return;
+    const full = {
+      id: record.id || `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      createdAt: record.createdAt || new Date().toISOString(),
+      jobType: record.jobType || 'other',
+      model: record.model || '—',
+      prompt: (record.prompt || '').slice(0, 500),
+      status: record.status || 'success',
+      credits: record.credits ?? null,
+      jobId: record.jobId,
+      resultUrl: record.resultUrl,
+      source: record.source || 'playground',
+    };
+    if (full.jobId) {
+      const idx = list.findIndex((r) => r && r.jobId === full.jobId);
+      if (idx >= 0) list[idx] = { ...list[idx], ...full };
+      else list.unshift(full);
+    } else {
+      list.unshift(full);
+    }
+    localStorage.setItem(STORAGE_USAGE, JSON.stringify(list.slice(0, MAX_USAGE_RECORDS)));
+  } catch {
+    /* ignore */
+  }
+}
+
+function notifyUsageParent(record) {
+  if (!isEmbed || window.parent === window) return;
+  try {
+    const target = document.referrer ? new URL(document.referrer).origin : '*';
+    window.parent.postMessage({ type: 'ai-gateway-usage', record }, target);
+  } catch {
+    try {
+      window.parent.postMessage({ type: 'ai-gateway-usage', record }, '*');
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function logUsageEvent(partial) {
+  const record = {
+    jobType: partial.jobType || 'other',
+    model: partial.model || '—',
+    prompt: (partial.prompt || '').slice(0, 500),
+    status: partial.status || 'success',
+    credits: partial.credits ?? null,
+    jobId: partial.jobId,
+    resultUrl: partial.resultUrl,
+    source: 'playground',
+  };
+  appendUsageLocal(record);
+  notifyUsageParent(record);
+}
+
+function jobTypeFromPollMedia(media) {
+  if (media === 'video') return 'video';
+  if (media === 'music') return 'music';
+  return 'image';
+}
+
+function logPollUsage(jobId, media, data, resultUrl) {
+  const jobType = jobTypeFromPollMedia(media);
+  const model = $('mediaModelSelect')?.value || '—';
+  const prompt = $('mediaPrompt')?.value?.trim() || '';
+  const status = isPollFailed(data) ? 'failed' : 'success';
+  logUsageEvent({ jobType, model, prompt, status, jobId, resultUrl });
+}
+
 async function requestPoll(jobId, media, label, attempt) {
   const start = performance.now();
   const url = `${baseUrl()}/gateway/jobs/${encodeURIComponent(jobId)}?media=${encodeURIComponent(media)}`;
@@ -698,6 +774,11 @@ async function runPollOnce() {
     const data = await requestPoll(jobId, media, label);
     const resultUrl = extractPollResultUrl(data);
     if (resultUrl) showResultUrl(resultUrl);
+    if (isPollSuccess(data)) {
+      logPollUsage(jobId, media, data, resultUrl);
+    } else if (isPollFailed(data)) {
+      logPollUsage(jobId, media, data, resultUrl);
+    }
     setStatus(status, resultUrl ? 'Done — see preview →' : 'Polled — check RESPONSE status', !!resultUrl);
   } catch (err) {
     setStatus(status, err.message, false);
@@ -739,10 +820,12 @@ async function runPollLoop() {
       const resultUrl = extractPollResultUrl(data);
       if (resultUrl) showResultUrl(resultUrl);
       if (isPollSuccess(data)) {
+        logPollUsage(jobId, media, data, resultUrl);
         setStatus(status, resultUrl ? `Done #${attempt} — preview →` : `Done #${attempt}`, true);
         break;
       }
       if (isPollFailed(data)) {
+        logPollUsage(jobId, media, data, resultUrl);
         setStatus(status, `Failed #${attempt} — see RESPONSE`, false);
         break;
       }
@@ -1071,6 +1154,18 @@ $('btnMediaJob')?.addEventListener('click', async () => {
       if ($('pollMedia')) $('pollMedia').value = pollMedia;
     }
 
+    if (wait) {
+      logUsageEvent({
+        jobType,
+        model: modelSlugVal,
+        prompt,
+        status: 'success',
+        jobId: jobId || undefined,
+        resultUrl: url || undefined,
+        credits: extractCredits(data),
+      });
+    }
+
     let msg = url ? 'Done — see preview →' : 'OK';
     if (jobId && !wait) msg += ` — job id copied to Poll (${jobId.slice(0, 8)}…)`;
     setStatus(status, msg, true);
@@ -1335,6 +1430,13 @@ $('btnTts')?.addEventListener('click', async () => {
     );
     const url = extractTtsUrl(data);
     showResultUrl(url);
+    logUsageEvent({
+      jobType: 'audio',
+      model: model || 'TTS',
+      prompt: text,
+      status: url ? 'success' : 'success',
+      resultUrl: url || undefined,
+    });
     setStatus(status, url ? 'Done — see preview →' : 'OK', true);
   } catch (err) {
     setStatus(status, err.message, false);

@@ -36,6 +36,38 @@ export function clearAuth(): void {
   clearCachedMe();
 }
 
+/**
+ * One-time import from URL query (dev sync from 79ai Network tab).
+ * ?access_token=...&device_id=... — params stripped from address bar after save.
+ */
+export function importSessionFromUrl(): boolean {
+  if (typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('access_token')?.trim();
+  const deviceId = params.get('device_id')?.trim();
+  let changed = false;
+
+  if (token) {
+    setStoredToken(token);
+    clearCachedMe();
+    changed = true;
+  }
+  if (deviceId) {
+    localStorage.setItem('gw_device_id', deviceId);
+    changed = true;
+  }
+
+  if (changed && (token || deviceId)) {
+    if (token) params.delete('access_token');
+    if (deviceId) params.delete('device_id');
+    const qs = params.toString();
+    const next = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`;
+    window.history.replaceState({}, '', next);
+  }
+
+  return changed;
+}
+
 /** Same-site path only — blocks open redirects. */
 export function sanitizeRedirectPath(path: string | null | undefined): string | null {
   if (!path || typeof path !== 'string') return null;

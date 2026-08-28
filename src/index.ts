@@ -4,6 +4,7 @@ import gatewayRoutes from './routes/gateway.js';
 import uploadRoutes from './routes/upload.js';
 import chatRoutes from './routes/chat.js';
 import audioRoutes from './routes/audio.js';
+import usageRoutes from './routes/usage.js';
 import adminRoutes from './routes/admin.js';
 import billingRoutes from './routes/billing.js';
 import portalRoutes from './routes/portal.js';
@@ -50,6 +51,7 @@ gatewayMount.use(gatewayRoutes);
 gatewayMount.use(uploadRoutes);
 gatewayMount.use(chatRoutes);
 gatewayMount.use(audioRoutes);
+gatewayMount.use(usageRoutes);
 app.use('/gateway', gatewayRateLimit, gatewayMount);
 
 app.use('/admin', adminRateLimit, adminRoutes);

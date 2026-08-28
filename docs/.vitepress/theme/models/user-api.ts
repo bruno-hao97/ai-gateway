@@ -1,5 +1,15 @@
 import { apiBase } from './gateway-base';
 import { getStoredDomain, getStoredToken } from './auth-api';
+import { appendDeviceToForm } from './gommo-device';
+import type { UsageRecord } from './usage-history';
+import type {
+  UsageListData,
+  UsageLogsData,
+  UsageStatsData,
+  UsageStatsPeriod,
+  UsageStatsType,
+} from './usage-stats';
+import { listItemCreatedAt } from './usage-stats';
 
 export const STORAGE_ME = 'gw_user_me';
 
@@ -10,9 +20,19 @@ export interface MeResponse {
     email?: string;
     username?: string;
     avatar?: string;
+    credits_ai?: number;
+    credits_all?: number;
+    balance?: number;
   };
   balancesInfo?: {
     credits_ai?: number;
+    credits_all?: number;
+    balance?: number;
+    credits?: number;
+  };
+  data?: {
+    userInfo?: MeResponse['userInfo'];
+    balancesInfo?: MeResponse['balancesInfo'];
   };
   message?: string;
   error?: unknown;
@@ -62,6 +82,13 @@ function authHeaders(json = true): HeadersInit {
   return headers;
 }
 
+function gatewayQueryParams(extra?: URLSearchParams): string {
+  const params = extra ?? new URLSearchParams();
+  const domain = getStoredDomain();
+  if (domain && !params.has('domain')) params.set('domain', domain);
+  return params.toString();
+}
+
 export function getCachedMe(): MeResponse | null {
   if (typeof window === 'undefined') return null;
   const raw = localStorage.getItem(STORAGE_ME);
@@ -101,11 +128,38 @@ export function getAvatarUrl(me?: MeResponse | null): string {
 }
 
 export function getCredits(me?: MeResponse | null): number {
-  return me?.balancesInfo?.credits_ai ?? 0;
+  const sources = [
+    me?.balancesInfo,
+    me?.data?.balancesInfo,
+    me?.userInfo,
+    me?.data?.userInfo,
+  ];
+  for (const b of sources) {
+    if (!b) continue;
+    for (const key of ['credits_ai', 'credits_all', 'balance', 'credits'] as const) {
+      const n = Number((b as Record<string, unknown>)[key]);
+      if (Number.isFinite(n) && n >= 0) return n;
+    }
+  }
+  return 0;
 }
 
 export function formatCredits(n: number): string {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(n);
+}
+
+function normalizeMeResponse(raw: Record<string, unknown>): MeResponse {
+  const nested =
+    raw.data && typeof raw.data === 'object' && !Array.isArray(raw.data)
+      ? (raw.data as Record<string, unknown>)
+      : null;
+  const userInfo = (raw.userInfo || nested?.userInfo) as MeResponse['userInfo'];
+  const balancesInfo = (raw.balancesInfo || nested?.balancesInfo) as MeResponse['balancesInfo'];
+  return {
+    ...(raw as MeResponse),
+    userInfo,
+    balancesInfo,
+  };
 }
 
 export async function fetchMe(): Promise<MeResponse> {
@@ -114,12 +168,14 @@ export async function fetchMe(): Promise<MeResponse> {
   if (!token) throw new Error('Not signed in');
 
   const body = new URLSearchParams({ access_token: token, domain });
+  appendDeviceToForm(body);
   const res = await fetch(`${apiBase()}/ai/me`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
     body,
   });
-  const data = (await res.json().catch(() => ({}))) as MeResponse;
+  const raw = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  const data = normalizeMeResponse(raw);
   if (!res.ok || data.error) {
     throw new Error(String(data.message || 'Could not load profile'));
   }
@@ -186,4 +242,125 @@ export function formatOrderDate(iso: string, isVi: boolean): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
+}
+
+export interface AudioListItem {
+  id_base: string;
+  file_url: string;
+  text?: string;
+  status?: string;
+  created_at?: string;
+}
+
+export async function fetchAudioLists(): Promise<AudioListItem[]> {
+  const q = gatewayQueryParams();
+  const res = await fetch(`${apiBase()}/gateway/audio/lists${q ? `?${q}` : ''}`, {
+    headers: authHeaders(false),
+  });
+  const data = (await res.json().catch(() => ({}))) as { data?: AudioListItem[]; message?: string };
+  if (!res.ok) throw new Error(String(data.message || 'Could not load audio history'));
+  return data.data || [];
+}
+
+function usageFormBase(opts: {
+  period?: UsageStatsPeriod;
+  type?: UsageStatsType;
+  language?: string;
+  page?: number;
+  limit?: number;
+}): URLSearchParams {
+  const form = new URLSearchParams();
+  form.set('domain', getStoredDomain());
+  if (opts.period) form.set('period', opts.period);
+  if (opts.type) form.set('type', opts.type);
+  form.set('language', opts.language || 'vi');
+  if (opts.page != null) form.set('page', String(opts.page));
+  if (opts.limit != null) form.set('limit', String(opts.limit));
+  const locale = (opts.language || 'vi').toLowerCase();
+  appendDeviceToForm(form, locale);
+  return form;
+}
+
+async function postUsage<T>(path: 'stats' | 'logs', form: URLSearchParams): Promise<T> {
+  const res = await fetch(`${apiBase()}/gateway/usage/${path}`, {
+    method: 'POST',
+    headers: {
+      ...authHeaders(false),
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: form.toString(),
+  });
+  const data = (await res.json().catch(() => ({}))) as { data?: T; message?: string };
+  if (!res.ok) throw new Error(String(data.message || `Could not load usage ${path}`));
+  if (data.data == null) throw new Error(`Empty usage ${path} response`);
+  return data.data;
+}
+
+export async function fetchUsageStats(opts?: {
+  period?: UsageStatsPeriod;
+  type?: UsageStatsType;
+  language?: string;
+}): Promise<UsageStatsData> {
+  const form = usageFormBase({
+    period: opts?.period,
+    type: opts?.type,
+    language: opts?.language || 'vi',
+  });
+  return postUsage<UsageStatsData>('stats', form);
+}
+
+export async function fetchUsageLogs(opts?: {
+  period?: UsageStatsPeriod;
+  type?: UsageStatsType;
+  language?: string;
+  page?: number;
+  limit?: number;
+}): Promise<UsageLogsData> {
+  const form = usageFormBase({
+    period: opts?.period,
+    type: opts?.type,
+    language: opts?.language || 'VI',
+    page: opts?.page ?? 1,
+    limit: opts?.limit ?? 30,
+  });
+  return postUsage<UsageLogsData>('logs', form);
+}
+
+/** @deprecated Use fetchUsageLogs */
+export async function fetchUsageList(opts?: {
+  period?: UsageStatsPeriod;
+  type?: UsageStatsType;
+  language?: string;
+  page?: number;
+  limit?: number;
+}): Promise<UsageListData> {
+  return fetchUsageLogs(opts);
+}
+
+export type UsageHistoryType = 'all' | 'image' | 'video';
+
+export async function fetchUsageHistory(opts?: {
+  type?: UsageHistoryType;
+  limit?: number;
+  period?: UsageStatsPeriod;
+}): Promise<UsageRecord[]> {
+  const list = await fetchUsageLogs({
+    type: opts?.type === 'image' || opts?.type === 'video' ? opts.type : 'all',
+    period: opts?.period ?? '30d',
+    limit: opts?.limit ?? 30,
+  });
+  return list.items.map((item, idx) => ({
+    id: item.id_base || `usage-${idx}`,
+    jobType: (item.type as UsageRecord['jobType']) || 'other',
+    model: item.model || '—',
+    prompt: (item.prompt || '').slice(0, 500),
+    status:
+      /fail|error/i.test(String(item.status || ''))
+        ? ('failed' as const)
+        : ('success' as const),
+    credits: Number(item.credit ?? item.credit_fee ?? 0) || null,
+    jobId: item.id_base,
+    createdAt: listItemCreatedAt(item) || new Date().toISOString(),
+    source: 'server' as const,
+  }));
 }

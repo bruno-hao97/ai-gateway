@@ -286,6 +286,263 @@ paths:
         '200':
           description: Audio lists
 
+  /gateway/usage/stats:
+    post:
+      tags: [Gateway]
+      summary: Usage statistics (79ai-style, preferred)
+      description: |
+        Aggregated usage from Gommo `POST /api/v2/usage-history` with `action=stats`.
+        Send `device_id`, `device_name`, `device_info` in form body (like 79ai).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                period:
+                  type: string
+                  enum: [7d, 30d, 90d]
+                type:
+                  type: string
+                  enum: [all, image, video, audio, music]
+                language:
+                  type: string
+                  default: vi
+                domain:
+                  type: string
+                device_id:
+                  type: string
+                device_name:
+                  type: string
+                device_info:
+                  type: string
+      responses:
+        '200':
+          description: Usage stats (summary, chart, table)
+    get:
+      tags: [Gateway]
+      summary: Usage statistics (79ai-style)
+      description: |
+        Aggregated usage from Gommo `POST /api/v2/usage-history` with `action=stats`.
+        Returns summary, chart series, and daily table — same data as 79ai Usage History.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [7d, 30d, 90d]
+            default: 30d
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [all, image, video, audio, music]
+            default: all
+        - name: language
+          in: query
+          schema:
+            type: string
+            default: vi
+        - name: device_id
+          in: query
+          description: Browser device id (forwarded to Gommo usage-history)
+          schema:
+            type: string
+        - name: device_name
+          in: query
+          schema:
+            type: string
+        - name: device_info
+          in: query
+          schema:
+            type: string
+        - name: domain
+          in: query
+          schema:
+            type: string
+        - name: projectId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Usage stats (summary, chart, table)
+
+  /gateway/usage/logs:
+    post:
+      tags: [Gateway]
+      summary: Usage job logs (79ai items table)
+      description: |
+        Per-job rows from Gommo `POST /api/v2/usage-history` with `action=logs`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                period:
+                  type: string
+                  enum: [7d, 30d, 90d]
+                type:
+                  type: string
+                language:
+                  type: string
+                  default: vi
+                limit:
+                  type: integer
+                  default: 30
+                page:
+                  type: integer
+                domain:
+                  type: string
+                device_id:
+                  type: string
+                device_name:
+                  type: string
+                device_info:
+                  type: string
+      responses:
+        '200':
+          description: Usage log items
+    get:
+      tags: [Gateway]
+      summary: Usage job logs (query params)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [7d, 30d, 90d]
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 30
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: domain
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Usage log items
+
+  /gateway/usage/list:
+    post:
+      tags: [Gateway]
+      summary: Usage job list (deprecated — use /usage/logs)
+      deprecated: true
+      description: |
+        Alias for `/gateway/usage/logs`. Gommo uses `action=logs`, not `list`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                period:
+                  type: string
+                  enum: [7d, 30d, 90d]
+                type:
+                  type: string
+                language:
+                  type: string
+                page:
+                  type: integer
+                limit:
+                  type: integer
+                domain:
+                  type: string
+                device_id:
+                  type: string
+                device_name:
+                  type: string
+                device_info:
+                  type: string
+      responses:
+        '200':
+          description: Usage list items
+    get:
+      tags: [Gateway]
+      summary: Usage job list (query params)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [7d, 30d, 90d]
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: domain
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Usage list items
+
+  /gateway/usage/history:
+    get:
+      tags: [Gateway]
+      summary: Usage history (deprecated — use /usage/logs)
+      deprecated: true
+      description: Alias for `/gateway/usage/logs` (Gommo usage-history action=logs).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [all, image, video]
+            default: all
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 100
+        - name: projectId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Usage records
+
   /billing/status:
     get:
       tags: [Billing]

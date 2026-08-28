@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useData, useRoute } from 'vitepress';
-import { getStoredToken, getStoredDomain, loginUrlWithRedirect } from '../models/auth-api';
+import { getStoredToken, getStoredDomain, importSessionFromUrl, loginUrlWithRedirect } from '../models/auth-api';
 import { playgroundEmbedUrl, playgroundOrigin, playgroundUrl } from '../models/gateway-base';
 import {
   createTopup,
@@ -24,7 +24,9 @@ import {
   type TopupOrderStatus,
   type TopupPayment,
 } from '../models/user-api';
+import { appendUsageRecord, type UsageJobType } from '../models/usage-history';
 import AppNavIcon from './AppNavIcon.vue';
+import ProfileUsagePanel from './ProfileUsagePanel.vue';
 
 interface AppNavItem {
   id?: string;
@@ -74,6 +76,7 @@ const billingReady = ref(true);
 const paying = ref<string | null>(null);
 const payment = ref<TopupPayment | null>(null);
 const playgroundFrame = ref<HTMLIFrameElement | null>(null);
+const usagePanelRef = ref<InstanceType<typeof ProfileUsagePanel> | null>(null);
 
 const embedSrc = computed(() => playgroundEmbedUrl(embedQuery.value));
 const playgroundExternalUrl = computed(() => playgroundUrl());
@@ -283,10 +286,41 @@ function onPlaygroundLoad() {
 
 async function loadProfileView() {
   profileSection.value = readProfileSectionFromLocation();
+  await refreshProfile();
   await loadTopupOrders();
+  if (profileSection.value === 'usage') {
+    await usagePanelRef.value?.reloadRecords();
+  }
+}
+
+function onPlaygroundUsageMessage(event: MessageEvent) {
+  const origin = playgroundOrigin();
+  if (origin && event.origin !== origin) return;
+  const data = event.data;
+  if (!data || data.type !== 'ai-gateway-usage' || !data.record) return;
+  const r = data.record as {
+    jobType?: UsageJobType;
+    model?: string;
+    prompt?: string;
+    status?: 'success' | 'failed' | 'pending';
+    credits?: number | null;
+    jobId?: string;
+    resultUrl?: string;
+  };
+  appendUsageRecord({
+    jobType: r.jobType || 'other',
+    model: r.model || '—',
+    prompt: r.prompt || '',
+    status: r.status || 'success',
+    credits: r.credits ?? null,
+    jobId: r.jobId,
+    resultUrl: r.resultUrl,
+    source: 'playground',
+  });
 }
 
 onMounted(async () => {
+  importSessionFromUrl();
   if (props.view === 'playground') {
     embedQuery.value = readEmbedQueryFromLocation();
   }
@@ -303,6 +337,11 @@ onMounted(async () => {
     await loadProfileView();
   }
   ready.value = true;
+  window.addEventListener('message', onPlaygroundUsageMessage);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('message', onPlaygroundUsageMessage);
 });
 
 watch(
@@ -313,6 +352,9 @@ watch(
     }
     if (props.view === 'profile') {
       profileSection.value = readProfileSectionFromLocation();
+      if (profileSection.value === 'usage') {
+        void usagePanelRef.value?.reloadRecords();
+      }
     }
   },
 );
@@ -589,35 +631,12 @@ watch(
 
           <!-- Usage -->
           <div v-else-if="profileSection === 'usage'" class="or-app-profile-panel">
-            <div class="or-app-usage-stat">
-              <p class="or-app-usage-value">{{ formatCredits(credits) }}</p>
-              <p class="or-app-usage-label">{{ isVi ? 'Credits khả dụng' : 'Available credits' }}</p>
-            </div>
-
-            <nav class="or-app-usage-subtabs" aria-label="Usage metrics">
-              <span class="or-app-usage-subtab active">{{ isVi ? 'Credits' : 'Credits' }}</span>
-              <span class="or-app-usage-subtab or-app-usage-subtab-disabled">
-                {{ isVi ? 'Jobs' : 'Jobs' }}
-                <span class="or-app-nav-badge">{{ isVi ? 'Sắp có' : 'Soon' }}</span>
-              </span>
-              <span class="or-app-usage-subtab or-app-usage-subtab-disabled">
-                {{ isVi ? 'Requests' : 'Requests' }}
-                <span class="or-app-nav-badge">{{ isVi ? 'Sắp có' : 'Soon' }}</span>
-              </span>
-            </nav>
-
-            <div class="or-app-panel or-app-usage-chart-placeholder">
-              <p class="or-app-muted">
-                {{
-                  isVi
-                    ? 'Biểu đồ usage theo ngày sẽ có khi gateway ghi nhận job metrics.'
-                    : 'Daily usage charts will appear when the gateway tracks job metrics.'
-                }}
-              </p>
-              <a :href="`${prefix}/app/credits/`" class="or-app-btn or-app-btn-ghost">
-                {{ isVi ? 'Nạp credits' : 'Top up credits' }} →
-              </a>
-            </div>
+            <ProfileUsagePanel
+              ref="usagePanelRef"
+              :credits="credits"
+              :is-vi="isVi"
+              :prefix="prefix"
+            />
           </div>
 
           <!-- API access -->
