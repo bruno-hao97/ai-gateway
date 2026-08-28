@@ -86,6 +86,22 @@ export async function getTopupOrder(orderCode: number): Promise<TopupOrder | nul
   return store.orders[String(orderCode)] ?? null;
 }
 
+export async function listTopupOrdersForUsername(
+  username: string,
+  limit = 20,
+): Promise<TopupOrder[]> {
+  const needle = username.trim().toLowerCase();
+  if (!needle) return [];
+
+  const cap = Math.min(100, Math.max(1, Math.floor(limit) || 20));
+  const store = await readStore();
+
+  return Object.values(store.orders)
+    .filter((order) => order.username.trim().toLowerCase() === needle)
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+    .slice(0, cap);
+}
+
 export async function sumReservedTopupCredits(excludeOrderCode?: number): Promise<number> {
   const store = await readStore();
   const now = Date.now();

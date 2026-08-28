@@ -30,6 +30,16 @@ export class BillingResource {
     });
   }
 
+  /** GET /billing/topup/orders?username=&limit= */
+  async listOrders(
+    username: string,
+    limit = 20,
+  ): Promise<GatewayEnvelope> {
+    ensureAccessToken(this.ctx);
+    const params = new URLSearchParams({ username, limit: String(limit) });
+    return requestJson(this.ctx, `/billing/topup/orders?${params}`);
+  }
+
   /** GET /billing/topup/orders/:orderCode */
   async getOrder(orderCode: number | string): Promise<GatewayEnvelope> {
     return requestJson(this.ctx, `/billing/topup/orders/${encodeURIComponent(String(orderCode))}`, {

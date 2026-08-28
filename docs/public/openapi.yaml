@@ -324,6 +324,32 @@ paths:
         '200':
           description: Checkout URL and orderCode
 
+  /billing/topup/orders:
+    get:
+      tags: [Billing]
+      summary: List topup orders for signed-in user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: username
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Order list (newest first)
+        '401':
+          description: Missing or invalid Bearer
+        '403':
+          description: Username does not match token
+
   /billing/topup/orders/{orderCode}:
     get:
       tags: [Billing]

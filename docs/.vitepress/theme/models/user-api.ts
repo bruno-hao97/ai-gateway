@@ -35,6 +35,20 @@ export interface TopupPayment {
   bankTransfer?: { content?: string; amountFormatted?: string };
 }
 
+export type TopupOrderStatus = 'pending' | 'paid' | 'credited' | 'failed';
+
+export interface TopupOrder {
+  orderCode: number;
+  username: string;
+  packageId: string;
+  amountVnd: number;
+  credits: number;
+  status: TopupOrderStatus;
+  createdAt: string;
+  paidAt?: string;
+  creditedAt?: string;
+}
+
 export interface BillingStatus {
   payosConfigured?: boolean;
   merchantReady?: boolean;
@@ -139,4 +153,37 @@ export async function createTopup(username: string, packageId: string): Promise<
   };
   if (!res.ok) throw new Error(String(data.message || 'Topup failed'));
   return data.data || {};
+}
+
+export async function fetchTopupOrders(username: string, limit = 20): Promise<TopupOrder[]> {
+  const params = new URLSearchParams({ username, limit: String(limit) });
+  const res = await fetch(`${apiBase()}/billing/topup/orders?${params}`, {
+    headers: authHeaders(false),
+  });
+  const data = (await res.json().catch(() => ({}))) as {
+    data?: TopupOrder[];
+    message?: string;
+  };
+  if (!res.ok) throw new Error(String(data.message || 'Could not load topup history'));
+  return data.data || [];
+}
+
+export function formatTopupOrderStatus(status: TopupOrderStatus, isVi: boolean): string {
+  const labels: Record<TopupOrderStatus, [string, string]> = {
+    pending: ['Pending', 'Chờ thanh toán'],
+    paid: ['Paid', 'Đã thanh toán'],
+    credited: ['Credited', 'Đã cộng credits'],
+    failed: ['Failed', 'Thất bại'],
+  };
+  const pair = labels[status] || labels.pending;
+  return isVi ? pair[1] : pair[0];
+}
+
+export function formatOrderDate(iso: string, isVi: boolean): string {
+  const d = Date.parse(iso);
+  if (!Number.isFinite(d)) return iso;
+  return new Date(d).toLocaleString(isVi ? 'vi-VN' : undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
 }

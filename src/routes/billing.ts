@@ -5,10 +5,16 @@ import { createTopupPayOsPayment, verifyPayOsWebhookSignature } from '../service
 import {
   bearerAccessToken,
   PaymentIdentityError,
+  verifyBearerUsername,
   verifyPaymentIdentity,
 } from '../services/paymentIdentity.js';
 import { fulfillTopupFromWebhook } from '../services/topupFulfillment.js';
-import { createTopupOrder, getTopupOrder, sumReservedTopupCredits } from '../services/topupOrders.js';
+import {
+  createTopupOrder,
+  getTopupOrder,
+  listTopupOrdersForUsername,
+  sumReservedTopupCredits,
+} from '../services/topupOrders.js';
 import {
   assertMerchantCanCover,
   fetchMerchantCreditsAi,
@@ -117,6 +123,39 @@ router.post('/topup/create', async (req, res) => {
     }
     const message = err instanceof Error ? err.message : String(err);
     console.error('[billing/topup/create]', message);
+    sendError(res, 500, message, 'INTERNAL_ERROR');
+  }
+});
+
+/** GET /billing/topup/orders?username=&limit= — Bearer must match username */
+router.get('/topup/orders', async (req, res) => {
+  try {
+    const username = String(req.query.username || '').trim();
+    if (!username) {
+      sendError(res, 400, 'username bắt buộc', 'VALIDATION_ERROR');
+      return;
+    }
+
+    const limitRaw = Number(req.query.limit);
+    const limit = Number.isFinite(limitRaw) ? limitRaw : 20;
+
+    await verifyBearerUsername({
+      accessToken: bearerAccessToken(String(req.headers.authorization || '')),
+      expectedUsername: username,
+    });
+
+    const orders = await listTopupOrdersForUsername(username, limit);
+    res.json({ success: true, data: orders });
+  } catch (err) {
+    if (err instanceof PaymentIdentityError) {
+      res.status(err.status).json({
+        success: false,
+        message: err.message,
+        code: err.code,
+      });
+      return;
+    }
+    const message = err instanceof Error ? err.message : String(err);
     sendError(res, 500, message, 'INTERNAL_ERROR');
   }
 });

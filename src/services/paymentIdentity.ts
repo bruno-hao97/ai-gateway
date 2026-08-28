@@ -109,16 +109,14 @@ async function probeGommoPaymentDomain(accessToken: string, amountVnd?: number):
   }
 }
 
-export async function verifyPaymentIdentity(input: {
+/** Bearer token → username, without PayOS domain probe (list/history). */
+export async function verifyBearerUsername(input: {
   accessToken: string;
   expectedUsername: string;
-  amountVnd?: number;
 }): Promise<{ username: string }> {
   if (!input.accessToken) {
     throw new PaymentIdentityError('Vui lòng đăng nhập trước khi nạp credit.', 401, 'AUTH_REQUIRED');
   }
-
-  await probeGommoPaymentDomain(input.accessToken, input.amountVnd);
 
   const me = await fetchGommoMe(input.accessToken);
   const user = me.userInfo;
@@ -141,4 +139,16 @@ export async function verifyPaymentIdentity(input: {
   }
 
   return { username };
+}
+
+export async function verifyPaymentIdentity(input: {
+  accessToken: string;
+  expectedUsername: string;
+  amountVnd?: number;
+}): Promise<{ username: string }> {
+  await probeGommoPaymentDomain(input.accessToken, input.amountVnd);
+  return verifyBearerUsername({
+    accessToken: input.accessToken,
+    expectedUsername: input.expectedUsername,
+  });
 }
