@@ -546,10 +546,17 @@ paths:
   /billing/status:
     get:
       tags: [Billing]
-      summary: PayOS and merchant config status
+      summary: Billing configuration status
+      description: |
+        Returns Gommo payment availability (`gommoPayment`, `billingMode`),
+        legacy PayOS flags, and merchant readiness.
       responses:
         '200':
           description: Status flags
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingStatusResponse'
 
   /billing/packages:
     get:
@@ -558,11 +565,85 @@ paths:
       responses:
         '200':
           description: Package list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditPackagesResponse'
+
+  /billing/payment/create:
+    post:
+      tags: [Billing]
+      summary: Create Gommo VietQR payment (default top-up)
+      description: |
+        Proxies Gommo `subscriptions/create_payment`. Persists a local order with
+        `source: gommo`. Returns QR image, bank transfer details, and VAT breakdown.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GommoPaymentCreateRequest'
+      responses:
+        '200':
+          description: Payment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GommoPaymentCreateResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Missing or invalid Bearer
+        '403':
+          description: Username does not match token
+        '502':
+          description: Upstream Gommo error
+
+  /billing/payment/sync:
+    post:
+      tags: [Billing]
+      summary: Sync Gommo payment status
+      description: |
+        Proxies Gommo `subscriptions/payment_sync`. When `paid` is true, marks the
+        local top-up order as credited.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GommoPaymentSyncRequest'
+      responses:
+        '200':
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GommoPaymentSyncResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Missing or invalid Bearer
+        '502':
+          description: Upstream Gommo error
 
   /billing/topup/create:
     post:
       tags: [Billing]
-      summary: Create PayOS topup order
+      summary: Create PayOS topup order (legacy)
+      deprecated: true
+      description: Legacy PayOS checkout. Prefer `/billing/payment/create` (Gommo VietQR).
       security:
         - bearerAuth: []
       requestBody:
@@ -602,6 +683,17 @@ paths:
       responses:
         '200':
           description: Order list (newest first)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TopupOrder'
         '401':
           description: Missing or invalid Bearer
         '403':
@@ -620,6 +712,15 @@ paths:
       responses:
         '200':
           description: Order details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/TopupOrder'
 
   /admin/merchant/balance:
     get:
@@ -816,3 +917,228 @@ components:
                 type: string
               text:
                 type: string
+
+    CreditPackage:
+      type: object
+      required: [id, gommoIdBase, name, amountVnd, credits, bonusPercent]
+      properties:
+        id:
+          type: string
+          example: basic-member
+        gommoIdBase:
+          type: string
+          description: Gommo `id_base` for create_payment
+          example: credit-basic
+        name:
+          type: string
+          example: BASIC - MEMBER
+        amountVnd:
+          type: integer
+          description: Pre-VAT plan price (79ai priceVND on /prices)
+        credits:
+          type: integer
+          example: 50000
+        bonusPercent:
+          type: integer
+          example: 0
+        featured:
+          type: boolean
+          example: false
+
+    CreditPackagesResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreditPackage'
+
+    BillingStatusResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            gommoPayment:
+              type: boolean
+              example: true
+            billingMode:
+              type: string
+              enum: [gommo, legacy]
+              example: gommo
+            payosConfigured:
+              type: boolean
+            merchantReady:
+              type: boolean
+            webhookUrl:
+              type: string
+              nullable: true
+            returnUrl:
+              type: string
+              nullable: true
+
+    InvoiceBuyer:
+      type: object
+      required: [type, name]
+      properties:
+        type:
+          type: string
+          enum: [consumer, personal, company]
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        national_id:
+          type: string
+        tax_code:
+          type: string
+        gui_name:
+          type: string
+        referral_code:
+          type: string
+
+    GommoPaymentCreateRequest:
+      type: object
+      required: [username, packageId]
+      properties:
+        username:
+          type: string
+          description: Gommo username — must match Bearer token identity
+        packageId:
+          type: string
+          example: ultra-member
+        invoiceBuyer:
+          $ref: '#/components/schemas/InvoiceBuyer'
+        promoCode:
+          type: string
+        referralCode:
+          type: string
+        device_id:
+          type: string
+        device_name:
+          type: string
+        device_info:
+          type: string
+          description: JSON string forwarded to Gommo
+
+    GommoPaymentResult:
+      type: object
+      properties:
+        url:
+          type: string
+        orderCode:
+          type: string
+          example: SP1234567890
+        content:
+          type: string
+          description: Bank transfer memo
+        amountVnd:
+          type: integer
+        amountBaseVnd:
+          type: integer
+        vatAmountVnd:
+          type: integer
+        vatPercent:
+          type: integer
+          example: 5
+        qrImage:
+          type: string
+        qrFallback:
+          type: string
+        gateway:
+          type: string
+        paymentServer:
+          type: string
+        bank:
+          type: string
+        acc:
+          type: string
+        holder:
+          type: string
+        store:
+          type: string
+        packageId:
+          type: string
+        credits:
+          type: integer
+
+    GommoPaymentCreateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/GommoPaymentResult'
+
+    GommoPaymentSyncRequest:
+      type: object
+      required: [orderCode]
+      properties:
+        orderCode:
+          type: string
+        device_id:
+          type: string
+        device_name:
+          type: string
+        device_info:
+          type: string
+
+    GommoPaymentSyncResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            paid:
+              type: boolean
+            orderCode:
+              type: string
+            deposit:
+              type: object
+              additionalProperties: true
+            sync:
+              type: object
+              additionalProperties: true
+
+    TopupOrder:
+      type: object
+      properties:
+        orderCode:
+          type: string
+        username:
+          type: string
+        packageId:
+          type: string
+        amountVnd:
+          type: integer
+        credits:
+          type: integer
+        status:
+          type: string
+          enum: [pending, paid, credited, failed]
+        source:
+          type: string
+          enum: [gommo, payos]
+        createdAt:
+          type: string
+          format: date-time
+        paidAt:
+          type: string
+          format: date-time
+        creditedAt:
+          type: string
+          format: date-time

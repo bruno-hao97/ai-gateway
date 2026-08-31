@@ -122,7 +122,7 @@ Check `success` and `code` on Mode B:
 | `INSUFFICIENT_CREDITS` | Prompt topup or admin send |
 | `UPSTREAM_ERROR` | Retry with backoff; check Gommo status |
 | `RATE_LIMITED` | Back off |
-| `NOT_CONFIGURED` | Fix server env (PayOS, admin, merchant) |
+| `NOT_CONFIGURED` | Fix server env (admin, merchant; PayOS only for legacy topup) |
 
 ## 10. Health check before deploy
 
@@ -134,7 +134,7 @@ Verify `merchantConfigured` and `adminConfigured` match expectations before enab
 
 ## 11. Separate billing from generation
 
-Use `/billing/*` for PayOS topup — not `/gateway`. Keeps payment webhooks and credit fulfillment isolated from media/chat APIs.
+Use `/billing/*` for credit top-up — **Gommo VietQR by default** (`/billing/payment/*`), not `/gateway`. Legacy PayOS (`/billing/topup/*`) is optional. Keeps payment flows isolated from media/chat APIs.
 
 ## 12. Test with playground first
 

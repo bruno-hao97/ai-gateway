@@ -62,6 +62,13 @@ export function formatApproxUsd(amountVnd: number): string {
   return `~${formatted}`;
 }
 
+/** 79ai /prices footer: total incl. 5% VAT. */
+export function formatPayTotalLine(amountVnd: number, isVi: boolean): string {
+  const totalVnd = calcBillingTotals(amountVnd).totalVnd;
+  const formatted = totalVnd.toLocaleString(isVi ? 'vi-VN' : 'en-US');
+  return isVi ? `Thanh toán ${formatted}đ VAT 5%` : `Pay ${formatted}đ incl. 5% VAT`;
+}
+
 export function billingCurrencyDisclaimer(isVi: boolean): string {
   return isVi
     ? ''

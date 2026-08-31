@@ -70,4 +70,4 @@ When `data.paid` is `true`, the gateway marks the local order `credited`.
 
 ## Credit packages
 
-See `GET /billing/packages` or `src/services/creditPackages.ts`. Each package maps to a Gommo `gommoIdBase` (`credit-basic`, `credit-vip`, …).
+See `GET /billing/packages` or `src/services/creditPackages.ts`. Each package maps to a Gommo `credit_plans` `key` sent as `gommoIdBase` on `create_payment` (`credit-basic`, `credit-agency`, …). `amountVnd` is the pre-VAT plan price (`priceVND` on 79ai `/prices`); checkout adds 5% VAT.

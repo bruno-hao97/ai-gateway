@@ -26,7 +26,7 @@ Swagger Editor tải spec và hiển thị schema, thử request trực tiếp (
 | `/health` | Health check — không auth |
 | `/gateway/auth/*` | Đăng nhập, đăng ký — không cần Bearer |
 | `/gateway/*` | REST wrap: models, jobs, upload, chat, audio — auth `Authorization: Bearer` user |
-| `/billing/*` | PayOS topup, packages, webhook — tách khỏi gateway |
+| `/billing/*` | Gommo VietQR (mặc định), PayOS legacy, packages, lịch sử đơn |
 | `/admin/*` | Merchant balance, send credits, register user — auth `x-admin-key` (chỉ server) |
 
 Chi tiết từng endpoint:
@@ -35,7 +35,7 @@ Chi tiết từng endpoint:
 - [Upload](./upload.md)
 - [Chat](./chat.md)
 - [Audio](./audio.md)
-- [Billing (PayOS)](./billing.md)
+- [Billing (Gommo + PayOS legacy)](./billing.md)
 - [Admin (chỉ server)](./admin.md)
 
 Auth user: xem [Authentication](../authentication.md).

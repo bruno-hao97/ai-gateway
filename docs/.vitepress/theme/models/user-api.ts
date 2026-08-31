@@ -40,6 +40,7 @@ export interface MeResponse {
 
 export interface CreditPackage {
   id: string;
+  gommoIdBase?: string;
   name: string;
   amountVnd: number;
   credits: number;

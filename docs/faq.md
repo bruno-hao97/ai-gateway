@@ -13,7 +13,7 @@ Common questions about AI Gateway and Gommo upstream.
 <summary>What is AI Gateway vs calling Gommo directly?</summary>
 
 **Direct (Mode A):** your backend calls `v2.api.gommo.net` and `api.gommo.net`.  
-**Gateway:** one base URL — REST `/gateway/*` (Mode B) or path proxy (Mode C). Hides upstream URLs, centralizes env, optional `wait: true` polling, PayOS billing.
+**Gateway:** one base URL — REST `/gateway/*` (Mode B) or path proxy (Mode C). Hides upstream URLs, centralizes env, optional `wait: true` polling, Gommo VietQR billing.
 
 </details>
 
@@ -57,7 +57,7 @@ Dev: docs at `:5173`, gateway API at `:3001`.
 <details>
 <summary>What is the merchant token?</summary>
 
-`GOMMO_ACCESS_TOKEN` in server `.env` — for `/admin/*` and billing fulfillment only. Never in browser apps.
+`GOMMO_ACCESS_TOKEN` in server `.env` — for `/admin/*` and legacy PayOS fulfillment only. Not required for default Gommo VietQR top-up. Never in browser apps.
 
 </details>
 
@@ -108,9 +108,31 @@ See [Integration modes](./routing/integration-modes.md).
 ## Billing
 
 <details>
+<summary>How do I top up credits?</summary>
+
+**Default:** Gommo VietQR — `POST /billing/payment/create` (user Bearer), then poll `POST /billing/payment/sync` until `paid: true`. Portal: [/app/credits/](/app/credits/). Recipe: [Gommo topup](./cookbook/gommo-topup.md).
+
+**Legacy (optional):** PayOS via `POST /billing/topup/create` when `PAYOS_*` and merchant env are configured. See [PayOS topup (legacy)](./cookbook/payos-topup.md).
+
+</details>
+
+<details>
+<summary>Why does billing fail or return an error?</summary>
+
+Check `GET /billing/status` — expect `billingMode: "gommo"` and `gommoPayment: true` for the default flow.
+
+Common issues:
+
+- Bearer token does not match `username` in the request body
+- Invalid `packageId`
+- Legacy PayOS: `payosConfigured` or `merchantReady` is false
+
+</details>
+
+<details>
 <summary>Why does /billing/topup/create return 503?</summary>
 
-PayOS or merchant env not configured. Check `GET /billing/status`.
+That path is **legacy PayOS only**. PayOS or merchant env is not configured. For new integrations use `POST /billing/payment/create` instead. Check `GET /billing/status`.
 
 </details>
 

@@ -32,7 +32,7 @@ Or import the local file from `docs/public/openapi.yaml`.
 | `GET /health` | Uptime and config flags |
 | `/gateway/auth/*` | Login and register (no Bearer required) |
 | `/gateway/*` | Models, jobs, upload, chat, audio (Bearer user token) |
-| `/billing/*` | PayOS topup (user Bearer on create) |
+| `/billing/*` | Gommo VietQR top-up (default), legacy PayOS, order history |
 | `/admin/*` | Merchant ops (`x-admin-key`) |
 
 Proxy routes (`/v2`, `/api/v2`, `/api/apps/go-mmo`) are **not** in this spec — they pass through upstream unchanged. See [Integration modes](../routing/integration-modes.md).
@@ -41,7 +41,7 @@ Proxy routes (`/v2`, `/api/v2`, `/api/apps/go-mmo`) are **not** in this spec —
 
 | Security scheme | Used on |
 |-----------------|---------|
-| `bearerAuth` | `/gateway/*`, `/billing/topup/create` |
+| `bearerAuth` | `/gateway/*`, `/billing/payment/*`, `/billing/topup/create`, `/billing/topup/orders` |
 | `adminKey` (`x-admin-key`) | `/admin/*` |
 
 ## Detailed reference

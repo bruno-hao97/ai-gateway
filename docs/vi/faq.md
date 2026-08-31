@@ -13,7 +13,7 @@ Câu hỏi phổ biến về AI Gateway và Gommo upstream.
 <summary>AI Gateway khác gì gọi Gommo trực tiếp?</summary>
 
 **Direct (Mode A):** backend gọi `v2.api.gommo.net` và `api.gommo.net`.  
-**Gateway:** một base URL — REST `/gateway/*` (Mode B) hoặc path proxy (Mode C). Ẩn URL upstream, tập trung env, poll tùy chọn `wait: true`, billing PayOS.
+**Gateway:** một base URL — REST `/gateway/*` (Mode B) hoặc path proxy (Mode C). Ẩn URL upstream, tập trung env, poll tùy chọn `wait: true`, billing Gommo VietQR.
 
 </details>
 
@@ -57,7 +57,7 @@ Dev: docs `:5173`, API gateway `:3001`.
 <details>
 <summary>Merchant token là gì?</summary>
 
-`GOMMO_ACCESS_TOKEN` trong `.env` server — cho `/admin/*` và fulfillment billing. Không đưa vào browser.
+`GOMMO_ACCESS_TOKEN` trong `.env` server — cho `/admin/*` và fulfillment PayOS legacy. Không bắt buộc cho nạp Gommo VietQR mặc định. Không đưa vào browser.
 
 </details>
 
@@ -108,9 +108,31 @@ Xem [Integration modes](./routing/integration-modes.md).
 ## Billing
 
 <details>
+<summary>Nạp credit thế nào?</summary>
+
+**Mặc định:** Gommo VietQR — `POST /billing/payment/create` (Bearer user), rồi poll `POST /billing/payment/sync` đến khi `paid: true`. Portal: [/vi/app/credits/](/vi/app/credits/). Recipe: [Gommo topup](./cookbook/gommo-topup.md).
+
+**Legacy (tùy chọn):** PayOS qua `POST /billing/topup/create` khi đã cấu hình `PAYOS_*` và merchant. Xem [PayOS nạp credit (legacy)](./cookbook/payos-topup.md).
+
+</details>
+
+<details>
+<summary>Billing lỗi hoặc trả lỗi — kiểm tra gì?</summary>
+
+Gọi `GET /billing/status` — flow mặc định cần `billingMode: "gommo"` và `gommoPayment: true`.
+
+Lỗi thường gặp:
+
+- Bearer không khớp `username` trong body
+- `packageId` không hợp lệ
+- PayOS legacy: `payosConfigured` hoặc `merchantReady` là false
+
+</details>
+
+<details>
 <summary>/billing/topup/create trả 503?</summary>
 
-PayOS hoặc merchant env chưa cấu hình. Kiểm tra `GET /billing/status`.
+Path này chỉ dành cho **PayOS legacy**. PayOS hoặc merchant env chưa cấu hình. Tích hợp mới nên dùng `POST /billing/payment/create`. Kiểm tra `GET /billing/status`.
 
 </details>
 

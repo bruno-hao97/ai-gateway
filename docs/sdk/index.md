@@ -81,7 +81,7 @@ console.log(job.data?.resultUrl);
 | [Chat](./typescript/chat.md) | send, stream SSE |
 | [Upload](./typescript/upload.md) | image, video multipart |
 | [Audio](./typescript/audio.md) | voices, TTS, lists |
-| [Billing](./typescript/billing.md) | PayOS topup |
+| [Billing](./typescript/billing.md) | Gommo VietQR topup (+ legacy PayOS) |
 | [Errors](./typescript/errors.md) | GatewayError, codes |
 
 ## Client SDKs vs Cookbook

@@ -87,7 +87,7 @@ fly certs add api.yourdomain.com
 | `GATEWAY_CORS_ORIGIN` | Origin browser, phân cách dấu phẩy |
 | `GATEWAY_PORTAL` | `true` bật portal prod (cẩn thận) |
 | Rate limit vars | Xem [Best practices](../best-practices/) |
-| PayOS | [Billing](../guides/billing-credits.md) |
+| Billing | Gommo VietQR mặc định không cần env thêm; PayOS legacy tùy chọn — xem [Billing](../guides/billing-credits.md) |
 
 Template: `.env.example` ở root repo.
 
@@ -171,7 +171,7 @@ Local dev: `npm run docs:dev` → `:5173`.
 - [ ] **`VITE_GATEWAY_URL`** trên docs build (GitHub variable / Vercel env)
 - [ ] **`GATEWAY_CORS_ORIGIN`** gồm origin docs
 - [ ] **`GATEWAY_PORTAL=true`** nếu dùng playground embed prod
-- [ ] Webhook PayOS HTTPS
+- [ ] Webhook PayOS HTTPS — **chỉ khi** dùng legacy `/billing/topup/*`
 - [ ] Merchant buffer đủ credit
 
 ## Tiếp theo

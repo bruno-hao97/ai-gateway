@@ -47,7 +47,8 @@ $h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/json'
 |--------|----------------|
 | [Chat + stream](./chat-stream.md) | Agent chat and SSE |
 | [Audio TTS](./audio-tts.md) | Search voices → synthesize |
-| [PayOS topup](./payos-topup.md) | Credit packages → checkout → poll |
+| [Gommo VietQR topup](./gommo-topup.md) | Credit packages → VietQR → poll sync |
+| [PayOS topup (legacy)](./payos-topup.md) | Merchant PayOS + sendBalances |
 | [Agent HTTP flow](./agent-http-flow.md) | Minimal loop for LLM agents / scripts |
 
 ## Next

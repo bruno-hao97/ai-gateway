@@ -97,7 +97,7 @@ curl https://api.yourdomain.com/health
 
 ## 11. Billing tách generation
 
-PayOS ở `/billing/*`, không gắn dưới `/gateway`.
+Nạp credit ở `/billing/*` — **Gommo VietQR mặc định** (`/billing/payment/*`), không gắn dưới `/gateway`. PayOS legacy (`/billing/topup/*`) là tùy chọn.
 
 ## 12. Test playground trước
 

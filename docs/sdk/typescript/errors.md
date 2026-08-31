@@ -27,7 +27,7 @@ try {
 |------|----------------|
 | `UNAUTHORIZED` | Missing or invalid Bearer token |
 | `VALIDATION_ERROR` | Bad body / query |
-| `NOT_CONFIGURED` | PayOS or merchant not set on server |
+| `NOT_CONFIGURED` | Server env missing (admin/merchant; PayOS only for legacy topup) |
 | `UPSTREAM_ERROR` | Gommo upstream failure |
 | `INSUFFICIENT_CREDITS` | Merchant balance / topup reserve |
 | `INTERNAL_ERROR` | Server error |

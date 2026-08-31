@@ -47,7 +47,8 @@ $h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/json'
 |--------|----------|
 | [Chat + stream](./chat-stream.md) | Agent chat và SSE |
 | [Audio TTS](./audio-tts.md) | Tìm voice → tổng hợp giọng |
-| [PayOS nạp credit](./payos-topup.md) | Gói credit → checkout → poll |
+| [Gommo VietQR nạp credit](./gommo-topup.md) | Gói credit → VietQR → poll sync |
+| [PayOS nạp credit (legacy)](./payos-topup.md) | Merchant PayOS + sendBalances |
 | [Agent HTTP flow](./agent-http-flow.md) | Vòng lặp tối thiểu cho agent / script |
 
 ## Tiếp theo

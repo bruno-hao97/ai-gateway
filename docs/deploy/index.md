@@ -106,7 +106,7 @@ fly certs add api.yourdomain.com
 | `GATEWAY_RATE_LIMIT_MAX` | Default 120/min/IP for `/gateway` |
 | `ADMIN_RATE_LIMIT_MAX` | Default 30/min/IP for `/admin` |
 | `BILLING_RATE_LIMIT_MAX` | Default 60/min/IP for `/billing` |
-| PayOS vars | See [Billing](../guides/billing-credits.md) |
+| Billing | Default Gommo VietQR needs no extra env; optional PayOS legacy — see [Billing](../guides/billing-credits.md) |
 
 Full template: `.env.example` in repo root.
 
@@ -208,7 +208,7 @@ Local preview (dev server with hot reload): `npm run docs:dev` → `:5173`.
 - [ ] **`VITE_GATEWAY_URL`** set on docs build (GitHub variable or Vercel env)
 - [ ] **`GATEWAY_CORS_ORIGIN`** includes docs origin (`https://docs.…`)
 - [ ] **`GATEWAY_PORTAL=true`** if using `/app/playground/` embed in prod
-- [ ] PayOS webhook URL registered and HTTPS
+- [ ] PayOS webhook URL registered (HTTPS) — **only if** using legacy `/billing/topup/*`
 - [ ] Merchant buffer credits sufficient for topup fulfillment
 - [ ] Rate limits appropriate for traffic
 

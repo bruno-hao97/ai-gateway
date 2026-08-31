@@ -27,7 +27,7 @@ import AppNavIcon from './AppNavIcon.vue';
 import CreditsCheckoutModal from './CreditsCheckoutModal.vue';
 import ProfileUsagePanel from './ProfileUsagePanel.vue';
 import ProfileActivityPanel from './ProfileActivityPanel.vue';
-import { formatApproxUsd } from '../models/invoice-buyer';
+import { formatApproxUsd, formatPayTotalLine } from '../models/invoice-buyer';
 
 interface AppNavItem {
   id?: string;
@@ -73,6 +73,23 @@ const packagesLoading = ref(false);
 const packagesError = ref('');
 const topupOrders = ref<TopupOrder[]>([]);
 const ordersLoading = ref(false);
+const showStalePending = ref(false);
+
+const PENDING_STALE_MS = 24 * 60 * 60 * 1000;
+
+const visibleTopupOrders = computed(() => {
+  if (showStalePending.value) return topupOrders.value;
+  const now = Date.now();
+  return topupOrders.value.filter((order) => {
+    if (order.status !== 'pending') return true;
+    const created = Date.parse(order.createdAt);
+    return Number.isFinite(created) && now - created < PENDING_STALE_MS;
+  });
+});
+
+const hiddenPendingCount = computed(
+  () => topupOrders.value.length - visibleTopupOrders.value.length,
+);
 const billingReady = ref(true);
 const checkoutOpen = ref(false);
 const checkoutPackage = ref<CreditPackage | null>(null);
@@ -798,30 +815,36 @@ watch(
           </div>
 
           <div v-else class="or-app-pkg-grid">
-            <div
+            <article
               v-for="pkg in packages"
               :key="pkg.id"
               class="or-app-pkg"
               :class="{ featured: pkg.featured }"
             >
+              <span v-if="pkg.featured" class="or-app-pkg-ribbon">
+                {{ isVi ? 'BEST' : 'BEST' }}
+              </span>
               <div class="or-app-pkg-head">
                 <h3>{{ pkg.name }}</h3>
-                <span v-if="pkg.bonusPercent > 0" class="or-app-pkg-badge">+{{ pkg.bonusPercent }}%</span>
+                <span v-if="pkg.bonusPercent > 0" class="or-app-pkg-badge">
+                  +{{ pkg.bonusPercent }}% {{ isVi ? 'Thưởng' : 'Bonus' }}
+                </span>
               </div>
-              <p class="or-app-pkg-meta">
-                {{ formatCredits(pkg.credits) }} credits ·
+              <p class="or-app-pkg-price">
                 {{ pkg.amountVnd.toLocaleString(isVi ? 'vi-VN' : 'en-US') }} ₫
                 <template v-if="!isVi"> · {{ formatApproxUsd(pkg.amountVnd) }}</template>
               </p>
+              <p class="or-app-pkg-credits">{{ formatCredits(pkg.credits) }} credits</p>
+              <p class="or-app-pkg-vat">{{ formatPayTotalLine(pkg.amountVnd, isVi) }}</p>
               <button
                 type="button"
                 class="or-app-btn"
-                :class="pkg.featured ? 'or-app-btn-primary' : 'or-app-btn-ghost'"
+                :class="pkg.featured ? 'or-app-btn-accent' : 'or-app-btn-ghost'"
                 @click="onTopup(pkg.id)"
               >
                 {{ isVi ? 'Nạp ngay' : 'Top up' }}
               </button>
-            </div>
+            </article>
           </div>
 
           <CreditsCheckoutModal
@@ -855,7 +878,7 @@ watch(
             <p v-if="ordersLoading && topupOrders.length === 0" class="or-app-muted">
               {{ isVi ? 'Đang tải lịch sử…' : 'Loading history…' }}
             </p>
-            <p v-else-if="topupOrders.length === 0" class="or-app-muted or-app-orders-empty">
+            <p v-else-if="visibleTopupOrders.length === 0" class="or-app-muted or-app-orders-empty">
               {{
                 isVi
                   ? 'Chưa có đơn nạp. Tạo đơn VietQR ở trên để bắt đầu.'
@@ -875,7 +898,7 @@ watch(
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="order in topupOrders" :key="order.orderCode">
+                  <tr v-for="order in visibleTopupOrders" :key="order.orderCode">
                     <td><code>#{{ order.orderCode }}</code></td>
                     <td>{{ formatCredits(order.credits) }}</td>
                     <td>
@@ -896,6 +919,22 @@ watch(
                 </tbody>
               </table>
             </div>
+            <button
+              v-if="hiddenPendingCount > 0"
+              type="button"
+              class="or-app-orders-pending-toggle"
+              @click="showStalePending = !showStalePending"
+            >
+              {{
+                showStalePending
+                  ? isVi
+                    ? 'Ẩn đơn chờ cũ'
+                    : 'Hide stale pending'
+                  : isVi
+                    ? `Hiện thêm ${hiddenPendingCount} đơn chờ cũ`
+                    : `Show ${hiddenPendingCount} stale pending`
+              }}
+            </button>
           </div>
         </section>
       </template>

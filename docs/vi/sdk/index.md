@@ -70,7 +70,7 @@ console.log(job.data?.resultUrl);
 | [Chat](./typescript/chat.md) | send, stream SSE |
 | [Upload](./typescript/upload.md) | image, video multipart |
 | [Audio](./typescript/audio.md) | voices, TTS, lists |
-| [Billing](./typescript/billing.md) | PayOS topup |
+| [Billing](./typescript/billing.md) | Gommo VietQR nạp credit (+ PayOS legacy) |
 | [Errors](./typescript/errors.md) | GatewayError, codes |
 
 ## Tiếp theo

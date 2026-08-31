@@ -59,14 +59,14 @@ Mode C (proxy) and Mode A (direct) still require `domain` in form bodies — use
 | Credential | Where | Used for |
 |------------|-------|----------|
 | User `access_token` | Client Bearer / form | `/gateway/*`, proxy user routes |
-| `GOMMO_ACCESS_TOKEN` | Server env only | `/admin/*`, PayOS fulfillment |
+| `GOMMO_ACCESS_TOKEN` | Server env only | `/admin/*`, legacy PayOS fulfillment |
 | `ADMIN_API_KEY` | Server env only | Protect `/admin/*` |
 
 Never expose merchant or admin secrets to browsers or mobile apps.
 
 ### 6. Billing is separate from generation
 
-Credit topup flows live under **`/billing/*`** (PayOS), not `/gateway`. Webhook → internal credit send. See [Billing & credits](./guides/billing-credits.md).
+Credit topup flows live under **`/billing/*`**, not `/gateway`. **Default:** Gommo `create_payment` + client `payment_sync` (VietQR bank transfer). **Optional legacy:** PayOS webhook → internal `sendBalances`. See [Billing & credits](./guides/billing-credits.md).
 
 ### 7. Errors you can rely on
 

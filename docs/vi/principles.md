@@ -59,14 +59,14 @@ Mode C (proxy) và Mode A (direct) vẫn cần `domain` trong form — dùng dom
 | Credential | Vị trí | Dùng cho |
 |------------|--------|----------|
 | User `access_token` | Client Bearer / form | `/gateway/*`, proxy user routes |
-| `GOMMO_ACCESS_TOKEN` | Server env only | `/admin/*`, fulfillment PayOS |
+| `GOMMO_ACCESS_TOKEN` | Server env only | `/admin/*`, fulfillment PayOS legacy |
 | `ADMIN_API_KEY` | Server env only | Bảo vệ `/admin/*` |
 
 Không expose merchant hoặc admin secret ra browser/mobile.
 
 ### 6. Billing tách khỏi generation
 
-Nạp credit ở **`/billing/*`** (PayOS), không phải `/gateway`. Webhook → gửi credit nội bộ. Xem [Billing & credits](./guides/billing-credits.md).
+Nạp credit ở **`/billing/*`**, không phải `/gateway`. **Mặc định:** Gommo `create_payment` + client `payment_sync` (chuyển khoản VietQR). **Legacy tùy chọn:** webhook PayOS → `sendBalances` nội bộ. Xem [Billing & credits](./guides/billing-credits.md).
 
 ### 7. Lỗi đáng tin cậy
 
