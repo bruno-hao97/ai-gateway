@@ -1,9 +1,13 @@
 ---
-title: 'Recipe: PayOS nạp credit'
-description: List gói, tạo checkout, poll trạng thái order
+title: 'Recipe: PayOS nạp credit (legacy)'
+description: PayOS merchant + sendBalances — mặc định dùng Gommo VietQR
 ---
 
-# PayOS nạp credit
+# PayOS nạp credit (legacy)
+
+::: warning
+**Luồng cũ.** Tích hợp mới nên dùng [Gommo VietQR](./gommo-topup.md) (`POST /billing/payment/create`). Recipe này cần `PAYOS_*` và `GOMMO_ACCESS_TOKEN` trên server.
+:::
 
 Billing nằm ở **`/billing/*`** — tách khỏi API generation `/gateway`.
 

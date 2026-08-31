@@ -84,7 +84,8 @@ const referenceSidebarEn = [
   { text: 'Upload', link: '/reference/upload' },
   { text: 'Chat', link: '/reference/chat' },
   { text: 'Audio', link: '/reference/audio' },
-  { text: 'Billing (PayOS)', link: '/reference/billing' },
+  { text: 'Billing', link: '/reference/billing' },
+  { text: 'Usage history', link: '/reference/usage' },
   { text: 'Admin (server-only)', link: '/reference/admin' },
 ];
 
@@ -94,7 +95,8 @@ const referenceSidebarVi = [
   { text: 'Upload', link: '/vi/reference/upload' },
   { text: 'Chat', link: '/vi/reference/chat' },
   { text: 'Audio', link: '/vi/reference/audio' },
-  { text: 'Billing (PayOS)', link: '/vi/reference/billing' },
+  { text: 'Billing', link: '/vi/reference/billing' },
+  { text: 'Lịch sử usage', link: '/vi/reference/usage' },
   { text: 'Admin (server-only)', link: '/vi/reference/admin' },
 ];
 
@@ -107,7 +109,8 @@ const cookbookSidebarEn = [
   { text: 'Upload image', link: '/cookbook/upload-image' },
   { text: 'Chat + stream', link: '/cookbook/chat-stream' },
   { text: 'Audio TTS', link: '/cookbook/audio-tts' },
-  { text: 'PayOS topup', link: '/cookbook/payos-topup' },
+  { text: 'Gommo VietQR topup', link: '/cookbook/gommo-topup' },
+  { text: 'PayOS topup (legacy)', link: '/cookbook/payos-topup' },
   { text: 'Agent HTTP flow', link: '/cookbook/agent-http-flow' },
 ];
 
@@ -120,7 +123,8 @@ const cookbookSidebarVi = [
   { text: 'Upload ảnh', link: '/vi/cookbook/upload-image' },
   { text: 'Chat + stream', link: '/vi/cookbook/chat-stream' },
   { text: 'Audio TTS', link: '/vi/cookbook/audio-tts' },
-  { text: 'PayOS nạp credit', link: '/vi/cookbook/payos-topup' },
+  { text: 'Gommo VietQR nạp credit', link: '/vi/cookbook/gommo-topup' },
+  { text: 'PayOS nạp credit (legacy)', link: '/vi/cookbook/payos-topup' },
   { text: 'Agent HTTP flow', link: '/vi/cookbook/agent-http-flow' },
 ];
 

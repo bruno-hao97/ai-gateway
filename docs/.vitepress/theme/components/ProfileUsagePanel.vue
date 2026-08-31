@@ -8,6 +8,7 @@ import {
   exportStatsTableCsv,
   filterListItems,
   filterStatsTable,
+  groupListItemsByDay,
   jobTypeLabel,
   listItemCredit,
   listItemCreatedAt,
@@ -24,11 +25,16 @@ const props = defineProps<{
   credits: number;
   isVi: boolean;
   prefix: string;
+  /** full = stats + chart + logs; logs = job history only */
+  mode?: 'full' | 'logs';
 }>();
+
+const logsOnly = computed(() => props.mode === 'logs');
 
 const loading = ref(false);
 const listLoading = ref(false);
-const loadError = ref('');
+const statsError = ref('');
+const listError = ref('');
 const statsData = ref<UsageStatsData | null>(null);
 const listItems = ref<UsageListItem[]>([]);
 const listPage = ref(1);
@@ -50,6 +56,7 @@ const rangeOptions = computed(() => [
   { id: '7d' as const, label: props.isVi ? '7 ngày' : '7 days' },
   { id: '30d' as const, label: props.isVi ? '30 ngày' : '30 days' },
   { id: '90d' as const, label: props.isVi ? '90 ngày' : '90 days' },
+  { id: 'all' as const, label: props.isVi ? 'Tất cả' : 'All time' },
 ]);
 
 const summary = computed(() => statsData.value?.summary);
@@ -88,8 +95,17 @@ const filteredListItems = computed(() =>
   }),
 );
 
+const groupedListItems = computed(() => groupListItemsByDay(filteredListItems.value, props.isVi));
+
+const showTypeCols = computed(() => typeFilter.value === 'all');
+
 const showZeroHint = computed(
-  () => !loading.value && !loadError.value && statsData.value != null && (summary.value?.total ?? 0) === 0,
+  () =>
+    !loading.value &&
+    !statsError.value &&
+    statsData.value != null &&
+    (summary.value?.total ?? 0) === 0 &&
+    props.credits === 0,
 );
 
 const period = computed(() => periodFromRange(range.value));
@@ -98,6 +114,7 @@ async function loadList(reset = true) {
   if (reset) {
     listPage.value = 1;
     listItems.value = [];
+    listError.value = '';
   }
   listLoading.value = true;
   try {
@@ -110,8 +127,12 @@ async function loadList(reset = true) {
     });
     listItems.value = reset ? data.items : [...listItems.value, ...data.items];
     listHasMore.value = Boolean(data.has_more) || data.items.length >= (data.limit ?? 30);
-  } catch {
-    if (reset) listItems.value = [];
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (reset) {
+      listItems.value = [];
+      listError.value = msg;
+    }
     listHasMore.value = false;
   }
   listLoading.value = false;
@@ -119,23 +140,25 @@ async function loadList(reset = true) {
 
 async function reloadRecords() {
   loading.value = true;
-  loadError.value = '';
-  try {
-    statsData.value = await fetchUsageStats({
-      period: period.value,
-      type: typeFilter.value,
-      language: 'vi',
-    });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (/failed to fetch|network|load/i.test(msg)) {
-      loadError.value = props.isVi
-        ? 'Không kết nối được gateway :3001 — chạy npm run dev rồi Refresh.'
-        : 'Cannot reach gateway :3001 — run npm run dev, then Refresh.';
-    } else {
-      loadError.value = msg;
+  statsError.value = '';
+  if (!logsOnly.value) {
+    try {
+      statsData.value = await fetchUsageStats({
+        period: period.value,
+        type: typeFilter.value,
+        language: 'vi',
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/failed to fetch|network|load/i.test(msg)) {
+        statsError.value = props.isVi
+          ? 'Không kết nối được gateway :3001 — chạy npm run dev rồi Refresh.'
+          : 'Cannot reach gateway :3001 — run npm run dev, then Refresh.';
+      } else {
+        statsError.value = msg;
+      }
+      statsData.value = null;
     }
-    statsData.value = null;
   }
   await loadList(true);
   loading.value = false;
@@ -187,24 +210,24 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="or-usage-dashboard">
-    <div class="or-usage-banner" role="status">
+  <div class="or-usage-dashboard" :class="{ 'or-usage-dashboard--logs': logsOnly }">
+    <div v-if="!logsOnly" class="or-usage-banner" role="status">
       {{
         isVi
-          ? 'Thống kê từ Gommo usage-history. Đăng nhập cùng tài khoản 79ai; hoặc ?access_token=...&device_id=... trên URL (một lần).'
-          : 'Stats from Gommo usage-history. Sign in with the same 79ai account, or use ?access_token=...&device_id=... once in the URL.'
+          ? 'Thống kê từ Gommo usage-history (cùng nguồn 79ai). Cần đăng nhập đúng tài khoản Gommo.'
+          : 'Stats from Gommo usage-history (same source as 79ai). Sign in with your Gommo account.'
       }}
     </div>
 
-    <p v-if="showZeroHint" class="or-app-error or-usage-note">
+    <p v-if="!logsOnly && showZeroHint" class="or-app-muted or-usage-note">
       {{
         isVi
-          ? 'Stats = 0: token docs có thể khác session 79ai. Đăng xuất → đăng nhập lại, hoặc mở Usage với access_token từ Network 79ai.'
-          : 'Stats = 0: docs token may differ from your 79ai session. Sign out and sign in again, or open Usage with access_token from 79ai Network tab.'
+          ? 'Chưa có lượt dùng trong khoảng đã chọn — thử All time hoặc chạy job qua Playground.'
+          : 'No usage in the selected range — try All time or run a job in Playground.'
       }}
     </p>
 
-    <div class="or-usage-stats or-usage-stats--wide">
+    <div v-if="!logsOnly" class="or-usage-stats or-usage-stats--wide">
       <div class="or-usage-stat-card">
         <p class="or-usage-stat-value">{{ (summary?.total ?? 0).toLocaleString() }}</p>
         <p class="or-usage-stat-label">{{ isVi ? 'Tổng lượt' : 'Total calls' }}</p>
@@ -249,7 +272,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="typeBreakdown.length > 0" class="or-usage-type-breakdown">
+    <div v-if="!logsOnly && typeBreakdown.length > 0" class="or-usage-type-breakdown">
       <h3 class="or-app-panel-title">{{ isVi ? 'Phân bổ theo loại' : 'Breakdown by type' }}</h3>
       <div class="or-usage-type-bars">
         <div v-for="row in typeBreakdown" :key="row.jobType" class="or-usage-type-row">
@@ -313,9 +336,23 @@ onMounted(() => {
       </div>
     </div>
 
-    <p v-if="loadError" class="or-app-error or-usage-note">{{ loadError }}</p>
+    <p v-if="logsOnly" class="or-app-muted or-usage-note">
+      {{
+        isVi
+          ? 'Lịch sử từng job từ Gommo usage-history. Xem thống kê đầy đủ tại tab Usage.'
+          : 'Per-job history from Gommo usage-history. See full stats on the Usage tab.'
+      }}
+      <a :href="`${prefix}/app/profile/?section=usage`">{{ isVi ? 'Mở Usage' : 'Open Usage' }}</a>
+    </p>
 
-    <div class="or-app-panel or-usage-chart-panel">
+    <p v-if="statsError" class="or-app-error or-usage-note">
+      {{ isVi ? 'Stats:' : 'Stats:' }} {{ statsError }}
+    </p>
+    <p v-if="listError" class="or-app-error or-usage-note">
+      {{ isVi ? 'Job logs:' : 'Job logs:' }} {{ listError }}
+    </p>
+
+    <div v-if="!logsOnly" class="or-app-panel or-usage-chart-panel">
       <div class="or-usage-chart-head">
         <h3 class="or-app-panel-title">{{ isVi ? 'Biểu đồ theo thời gian' : 'Activity over time' }}</h3>
         <select v-model.number="chartDays" class="or-usage-chart-select" aria-label="Chart range">
@@ -370,36 +407,39 @@ onMounted(() => {
         {{ isVi ? 'Chưa có bản ghi trong khoảng đã chọn.' : 'No records in the selected range.' }}
       </p>
       <div v-else class="or-usage-table-scroll">
-        <table class="or-usage-table">
-          <thead>
-            <tr>
-              <th>{{ isVi ? 'Thời gian' : 'Time' }}</th>
-              <th>{{ isVi ? 'Loại' : 'Type' }}</th>
-              <th>Model</th>
-              <th>Prompt</th>
-              <th>{{ isVi ? 'Credit' : 'Credit' }}</th>
-              <th>{{ isVi ? 'Trạng thái' : 'Status' }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in filteredListItems" :key="row.id_base || `${row.created_at}-${row.model}`">
-              <td class="or-usage-td-time">
-                {{ formatUsageTime(listItemCreatedAt(row) || '', isVi) }}
-              </td>
-              <td>{{ jobTypeLabel((row.type as UsageStatsType) || 'image', isVi) }}</td>
-              <td><code class="or-usage-model">{{ row.model || '—' }}</code></td>
-              <td class="or-usage-td-prompt">
-                <span :title="row.prompt">{{ row.prompt || '—' }}</span>
-              </td>
-              <td>{{ listItemCredit(row) > 0 ? formatCredits(listItemCredit(row)) : '—' }}</td>
-              <td>
-                <span class="or-usage-status" :class="`or-usage-status--${listItemStatus(row)}`">
-                  {{ statusLabel(listItemStatus(row)) }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div v-for="group in groupedListItems" :key="group.dayKey" class="or-usage-day-group">
+          <h4 class="or-usage-day-title">{{ group.label }}</h4>
+          <table class="or-usage-table">
+            <thead>
+              <tr>
+                <th>{{ isVi ? 'Thời gian' : 'Time' }}</th>
+                <th>{{ isVi ? 'Loại' : 'Type' }}</th>
+                <th>Model</th>
+                <th>Prompt</th>
+                <th>{{ isVi ? 'Credit' : 'Credit' }}</th>
+                <th>{{ isVi ? 'Trạng thái' : 'Status' }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in group.items" :key="row.id_base || `${row.created_at}-${row.model}`">
+                <td class="or-usage-td-time">
+                  {{ formatUsageTime(listItemCreatedAt(row) || '', isVi) }}
+                </td>
+                <td>{{ jobTypeLabel((row.type as UsageStatsType) || 'image', isVi) }}</td>
+                <td><code class="or-usage-model">{{ row.model || '—' }}</code></td>
+                <td class="or-usage-td-prompt">
+                  <span :title="row.prompt">{{ row.prompt || '—' }}</span>
+                </td>
+                <td>{{ listItemCredit(row) > 0 ? formatCredits(listItemCredit(row)) : '—' }}</td>
+                <td>
+                  <span class="or-usage-status" :class="`or-usage-status--${listItemStatus(row)}`">
+                    {{ statusLabel(listItemStatus(row)) }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
       <div v-if="listHasMore" class="or-usage-load-more">
         <button
@@ -413,7 +453,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="tableRows.length > 0" class="or-usage-table-wrap">
+    <div v-if="!logsOnly && tableRows.length > 0" class="or-usage-table-wrap">
       <h3 class="or-app-panel-title">{{ isVi ? 'Tổng hợp theo ngày' : 'Daily summary' }}</h3>
       <div class="or-usage-table-scroll">
         <table class="or-usage-table or-usage-table--stats">

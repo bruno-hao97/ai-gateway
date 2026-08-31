@@ -3,14 +3,16 @@ import path from 'node:path';
 import { config } from '../config.js';
 
 export type TopupOrderStatus = 'pending' | 'paid' | 'credited' | 'failed';
+export type TopupOrderSource = 'gommo' | 'payos';
 
 export interface TopupOrder {
-  orderCode: number;
+  orderCode: string;
   username: string;
   packageId: string;
   amountVnd: number;
   credits: number;
   status: TopupOrderStatus;
+  source: TopupOrderSource;
   createdAt: string;
   paidAt?: string;
   creditedAt?: string;
@@ -23,6 +25,18 @@ interface OrderStore {
 }
 
 let writeQueue: Promise<void> = Promise.resolve();
+
+function normalizeOrderCode(orderCode: string | number): string {
+  return String(orderCode ?? '').trim();
+}
+
+function normalizeOrder(order: TopupOrder): TopupOrder {
+  return {
+    ...order,
+    orderCode: normalizeOrderCode(order.orderCode),
+    source: order.source === 'gommo' ? 'gommo' : 'payos',
+  };
+}
 
 async function ensureStoreFile(): Promise<void> {
   const dir = path.dirname(config.topup.ordersFile);
@@ -39,11 +53,16 @@ async function readStore(): Promise<OrderStore> {
   const raw = await fs.readFile(config.topup.ordersFile, 'utf8');
   try {
     const parsed = JSON.parse(raw) as OrderStore;
-    if (parsed?.orders) return parsed;
+    if (!parsed?.orders) return { orders: {} };
+    const orders: Record<string, TopupOrder> = {};
+    for (const [key, order] of Object.entries(parsed.orders)) {
+      const normalized = normalizeOrder(order);
+      orders[normalized.orderCode || key] = normalized;
+    }
+    return { orders };
   } catch {
-    /* reset */
+    return { orders: {} };
   }
-  return { orders: {} };
 }
 
 function queueWrite(task: () => Promise<void>): Promise<void> {
@@ -56,34 +75,39 @@ async function writeStore(store: OrderStore): Promise<void> {
 }
 
 export async function createTopupOrder(input: {
-  orderCode: number;
+  orderCode: string | number;
   username: string;
   packageId: string;
   amountVnd: number;
   credits: number;
+  source?: TopupOrderSource;
 }): Promise<TopupOrder> {
+  const orderCode = normalizeOrderCode(input.orderCode);
   const order: TopupOrder = {
-    orderCode: input.orderCode,
+    orderCode,
     username: input.username,
     packageId: input.packageId,
     amountVnd: input.amountVnd,
     credits: input.credits,
     status: 'pending',
+    source: input.source ?? 'payos',
     createdAt: new Date().toISOString(),
   };
 
   await queueWrite(async () => {
     const store = await readStore();
-    store.orders[String(input.orderCode)] = order;
+    store.orders[orderCode] = order;
     await writeStore(store);
   });
 
   return order;
 }
 
-export async function getTopupOrder(orderCode: number): Promise<TopupOrder | null> {
+export async function getTopupOrder(orderCode: string | number): Promise<TopupOrder | null> {
+  const key = normalizeOrderCode(orderCode);
+  if (!key) return null;
   const store = await readStore();
-  return store.orders[String(orderCode)] ?? null;
+  return store.orders[key] ?? null;
 }
 
 export async function listTopupOrdersForUsername(
@@ -102,13 +126,14 @@ export async function listTopupOrdersForUsername(
     .slice(0, cap);
 }
 
-export async function sumReservedTopupCredits(excludeOrderCode?: number): Promise<number> {
+export async function sumReservedTopupCredits(excludeOrderCode?: string | number): Promise<number> {
+  const exclude = excludeOrderCode != null ? normalizeOrderCode(excludeOrderCode) : null;
   const store = await readStore();
   const now = Date.now();
   const pendingMaxAgeMs = 2 * 60 * 60 * 1000;
   let total = 0;
   for (const order of Object.values(store.orders)) {
-    if (excludeOrderCode != null && order.orderCode === excludeOrderCode) continue;
+    if (exclude && order.orderCode === exclude) continue;
     if (order.status === 'paid') {
       const credits = Math.floor(Number(order.credits) || 0);
       if (credits > 0) total += credits;
@@ -124,20 +149,33 @@ export async function sumReservedTopupCredits(excludeOrderCode?: number): Promis
 }
 
 export async function updateTopupOrder(
-  orderCode: number,
+  orderCode: string | number,
   patch: Partial<TopupOrder>,
 ): Promise<TopupOrder | null> {
+  const key = normalizeOrderCode(orderCode);
+  if (!key) return null;
   let updated: TopupOrder | null = null;
 
   await queueWrite(async () => {
     const store = await readStore();
-    const key = String(orderCode);
     const current = store.orders[key];
     if (!current) return;
-    updated = { ...current, ...patch };
+    updated = normalizeOrder({ ...current, ...patch, orderCode: key });
     store.orders[key] = updated;
     await writeStore(store);
   });
 
   return updated;
+}
+
+export async function markGommoTopupPaid(orderCode: string | number): Promise<TopupOrder | null> {
+  const order = await getTopupOrder(orderCode);
+  if (!order || order.source !== 'gommo') return order;
+  if (order.status === 'credited') return order;
+  const now = new Date().toISOString();
+  return updateTopupOrder(orderCode, {
+    status: 'credited',
+    paidAt: order.paidAt || now,
+    creditedAt: now,
+  });
 }

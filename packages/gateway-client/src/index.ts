@@ -37,6 +37,7 @@ export type {
   PollUntilDoneOptions,
   SearchVoicesParams,
   TopupOrderResult,
+  PaymentSyncResult,
   TtsParams,
   UploadFileInput,
   VoiceProvider,

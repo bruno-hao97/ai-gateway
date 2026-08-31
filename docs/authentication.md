@@ -33,10 +33,10 @@ Use these JSON endpoints from your own app or scripts. The gateway fills `domain
 POST /gateway/auth/login
 Content-Type: application/json
 
-{"email":"you@example.com","password":"YOUR_PASSWORD"}
+{"email":"you@example.com","password":"YOUR_PASSWORD","device_id":"…","device_name":"Chrome 1","device_info":"{…}"}
 ```
 
-Response includes `access_token` — use as `Authorization: Bearer …` for `/gateway/*`.
+The docs sign-in form sends **`device_id`**, **`device_name`**, and **`device_info`** (79ai marketplace shape) so `/ai/me` returns full credit balances. Optional for API clients; recommended for browser apps.
 
 ::: code-group
 
@@ -175,4 +175,8 @@ Invoke-RestMethod -Method POST `
 
 :::
 
-Response fields used by the dashboard: `userInfo` (name, email, username) and `balancesInfo.credits_ai`.
+Response includes `access_token` — use as `Authorization: Bearer …` for `/gateway/*`.
+
+### Check session (`/ai/me`)
+
+Include **`device_id`**, **`device_name`**, and **`device_info`** in the form body (same as 79ai) so `balancesInfo.credits_ai` is populated.

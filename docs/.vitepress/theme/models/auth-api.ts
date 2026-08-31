@@ -1,5 +1,6 @@
 import { apiBase } from './gateway-base';
 import { clearCachedMe } from './user-api';
+import { gommoClientDeviceFields } from './gommo-device';
 
 export const STORAGE_TOKEN = 'gw_access_token';
 export const STORAGE_DOMAIN = 'gw_login_domain';
@@ -109,11 +110,20 @@ async function parseJsonResponse(res: Response): Promise<Record<string, unknown>
   }
 }
 
+function loginDevicePayload(): Record<string, string> {
+  const device = gommoClientDeviceFields();
+  return {
+    device_id: device.device_id,
+    device_name: device.device_name,
+    device_info: device.device_info,
+  };
+}
+
 export async function loginWithEmail(email: string, password: string): Promise<string> {
   const res = await fetch(`${gatewayBase()}/gateway/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ email: email.trim(), password }),
+    body: JSON.stringify({ email: email.trim(), password, ...loginDevicePayload() }),
   });
   const data = await parseJsonResponse(res);
   if (!res.ok) {
@@ -140,6 +150,7 @@ export async function registerAccount(input: {
       password: input.password,
       phone: input.phone.trim(),
       name: input.name?.trim() || undefined,
+      ...loginDevicePayload(),
     }),
   });
   const data = await parseJsonResponse(res);

@@ -1,9 +1,13 @@
 ---
-title: 'Recipe: PayOS credit topup'
-description: List packages, create checkout, poll order status
+title: 'Recipe: PayOS credit topup (legacy)'
+description: Merchant-controlled PayOS + sendBalances — use Gommo VietQR by default
 ---
 
-# PayOS credit topup
+# PayOS credit topup (legacy)
+
+::: warning
+**Legacy path.** New integrations should use [Gommo VietQR topup](./gommo-topup.md) (`POST /billing/payment/create`). This recipe requires PayOS keys and merchant `GOMMO_ACCESS_TOKEN` on the server.
+:::
 
 Billing lives under **`/billing/*`** — separate from `/gateway` generation APIs.
 

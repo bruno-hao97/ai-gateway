@@ -278,6 +278,39 @@ export function exportStatsTableCsv(rows: UsageStatsTableRow[]): string {
   return [header.join(','), ...body].join('\n');
 }
 
+export function groupListItemsByDay(
+  items: UsageListItem[],
+  isVi: boolean,
+): { dayKey: string; label: string; items: UsageListItem[] }[] {
+  const map = new Map<string, UsageListItem[]>();
+  for (const item of items) {
+    const iso = listItemCreatedAt(item);
+    const dayKey = iso ? iso.slice(0, 10) : 'unknown';
+    const bucket = map.get(dayKey);
+    if (bucket) bucket.push(item);
+    else map.set(dayKey, [item]);
+  }
+  return [...map.entries()]
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([dayKey, dayItems]) => ({
+      dayKey,
+      label: formatDayLabel(dayKey, isVi),
+      items: dayItems,
+    }));
+}
+
+function formatDayLabel(dayKey: string, isVi: boolean): string {
+  if (dayKey === 'unknown') return isVi ? 'Không rõ ngày' : 'Unknown date';
+  const d = Date.parse(`${dayKey}T12:00:00`);
+  if (!Number.isFinite(d)) return dayKey;
+  return new Intl.DateTimeFormat(isVi ? 'vi-VN' : 'en-US', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(d));
+}
+
 export function jobTypeLabel(type: UsageStatsType | 'all', isVi: boolean): string {
   const map: Record<string, [string, string]> = {
     all: ['All', 'Tất cả'],

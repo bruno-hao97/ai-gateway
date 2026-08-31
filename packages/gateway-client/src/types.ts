@@ -196,6 +196,8 @@ export interface CreateTopupParams {
 }
 
 export interface BillingStatus {
+  gommoPayment?: boolean;
+  billingMode?: 'gommo' | 'legacy';
   payosConfigured: boolean;
   merchantReady: boolean;
   webhookUrl?: string | null;
@@ -204,10 +206,23 @@ export interface BillingStatus {
 
 export interface TopupOrderResult {
   url?: string;
-  orderCode?: number;
+  orderCode?: string | number;
   username?: string;
   packageId?: string;
   credits?: number;
   qrImage?: string;
+  amountVnd?: number;
+  paid?: boolean;
   order?: Record<string, unknown>;
+}
+
+export interface PaymentSyncResult {
+  paid: boolean;
+  orderCode: string;
+  deposit?: {
+    status?: string;
+    amount?: string;
+    gateway?: string;
+    created_time?: string;
+  };
 }

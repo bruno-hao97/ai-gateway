@@ -41,4 +41,4 @@ Xem `.env.example`. Không commit `.env` / `GOMMO_ACCESS_TOKEN`.
 - Copy FE site-ai (studio, workflow)
 - Nhầm Cursor MCP `gommo_*` với HTTP gateway runtime
 - Expose merchant token ra browser
-- Gom PayOS billing vào `/gateway` — dùng `/billing/*`
+- Gắn PayOS billing vào `/gateway` — dùng `/billing/*` (Gommo: `/billing/payment/*`)

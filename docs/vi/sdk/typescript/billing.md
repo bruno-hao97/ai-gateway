@@ -1,38 +1,54 @@
 ---
 title: Billing
-description: PayOS topup via SDK
+description: Nạp credit Gommo VietQR qua SDK
 ---
 
 # Billing
 
-Separate from `/gateway` — credit topup.
+Tách khỏi `/gateway` — nạp credit.
 
-## Status and packages
+## Status và gói
 
 ```typescript
 const status = await client.billing.status();
 const packages = await client.billing.packages();
 ```
 
-## Create topup
+## Tạo payment Gommo (khuyến nghị)
 
 ```typescript
 const me = await client.auth.me();
 const username = me.userInfo?.username!;
 
-const order = await client.billing.createTopup({
+const payment = await client.billing.createPayment({
   username,
   packageId: 'basic-member',
+  invoiceBuyer: {
+    type: 'consumer',
+    name: 'Bán cho người tiêu dùng',
+    email: '',
+  },
 });
 
-console.log(order.data?.url);       // PayOS checkout
-console.log(order.data?.orderCode);
+const orderCode = payment.data?.content ?? payment.data?.orderCode;
 ```
 
-## Poll order
+## Poll đến khi paid
 
 ```typescript
-await client.billing.getOrder(order.data!.orderCode!);
+const sync = await client.billing.syncPayment({ orderCode: String(orderCode) });
 ```
 
-See [Billing reference](../../reference/billing.md) and [Cookbook: PayOS](../../cookbook/payos-topup.md).
+## Lịch sử
+
+```typescript
+const orders = await client.billing.listOrders(username, 20);
+```
+
+## PayOS legacy
+
+```typescript
+await client.billing.createTopup({ username, packageId: 'basic-member' });
+```
+
+Xem [Billing reference](../../reference/billing.md) và [Cookbook Gommo VietQR](../../cookbook/gommo-topup.md).

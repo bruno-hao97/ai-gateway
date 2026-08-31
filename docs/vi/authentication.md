@@ -33,10 +33,10 @@ JSON endpoint cho app/script của bạn. Gateway tự điền `domain` từ `GO
 POST /gateway/auth/login
 Content-Type: application/json
 
-{"email":"you@example.com","password":"YOUR_PASSWORD"}
+{"email":"you@example.com","password":"YOUR_PASSWORD","device_id":"…","device_name":"Chrome 1","device_info":"{…}"}
 ```
 
-Response có `access_token` — dùng `Authorization: Bearer …` cho `/gateway/*`.
+Form đăng nhập docs gửi **`device_id`**, **`device_name`**, **`device_info`** (format 79ai) để `/ai/me` trả đủ `balancesInfo.credits_ai`. Tùy chọn cho API client; khuyên dùng cho browser app.
 
 ::: code-group
 
@@ -175,4 +175,8 @@ Invoke-RestMethod -Method POST `
 
 :::
 
-Response dashboard dùng: `userInfo` (name, email, username) và `balancesInfo.credits_ai`.
+Response có `access_token` — dùng `Authorization: Bearer …` cho `/gateway/*`.
+
+### Kiểm tra session (`/ai/me`)
+
+Gửi **`device_id`**, **`device_name`**, **`device_info`** trong form (giống 79ai) để `balancesInfo.credits_ai` có giá trị.

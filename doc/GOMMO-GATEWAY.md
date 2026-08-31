@@ -2,7 +2,7 @@
 
 > **Nguồn:** reverse-engineer từ repo `site-ai` (đọc code 2026-08-20).  
 > **Mục đích:** nền móng AI gateway — proxy + wrap REST Gommo.  
-> **Billing:** PayOS topup tại `/billing/*` (tách `/gateway`). Webhook PAID → internal sendBalances.
+> **Billing:** Gommo VietQR tại `/billing/payment/*` (mặc định). PayOS legacy tại `/billing/topup/*` khi cấu hình `PAYOS_*`.
 
 ---
 

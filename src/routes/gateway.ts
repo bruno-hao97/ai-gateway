@@ -33,15 +33,28 @@ const POLL_MEDIA = new Set<PollMedia>(['image', 'video', 'music']);
 
 const router = Router();
 
-/** POST /gateway/auth/login — body: { email, password, domain? } */
+function readLoginDevice(body: Record<string, unknown> | undefined) {
+  const device_id = typeof body?.device_id === 'string' ? body.device_id.trim() : '';
+  const device_name = typeof body?.device_name === 'string' ? body.device_name.trim() : '';
+  const device_info = typeof body?.device_info === 'string' ? body.device_info : '';
+  if (!device_id || !device_name || !device_info) return undefined;
+  return { device_id, device_name, device_info };
+}
+
+/** POST /gateway/auth/login — body: { email, password, domain?, device_id?, device_name?, device_info? } */
 router.post('/auth/login', async (req, res) => {
   try {
-    const { email, password, domain } = req.body ?? {};
+    const { email, password } = req.body ?? {};
     if (!email || !password) {
       sendError(res, 400, 'email and password are required', 'VALIDATION_ERROR');
       return;
     }
-    const result = await loginGommoUser(String(email), String(password), readDomain(req));
+    const result = await loginGommoUser(
+      String(email),
+      String(password),
+      readDomain(req),
+      readLoginDevice(req.body),
+    );
     res.json({
       success: true,
       data: { access_token: result.accessToken },

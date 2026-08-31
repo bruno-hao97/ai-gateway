@@ -1,4 +1,5 @@
 import { config } from '../config.js';
+import type { Gommo79aiDevicePayload } from './gommoDevice.js';
 
 export class GommoAuthError extends Error {
   status: number;
@@ -35,16 +36,23 @@ export async function loginGommoUser(
   email: string,
   password: string,
   domain: string,
+  device?: Gommo79aiDevicePayload,
 ): Promise<{ accessToken: string; message?: string }> {
   const trimmedEmail = email.trim();
   if (!trimmedEmail) throw new GommoAuthError('Email is required');
   if (!password) throw new GommoAuthError('Password is required');
 
-  const body = new URLSearchParams({
+  const params = new URLSearchParams({
     email: trimmedEmail,
     password,
     domain: domain.trim() || config.gommo.apiDomain,
-  }).toString();
+  });
+  if (device?.device_id && device.device_name && device.device_info) {
+    params.set('device_id', device.device_id);
+    params.set('device_name', device.device_name);
+    params.set('device_info', device.device_info);
+  }
+  const body = params.toString();
 
   const url = `${config.gommo.authBaseUrl}${config.gommo.authPath}/auth/login`;
   const res = await fetch(url, {

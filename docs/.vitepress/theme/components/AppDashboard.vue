@@ -4,7 +4,6 @@ import { useData, useRoute } from 'vitepress';
 import { getStoredToken, getStoredDomain, importSessionFromUrl, loginUrlWithRedirect } from '../models/auth-api';
 import { playgroundEmbedUrl, playgroundOrigin, playgroundUrl } from '../models/gateway-base';
 import {
-  createTopup,
   fetchBillingPackages,
   fetchBillingStatus,
   fetchMe,
@@ -22,11 +21,13 @@ import {
   type MeResponse,
   type TopupOrder,
   type TopupOrderStatus,
-  type TopupPayment,
 } from '../models/user-api';
 import { appendUsageRecord, type UsageJobType } from '../models/usage-history';
 import AppNavIcon from './AppNavIcon.vue';
+import CreditsCheckoutModal from './CreditsCheckoutModal.vue';
 import ProfileUsagePanel from './ProfileUsagePanel.vue';
+import ProfileActivityPanel from './ProfileActivityPanel.vue';
+import { formatApproxUsd } from '../models/invoice-buyer';
 
 interface AppNavItem {
   id?: string;
@@ -37,9 +38,9 @@ interface AppNavItem {
   badge?: string;
 }
 
-type ProfileSection = 'general' | 'usage' | 'api' | 'activity';
+type ProfileSection = 'general' | 'usage' | 'api' | 'activity' | 'logs';
 
-const PROFILE_SECTIONS = new Set<ProfileSection>(['general', 'usage', 'api', 'activity']);
+const PROFILE_SECTIONS = new Set<ProfileSection>(['general', 'usage', 'api', 'activity', 'logs']);
 
 const props = defineProps<{
   view: 'overview' | 'profile' | 'playground' | 'token' | 'credits';
@@ -73,10 +74,13 @@ const packagesError = ref('');
 const topupOrders = ref<TopupOrder[]>([]);
 const ordersLoading = ref(false);
 const billingReady = ref(true);
-const paying = ref<string | null>(null);
-const payment = ref<TopupPayment | null>(null);
+const checkoutOpen = ref(false);
+const checkoutPackage = ref<CreditPackage | null>(null);
+const checkoutToast = ref('');
+let checkoutToastTimer: ReturnType<typeof setTimeout> | null = null;
 const playgroundFrame = ref<HTMLIFrameElement | null>(null);
 const usagePanelRef = ref<InstanceType<typeof ProfileUsagePanel> | null>(null);
+const logsPanelRef = ref<InstanceType<typeof ProfileUsagePanel> | null>(null);
 
 const embedSrc = computed(() => playgroundEmbedUrl(embedQuery.value));
 const playgroundExternalUrl = computed(() => playgroundUrl());
@@ -124,16 +128,14 @@ const navAccount = computed((): AppNavItem[] => [
   {
     id: 'activity',
     label: 'Activity',
+    href: `${prefix.value}/app/profile/?section=activity`,
     icon: 'activity',
-    disabled: true,
-    badge: isVi.value ? 'Sắp có' : 'Soon',
   },
   {
     id: 'logs',
     label: isVi.value ? 'Nhật ký' : 'Logs',
+    href: `${prefix.value}/app/profile/?section=logs`,
     icon: 'logs',
-    disabled: true,
-    badge: isVi.value ? 'Sắp có' : 'Soon',
   },
 ]);
 
@@ -149,6 +151,7 @@ const profileSection = ref<ProfileSection>(readProfileSectionFromLocation());
 const profileTabs = computed(() => [
   { id: 'general' as const, label: isVi.value ? 'Chung' : 'General' },
   { id: 'usage' as const, label: 'Usage' },
+  { id: 'logs' as const, label: isVi.value ? 'Nhật ký' : 'Logs' },
   { id: 'api' as const, label: isVi.value ? 'API access' : 'API access' },
   { id: 'activity' as const, label: 'Activity' },
 ]);
@@ -180,6 +183,26 @@ function isActive(id: string): boolean {
   return props.view === id;
 }
 
+function isAccountNavActive(item: AppNavItem): boolean {
+  if (!item.id) return false;
+  if (item.id === 'credits') return props.view === 'credits';
+  if (props.view !== 'profile') return false;
+  const section = profileSection.value;
+  if (item.id === 'activity') return section === 'activity';
+  if (item.id === 'logs') return section === 'logs';
+  if (item.id === 'profile') return section === 'general' || section === 'api' || section === 'usage';
+  return false;
+}
+
+async function reloadUsagePanels() {
+  if (profileSection.value === 'usage') {
+    await usagePanelRef.value?.reloadRecords();
+  }
+  if (profileSection.value === 'logs') {
+    await logsPanelRef.value?.reloadRecords();
+  }
+}
+
 async function refreshProfile() {
   loadError.value = '';
   try {
@@ -209,7 +232,7 @@ async function loadCreditsView() {
   packagesError.value = '';
   try {
     const status = await fetchBillingStatus();
-    billingReady.value = Boolean(status.payosConfigured && status.merchantReady);
+    billingReady.value = status.gommoPayment !== false;
     packages.value = await fetchBillingPackages();
     await loadTopupOrders();
   } catch (e) {
@@ -223,23 +246,34 @@ function orderStatusClass(status: TopupOrderStatus): string {
   return `or-app-order-status--${status}`;
 }
 
-async function onTopup(packageId: string) {
+function onTopup(packageId: string) {
   if (!username.value) {
     packagesError.value = isVi.value ? 'Thiếu username — đăng nhập lại' : 'Missing username — sign in again';
     return;
   }
-  paying.value = packageId;
-  payment.value = null;
+  const pkg = packages.value.find((item) => item.id === packageId);
+  if (!pkg) return;
   packagesError.value = '';
-  try {
-    payment.value = await createTopup(username.value, packageId);
-    await refreshProfile();
-    await loadTopupOrders();
-  } catch (e) {
-    packagesError.value = e instanceof Error ? e.message : String(e);
-  } finally {
-    paying.value = null;
-  }
+  checkoutPackage.value = pkg;
+  checkoutOpen.value = true;
+}
+
+function closeCheckout() {
+  checkoutOpen.value = false;
+  checkoutPackage.value = null;
+}
+
+function onCheckoutToast(message: string) {
+  checkoutToast.value = message;
+  if (checkoutToastTimer) clearTimeout(checkoutToastTimer);
+  checkoutToastTimer = setTimeout(() => {
+    checkoutToast.value = '';
+  }, 3200);
+}
+
+async function onCheckoutPaid() {
+  await refreshProfile();
+  await loadTopupOrders();
 }
 
 async function copyToken() {
@@ -288,9 +322,7 @@ async function loadProfileView() {
   profileSection.value = readProfileSectionFromLocation();
   await refreshProfile();
   await loadTopupOrders();
-  if (profileSection.value === 'usage') {
-    await usagePanelRef.value?.reloadRecords();
-  }
+  await reloadUsagePanels();
 }
 
 function onPlaygroundUsageMessage(event: MessageEvent) {
@@ -352,9 +384,10 @@ watch(
     }
     if (props.view === 'profile') {
       profileSection.value = readProfileSectionFromLocation();
-      if (profileSection.value === 'usage') {
-        void usagePanelRef.value?.reloadRecords();
+      if (profileSection.value === 'activity') {
+        void loadTopupOrders();
       }
+      void reloadUsagePanels();
     }
   },
 );
@@ -397,7 +430,7 @@ watch(
             v-if="item.href && !item.disabled"
             :href="item.href"
             class="or-app-nav-link"
-            :class="{ active: item.id && isActive(item.id) }"
+            :class="{ active: item.id ? (item.id === 'profile' || item.id === 'credits' || item.id === 'activity' || item.id === 'logs' ? isAccountNavActive(item) : isActive(item.id)) : false }"
           >
             <AppNavIcon :name="item.icon" />
             <span class="or-app-nav-text">{{ item.label }}</span>
@@ -439,11 +472,22 @@ watch(
               }}
             </template>
             <template v-else-if="view === 'profile'">
-              {{
-                isVi
-                  ? 'Thông tin tài khoản Gommo từ /ai/me.'
-                  : 'Your Gommo account details from /ai/me.'
-              }}
+              <template v-if="profileSection === 'usage'">
+                {{ isVi ? 'Thống kê usage và credit từ Gommo.' : 'Usage stats and credits from Gommo.' }}
+              </template>
+              <template v-else-if="profileSection === 'logs'">
+                {{ isVi ? 'Nhật ký từng job từ usage-history.' : 'Per-job logs from usage-history.' }}
+              </template>
+              <template v-else-if="profileSection === 'activity'">
+                {{ isVi ? 'Hoạt động tài khoản và nạp credit.' : 'Account activity and top-ups.' }}
+              </template>
+              <template v-else>
+                {{
+                  isVi
+                    ? 'Thông tin tài khoản Gommo từ /ai/me.'
+                    : 'Your Gommo account details from /ai/me.'
+                }}
+              </template>
             </template>
             <template v-else-if="view === 'token'">
               {{
@@ -455,8 +499,8 @@ watch(
             <template v-else>
               {{
                 isVi
-                  ? 'Nạp credit qua PayOS trên gateway.'
-                  : 'Top up credits via PayOS on the gateway.'
+                  ? 'Nạp credit qua Gommo (VietQR) — credits cộng tự động sau khi chuyển khoản.'
+                  : 'Top up via Gommo (VietQR) — credits apply automatically after bank transfer.'
               }}
             </template>
           </p>
@@ -546,13 +590,18 @@ watch(
             </a>
             <a :href="`${prefix}/app/credits/`" class="or-app-card">
               <h3>{{ isVi ? 'Nạp credits' : 'Top up credits' }}</h3>
-              <p>{{ isVi ? 'PayOS packages trên gateway.' : 'PayOS packages on the gateway.' }}</p>
+              <p>{{ isVi ? 'Gói credit qua Gommo.' : 'Credit packages via Gommo.' }}</p>
               <span class="or-app-card-cta">{{ isVi ? 'Wallet' : 'Wallet' }} →</span>
             </a>
             <a :href="`${prefix}/app/token/`" class="or-app-card">
               <h3>Access token</h3>
               <p>{{ isVi ? 'Copy Bearer cho API client.' : 'Copy Bearer for your API client.' }}</p>
               <span class="or-app-card-cta">{{ isVi ? 'Xem token' : 'View token' }} →</span>
+            </a>
+            <a :href="`${prefix}/app/profile/?section=usage`" class="or-app-card">
+              <h3>Usage</h3>
+              <p>{{ isVi ? 'Thống kê credit và lịch sử job.' : 'Credit stats and job history.' }}</p>
+              <span class="or-app-card-cta">{{ isVi ? 'Xem usage' : 'View usage' }} →</span>
             </a>
             <a :href="`${prefix}/app/profile/`" class="or-app-card">
               <h3>{{ isVi ? 'Hồ sơ' : 'Profile' }}</h3>
@@ -671,63 +720,32 @@ watch(
             </p>
           </div>
 
+          <!-- Logs -->
+          <div v-else-if="profileSection === 'logs'" class="or-app-profile-panel">
+            <ProfileUsagePanel
+              ref="logsPanelRef"
+              mode="logs"
+              :credits="credits"
+              :is-vi="isVi"
+              :prefix="prefix"
+            />
+          </div>
+
           <!-- Activity -->
-          <div v-else class="or-app-profile-panel">
-            <div class="or-app-panel or-app-activity-soon">
-              <h3 class="or-app-panel-title">{{ isVi ? 'Hoạt động API' : 'API activity' }}</h3>
-              <p class="or-app-muted">
-                {{
-                  isVi
-                    ? 'Heatmap và job history sẽ có khi gateway expose danh sách job theo user.'
-                    : 'Heatmap and job history will appear when the gateway exposes per-user job lists.'
-                }}
-              </p>
-            </div>
+          <div v-else-if="profileSection === 'activity'" class="or-app-profile-panel">
+            <ProfileActivityPanel
+              :is-vi="isVi"
+              :prefix="prefix"
+              :credits="credits"
+              :topup-orders="topupOrders"
+              :orders-loading="ordersLoading"
+              @refresh="loadTopupOrders"
+            />
+          </div>
 
-            <div class="or-app-orders-head">
-              <h3 class="or-app-panel-title">{{ isVi ? 'Nạp credit gần đây' : 'Recent top-ups' }}</h3>
-              <button
-                type="button"
-                class="or-app-btn or-app-btn-ghost or-app-btn-sm"
-                :disabled="ordersLoading"
-                @click="loadTopupOrders"
-              >
-                {{ ordersLoading ? (isVi ? 'Đang tải…' : 'Loading…') : isVi ? 'Làm mới' : 'Refresh' }}
-              </button>
-            </div>
-
-            <p v-if="ordersLoading && topupOrders.length === 0" class="or-app-muted">
-              {{ isVi ? 'Đang tải…' : 'Loading…' }}
-            </p>
-            <p v-else-if="topupOrders.length === 0" class="or-app-muted or-app-orders-empty">
-              {{ isVi ? 'Chưa có đơn nạp.' : 'No top-ups yet.' }}
-            </p>
-            <div v-else class="or-app-orders-table-wrap">
-              <table class="or-app-orders-table">
-                <thead>
-                  <tr>
-                    <th>{{ isVi ? 'Mã đơn' : 'Order' }}</th>
-                    <th>{{ isVi ? 'Credits' : 'Credits' }}</th>
-                    <th>{{ isVi ? 'Trạng thái' : 'Status' }}</th>
-                    <th>{{ isVi ? 'Thời gian' : 'Date' }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="order in topupOrders.slice(0, 8)" :key="order.orderCode">
-                    <td><code>#{{ order.orderCode }}</code></td>
-                    <td>{{ formatCredits(order.credits) }}</td>
-                    <td>
-                      <span class="or-app-order-status" :class="orderStatusClass(order.status)">
-                        {{ formatTopupOrderStatus(order.status, isVi) }}
-                      </span>
-                    </td>
-                    <td class="or-app-orders-date">{{ formatOrderDate(order.createdAt, isVi) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <p v-if="topupOrders.length > 0" class="or-app-muted">
-              <a :href="`${prefix}/app/credits/`">{{ isVi ? 'Xem tất cả trên Credits' : 'View all on Credits' }} →</a>
+          <div v-else class="or-app-profile-panel or-app-profile-panel--fallback">
+            <p class="or-app-muted">
+              <a :href="profileSectionHref('general')">{{ isVi ? 'Về tab Chung' : 'Go to General' }}</a>
             </p>
           </div>
         </section>
@@ -765,8 +783,8 @@ watch(
           <p v-if="!billingReady" class="or-app-alert or-app-alert-warn">
             {{
               isVi
-                ? 'PayOS hoặc merchant chưa cấu hình trên server — xem GET /billing/status.'
-                : 'PayOS or merchant not configured on server — see GET /billing/status.'
+                ? 'Billing Gommo chưa sẵn sàng — xem GET /billing/status.'
+                : 'Gommo billing not ready — see GET /billing/status.'
             }}
           </p>
 
@@ -793,41 +811,31 @@ watch(
               <p class="or-app-pkg-meta">
                 {{ formatCredits(pkg.credits) }} credits ·
                 {{ pkg.amountVnd.toLocaleString(isVi ? 'vi-VN' : 'en-US') }} ₫
+                <template v-if="!isVi"> · {{ formatApproxUsd(pkg.amountVnd) }}</template>
               </p>
               <button
                 type="button"
                 class="or-app-btn"
                 :class="pkg.featured ? 'or-app-btn-primary' : 'or-app-btn-ghost'"
-                :disabled="paying === pkg.id"
                 @click="onTopup(pkg.id)"
               >
-                {{ paying === pkg.id ? (isVi ? 'Đang tạo…' : 'Creating…') : isVi ? 'Nạp ngay' : 'Top up' }}
+                {{ isVi ? 'Nạp ngay' : 'Top up' }}
               </button>
             </div>
           </div>
 
-          <div v-if="payment" class="or-app-panel or-app-payment">
-            <h3 class="or-app-panel-title">PayOS</h3>
-            <p class="or-app-muted">Order #{{ payment.orderCode }}</p>
-            <img
-              v-if="payment.qrImage"
-              :src="payment.qrImage"
-              alt="PayOS QR"
-              class="or-app-qr"
-            />
-            <a
-              v-if="payment.url"
-              :href="payment.url"
-              target="_blank"
-              rel="noreferrer"
-              class="or-app-btn or-app-btn-primary or-app-pay-link"
-            >
-              {{ isVi ? 'Mở trang thanh toán' : 'Open payment page' }} ↗
-            </a>
-            <p v-if="payment.bankTransfer" class="or-app-muted or-app-bank">
-              {{ payment.bankTransfer.amountFormatted }} · {{ payment.bankTransfer.content }}
-            </p>
-          </div>
+          <CreditsCheckoutModal
+            :open="checkoutOpen"
+            :pkg="checkoutPackage"
+            :username="username"
+            :default-email="email"
+            :is-vi="isVi"
+            @close="closeCheckout"
+            @paid="onCheckoutPaid"
+            @toast="onCheckoutToast"
+          />
+
+          <p v-if="checkoutToast" class="or-checkout-toast" role="status">{{ checkoutToast }}</p>
 
           <div class="or-app-panel or-app-orders">
             <div class="or-app-orders-head">
@@ -850,8 +858,8 @@ watch(
             <p v-else-if="topupOrders.length === 0" class="or-app-muted or-app-orders-empty">
               {{
                 isVi
-                  ? 'Chưa có đơn nạp. Tạo đơn PayOS ở trên để bắt đầu.'
-                  : 'No top-ups yet. Create a PayOS order above to get started.'
+                  ? 'Chưa có đơn nạp. Tạo đơn VietQR ở trên để bắt đầu.'
+                  : 'No top-ups yet. Create a VietQR order above to get started.'
               }}
             </p>
 

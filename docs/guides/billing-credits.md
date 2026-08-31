@@ -1,32 +1,32 @@
 ---
 title: Billing & credits
-description: PayOS topup and credit fulfillment overview
+description: Gommo VietQR topup and credit fulfillment overview
 ---
 
 # Billing & credits
 
-End-user **credit topup** via PayOS — separate from `/gateway` generation APIs.
+End-user **credit topup** via Gommo (`create_payment` + VietQR) — separate from `/gateway` generation APIs.
 
-OpenRouter uses Stripe and shared projects; AI Gateway uses **PayOS** + internal Gommo credit send.
+The default path proxies Gommo subscriptions APIs. Credits are fulfilled by **Gommo upstream** after bank transfer; the gateway polls `payment_sync` from the client.
 
 ## Overview
 
 ```
-User app ──► POST /billing/topup/create (Bearer user)
-                └── PayOS checkout URL / QR
-                        └── webhook PAID ──► gateway fulfills credits on Gommo user
+User app ──► POST /billing/payment/create (Bearer user)
+                └── Gommo VietQR + order code (SP…)
+                        └── poll payment_sync ──► paid: true → Gommo credits user
 ```
 
-Merchant `GOMMO_ACCESS_TOKEN` stays on the server — used only during fulfillment (same family as `/admin`).
+Legacy PayOS + `sendBalances` (`POST /billing/topup/create`) remains for merchant-controlled fulfillment when `PAYOS_*` is configured.
 
 ## Prerequisites
 
 | Requirement | Env / note |
 |-------------|------------|
-| PayOS account | `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY` |
-| Public webhook URL | `PAYOS_WEBHOOK_URL` → `https://api…/billing/webhook/payos` |
-| Merchant Gommo token | `GOMMO_ACCESS_TOKEN` |
-| Merchant buffer | After send, merchant balance > 500k credits (Gommo rule) |
+| Gommo domain | `GOMMO_API_DOMAIN` (default `79ai.net`) |
+| User session | Bearer from `/ai/login` — same as generation APIs |
+| Device fields | `device_id`, `device_name`, `device_info` (portal sends automatically) |
+| Legacy PayOS (optional) | `PAYOS_*` + `GOMMO_ACCESS_TOKEN` for `/billing/topup/create` |
 
 Check config:
 
@@ -34,7 +34,7 @@ Check config:
 GET /billing/status
 ```
 
-Returns `payosConfigured`, `merchantReady`.
+Returns `billingMode: "gommo"`, `gommoPayment: true`, and optional `payosConfigured`.
 
 ## Packages
 
@@ -42,50 +42,66 @@ Returns `payosConfigured`, `merchantReady`.
 GET /billing/packages
 ```
 
-Returns credit packages (amount VND, credits, optional bonus). Defined in server `creditPackages` — not hard-coded in clients.
+Returns credit packages (`id`, `amountVnd`, `credits`, `gommoIdBase`). Defined in server `creditPackages.ts`.
 
-## Create topup order
+## Create payment (Gommo)
 
 ```http
-POST /billing/topup/create
+POST /billing/payment/create
 Authorization: Bearer {user_access_token}
 Content-Type: application/json
 
 {
   "username": "gommo_username_from_/ai/me",
-  "packageId": "basic-member"
+  "packageId": "basic-member",
+  "invoiceBuyer": {
+    "type": "consumer",
+    "name": "Bán cho người tiêu dùng",
+    "email": ""
+  },
+  "promoCode": "OPTIONAL",
+  "referralCode": "OPTIONAL"
 }
 ```
 
-Response includes PayOS checkout URL / QR data and `orderCode`.
+Response includes VietQR image URL, bank transfer fields (`holder`, `acc`, `bank`, `content`), VAT breakdown, and `orderCode`.
 
-Poll order (optional):
+The gateway stores the order locally (`TOPUP_ORDERS_FILE`) for history.
+
+## Poll payment status
 
 ```http
-GET /billing/topup/orders/{orderCode}
+POST /billing/payment/sync
+Authorization: Bearer {user_access_token}
+Content-Type: application/json
+
+{ "orderCode": "SP..." }
 ```
 
-Statuses include `pending`, `paid`, `credited`, `failed`.
+Poll every ~3.5s until `data.paid === true`. Gommo credits the user automatically.
 
-## Webhook flow
+## Order history
 
-1. PayOS POST `/billing/webhook/payos` with signature.
-2. Gateway verifies checksum.
-3. On `PAID` → lookup order → `sendCreditsToUser()` (internal, no `x-admin-key` from client).
-4. Order marked `credited`.
+```http
+GET /billing/topup/orders?username={}&limit=20
+Authorization: Bearer {user_access_token}
+```
+
+Returns local orders for Gommo and legacy PayOS flows. Statuses: `pending`, `paid`, `credited`, `failed`.
 
 ## vs `/gateway`
 
 | Path | Purpose |
 |------|---------|
 | `/gateway/*` | Consume credits (models, jobs, chat, …) |
-| `/billing/*` | Add credits (PayOS) |
+| `/billing/*` | Add credits (Gommo VietQR or legacy PayOS) |
 
-Do not mount PayOS logic under `/gateway`.
+Do not mount billing logic under `/gateway`.
 
 ## Full reference
 
-→ [Billing (PayOS) API reference](./../reference/billing.md)
+→ [Billing API reference](./../reference/billing.md)  
+→ [Recipe: Gommo VietQR topup](./../cookbook/gommo-topup.md)
 
 ## Next
 

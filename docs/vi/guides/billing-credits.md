@@ -1,40 +1,38 @@
 ---
 title: Billing & credits
-description: Tổng quan nạp PayOS và fulfillment credit
+description: Tổng quan nạp Gommo VietQR và fulfillment credit
 ---
 
 # Billing & credits
 
-**Nạp credit** end-user qua PayOS — tách khỏi API generation `/gateway`.
+**Nạp credit** end-user qua Gommo (`create_payment` + VietQR) — tách khỏi API generation `/gateway`.
 
-OpenRouter dùng Stripe và shared project; AI Gateway dùng **PayOS** + gửi credit Gommo nội bộ.
+Luồng mặc định proxy Gommo subscriptions. Credit được cộng bởi **Gommo upstream** sau chuyển khoản; client poll `payment_sync`.
 
 ## Tổng quan
 
 ```
-User app ──► POST /billing/topup/create (Bearer user)
-                └── PayOS checkout URL / QR
-                        └── webhook PAID ──► gateway fulfill credit user Gommo
+User app ──► POST /billing/payment/create (Bearer user)
+                └── VietQR Gommo + mã đơn (SP…)
+                        └── poll payment_sync ──► paid: true → Gommo cộng credit
 ```
 
-Merchant `GOMMO_ACCESS_TOKEN` ở server — chỉ dùng khi fulfill (cùng nhóm `/admin`).
+PayOS legacy + `sendBalances` (`POST /billing/topup/create`) vẫn giữ khi cấu hình `PAYOS_*`.
 
 ## Điều kiện
 
 | Yêu cầu | Env / ghi chú |
 |---------|---------------|
-| Tài khoản PayOS | `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY` |
-| Webhook public | `PAYOS_WEBHOOK_URL` → `https://api…/billing/webhook/payos` |
-| Merchant Gommo token | `GOMMO_ACCESS_TOKEN` |
-| Buffer merchant | Sau send, merchant balance > 500k credits (quy tắc Gommo) |
-
-Kiểm tra cấu hình:
+| Domain Gommo | `GOMMO_API_DOMAIN` (mặc định `79ai.net`) |
+| Session user | Bearer từ `/ai/login` |
+| Device fields | `device_id`, `device_name`, `device_info` (portal tự gửi) |
+| PayOS legacy (tùy chọn) | `PAYOS_*` + `GOMMO_ACCESS_TOKEN` cho `/billing/topup/create` |
 
 ```http
 GET /billing/status
 ```
 
-Trả `payosConfigured`, `merchantReady`.
+Trả `billingMode: "gommo"`, `gommoPayment: true`.
 
 ## Gói nạp
 
@@ -42,50 +40,58 @@ Trả `payosConfigured`, `merchantReady`.
 GET /billing/packages
 ```
 
-Trả các gói credit (VND, credits, bonus tùy chọn). Định nghĩa server `creditPackages` — không hard-code client.
-
-## Tạo đơn topup
+## Tạo thanh toán (Gommo)
 
 ```http
-POST /billing/topup/create
+POST /billing/payment/create
 Authorization: Bearer {user_access_token}
 Content-Type: application/json
 
 {
   "username": "gommo_username_từ_/ai/me",
-  "packageId": "basic-member"
+  "packageId": "basic-member",
+  "invoiceBuyer": {
+    "type": "consumer",
+    "name": "Bán cho người tiêu dùng",
+    "email": ""
+  },
+  "promoCode": "TÙY_CHỌN",
+  "referralCode": "TÙY_CHỌN"
 }
 ```
 
-Response có URL checkout PayOS / QR và `orderCode`.
+Response gồm QR VietQR, thông tin ngân hàng, VAT và `orderCode`. Gateway lưu đơn local (`TOPUP_ORDERS_FILE`).
 
-Poll đơn (tùy chọn):
+## Poll trạng thái
 
 ```http
-GET /billing/topup/orders/{orderCode}
+POST /billing/payment/sync
+Authorization: Bearer {user_access_token}
+Content-Type: application/json
+
+{ "orderCode": "SP..." }
 ```
 
-Status: `pending`, `paid`, `credited`, `failed`.
+Poll ~3.5s cho đến `data.paid === true`.
 
-## Luồng webhook
+## Lịch sử nạp
 
-1. PayOS POST `/billing/webhook/payos` kèm chữ ký.
-2. Gateway verify checksum.
-3. `PAID` → lookup order → `sendCreditsToUser()` (nội bộ, client không gửi `x-admin-key`).
-4. Order đánh dấu `credited`.
+```http
+GET /billing/topup/orders?username={}&limit=20
+Authorization: Bearer {user_access_token}
+```
 
 ## So với `/gateway`
 
 | Path | Mục đích |
 |------|----------|
-| `/gateway/*` | Tiêu credit (models, jobs, chat, …) |
-| `/billing/*` | Cộng credit (PayOS) |
-
-Không gắn logic PayOS dưới `/gateway`.
+| `/gateway/*` | Tiêu credit |
+| `/billing/*` | Cộng credit (Gommo hoặc PayOS legacy) |
 
 ## Reference đầy đủ
 
-→ [Billing (PayOS) API reference](../reference/billing.md)
+→ [Billing API reference](../reference/billing.md)  
+→ [Cookbook: Gommo VietQR](../cookbook/gommo-topup.md)
 
 ## Tiếp theo
 

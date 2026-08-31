@@ -1,6 +1,6 @@
 import { apiBase } from './gateway-base';
 import { getStoredDomain, getStoredToken } from './auth-api';
-import { appendDeviceToForm } from './gommo-device';
+import { appendDeviceToForm, gommoClientDeviceFields } from './gommo-device';
 import type { UsageRecord } from './usage-history';
 import type {
   UsageListData,
@@ -47,29 +47,84 @@ export interface CreditPackage {
   featured?: boolean;
 }
 
+export interface TopupPaymentVat {
+  enabled?: boolean;
+  percent?: number;
+  baseAmountVnd: number;
+  vatAmountVnd: number;
+  chargeAmountVnd: number;
+}
+
 export interface TopupPayment {
   url?: string;
   qrImage?: string;
-  orderCode?: number;
+  qrFallback?: string;
+  orderCode?: string | number;
+  content?: string;
   credits?: number;
+  packageId?: string;
+  amountVnd?: number;
+  amountBaseVnd?: number;
+  vatAmountVnd?: number;
+  vatPercent?: number;
+  paid?: boolean;
+  paymentServer?: string;
+  bank?: string;
+  acc?: string;
+  holder?: string;
+  store?: string;
+  vat?: TopupPaymentVat;
+  deposit?: {
+    status?: string;
+    amount?: string;
+    gateway?: string;
+    created_time?: string;
+  };
   bankTransfer?: { content?: string; amountFormatted?: string };
+}
+
+export interface PaymentSyncResult {
+  paid: boolean;
+  orderCode: string;
+  deposit?: TopupPayment['deposit'];
+  sync?: {
+    ok?: number;
+    scanned?: number;
+    matched?: number;
+    fulfilled?: number;
+  };
+}
+
+export interface InvoiceBuyer {
+  type: 'consumer' | 'personal' | 'company' | string;
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  national_id?: string;
+  tax_code?: string;
+  gui_name?: string;
+  referral_code?: string;
 }
 
 export type TopupOrderStatus = 'pending' | 'paid' | 'credited' | 'failed';
 
 export interface TopupOrder {
-  orderCode: number;
+  orderCode: string;
   username: string;
   packageId: string;
   amountVnd: number;
   credits: number;
   status: TopupOrderStatus;
+  source?: 'gommo' | 'payos';
   createdAt: string;
   paidAt?: string;
   creditedAt?: string;
 }
 
 export interface BillingStatus {
+  gommoPayment?: boolean;
+  billingMode?: 'gommo' | 'legacy';
   payosConfigured?: boolean;
   merchantReady?: boolean;
 }
@@ -197,11 +252,28 @@ export async function fetchBillingPackages(): Promise<CreditPackage[]> {
   return data.data || [];
 }
 
-export async function createTopup(username: string, packageId: string): Promise<TopupPayment> {
-  const res = await fetch(`${apiBase()}/billing/topup/create`, {
+export async function createTopup(
+  username: string,
+  packageId: string,
+  invoiceBuyer?: InvoiceBuyer,
+  promoCode?: string,
+): Promise<TopupPayment> {
+  const device = gommoClientDeviceFields('vi');
+  const referralCode =
+    typeof invoiceBuyer?.referral_code === 'string' ? invoiceBuyer.referral_code.trim() : '';
+  const res = await fetch(`${apiBase()}/billing/payment/create`, {
     method: 'POST',
     headers: authHeaders(true),
-    body: JSON.stringify({ username, packageId }),
+    body: JSON.stringify({
+      username,
+      packageId,
+      invoiceBuyer,
+      promoCode: promoCode?.trim() || undefined,
+      referralCode: referralCode || undefined,
+      device_id: device.device_id,
+      device_name: device.device_name,
+      device_info: device.device_info,
+    }),
   });
   const data = (await res.json().catch(() => ({}))) as {
     data?: TopupPayment;
@@ -209,6 +281,26 @@ export async function createTopup(username: string, packageId: string): Promise<
   };
   if (!res.ok) throw new Error(String(data.message || 'Topup failed'));
   return data.data || {};
+}
+
+export async function syncGommoPayment(orderCode: string): Promise<PaymentSyncResult> {
+  const device = gommoClientDeviceFields('vi');
+  const res = await fetch(`${apiBase()}/billing/payment/sync`, {
+    method: 'POST',
+    headers: authHeaders(true),
+    body: JSON.stringify({
+      orderCode,
+      device_id: device.device_id,
+      device_name: device.device_name,
+      device_info: device.device_info,
+    }),
+  });
+  const data = (await res.json().catch(() => ({}))) as {
+    data?: PaymentSyncResult;
+    message?: string;
+  };
+  if (!res.ok) throw new Error(String(data.message || 'Payment sync failed'));
+  return data.data || { paid: false, orderCode };
 }
 
 export async function fetchTopupOrders(username: string, limit = 20): Promise<TopupOrder[]> {

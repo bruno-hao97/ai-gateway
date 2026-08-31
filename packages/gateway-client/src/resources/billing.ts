@@ -5,6 +5,7 @@ import type {
   CreateTopupParams,
   CreditPackage,
   GatewayEnvelope,
+  PaymentSyncResult,
   TopupOrderResult,
 } from '../types.js';
 
@@ -21,10 +22,42 @@ export class BillingResource {
     return requestJson(this.ctx, '/billing/packages', { auth: false });
   }
 
-  /** POST /billing/topup/create */
+  /** POST /billing/topup/create — legacy PayOS + sendBalances */
   async createTopup(params: CreateTopupParams): Promise<GatewayEnvelope<TopupOrderResult>> {
     ensureAccessToken(this.ctx);
     return requestJson(this.ctx, '/billing/topup/create', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  /** POST /billing/payment/create — Gommo create_payment proxy */
+  async createPayment(params: {
+    username: string;
+    packageId: string;
+    invoiceBuyer?: Record<string, unknown>;
+    promoCode?: string;
+    referralCode?: string;
+    device_id?: string;
+    device_name?: string;
+    device_info?: string;
+  }): Promise<GatewayEnvelope<TopupOrderResult>> {
+    ensureAccessToken(this.ctx);
+    return requestJson(this.ctx, '/billing/payment/create', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  /** POST /billing/payment/sync — Gommo payment_sync proxy */
+  async syncPayment(params: {
+    orderCode: string;
+    device_id?: string;
+    device_name?: string;
+    device_info?: string;
+  }): Promise<GatewayEnvelope<PaymentSyncResult>> {
+    ensureAccessToken(this.ctx);
+    return requestJson(this.ctx, '/billing/payment/sync', {
       method: 'POST',
       body: JSON.stringify(params),
     });
