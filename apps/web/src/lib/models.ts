@@ -4,6 +4,7 @@ export interface CatalogModel {
   ratios: string[];
   modes: string[];
   resolutions: string[];
+  durations: string[];
   raw: Record<string, unknown>;
 }
 
@@ -17,7 +18,7 @@ function optionValues(list: unknown[] | undefined): string[] {
     }
     if (item && typeof item === 'object') {
       const row = item as Record<string, unknown>;
-      const v = row.value ?? row.ratio ?? row.mode ?? row.resolution ?? row.label ?? row.name;
+      const v = row.value ?? row.ratio ?? row.mode ?? row.resolution ?? row.duration ?? row.label ?? row.name;
       if (typeof v === 'string' && v.trim()) out.push(v.trim());
     }
   }
@@ -46,12 +47,14 @@ export function parseModelsEnvelope(envelope: unknown): CatalogModel[] {
       const ratios = optionValues((row.ratios ?? row.ratio) as unknown[]);
       const modes = optionValues((row.modes ?? row.mode) as unknown[]);
       const resolutions = optionValues((row.resolutions ?? row.resolution) as unknown[]);
+      const durations = optionValues((row.durations ?? row.duration) as unknown[]);
       return {
         slug,
         name: String(row.name || slug),
         ratios,
         modes,
         resolutions,
+        durations,
         raw: row,
       } satisfies CatalogModel;
     })

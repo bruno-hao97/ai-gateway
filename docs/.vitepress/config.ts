@@ -168,9 +168,22 @@ const sdkSidebarVi = [
   },
 ];
 
+const mcpSidebarEn = [
+  { text: 'Overview', link: '/mcp/' },
+  { text: 'Setup Cursor', link: '/mcp/setup-cursor' },
+  { text: 'Tool reference', link: '/mcp/tools' },
+];
+
+const mcpSidebarVi = [
+  { text: 'Tổng quan', link: '/vi/mcp/' },
+  { text: 'Cấu hình Cursor', link: '/vi/mcp/setup-cursor' },
+  { text: 'Tool reference', link: '/vi/mcp/tools' },
+];
+
 /** Docs guide sidebar (tab Docs). */
 const docsSidebarEn = [
   { text: 'Overview', items: overviewSidebarEn },
+  { text: 'MCP', items: mcpSidebarEn },
   { text: 'Features', items: featuresSidebarEn },
   { text: 'Models & routing', items: modelsRoutingInDocsEn },
   { text: 'Privacy & ops', items: opsSidebarEn },
@@ -179,6 +192,7 @@ const docsSidebarEn = [
 
 const docsSidebarVi = [
   { text: 'Overview', items: overviewSidebarVi },
+  { text: 'MCP', items: mcpSidebarVi },
   { text: 'Features', items: featuresSidebarVi },
   { text: 'Models & routing', items: modelsRoutingInDocsVi },
   { text: 'Privacy & ops', items: opsSidebarVi },
@@ -215,6 +229,7 @@ const docsGuideSidebarEn = {
   '/authentication': docsSidebarEn,
   '/principles': docsSidebarEn,
   '/mcp': docsSidebarEn,
+  '/mcp/': docsSidebarEn,
   '/faq': docsSidebarEn,
   '/report-feedback': docsSidebarEn,
   '/guides/': docsSidebarEn,
@@ -235,6 +250,7 @@ const docsGuideSidebarVi = {
   '/vi/authentication': docsSidebarVi,
   '/vi/principles': docsSidebarVi,
   '/vi/mcp': docsSidebarVi,
+  '/vi/mcp/': docsSidebarVi,
   '/vi/faq': docsSidebarVi,
   '/vi/report-feedback': docsSidebarVi,
   '/vi/guides/': docsSidebarVi,

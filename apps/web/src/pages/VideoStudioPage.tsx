@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Download, Loader2, Sparkles } from 'lucide-react';
+import { Download, Loader2, Video } from 'lucide-react';
 import { toast } from 'sonner';
+import { useOutletContext } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import type { AppOutletContext } from '@/components/layout/AppShell';
 import { ApiError, gatewayGet, gatewayPost } from '@/lib/apiClient';
 import { pickJobResultUrl } from '@/lib/jobResult';
 import type { CatalogModel } from '@/lib/models';
 import { parseModelsEnvelope } from '@/lib/models';
-import { useOutletContext } from 'react-router-dom';
-import type { AppOutletContext } from '@/components/layout/AppShell';
 
-export function ImageStudioPage() {
+export function VideoStudioPage() {
   const { refreshCredits } = useOutletContext<AppOutletContext>();
   const [models, setModels] = useState<CatalogModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(true);
@@ -21,7 +21,8 @@ export function ImageStudioPage() {
   const [ratio, setRatio] = useState('');
   const [mode, setMode] = useState('');
   const [resolution, setResolution] = useState('');
-  const [prompt, setPrompt] = useState('A cute cat, studio photo, soft lighting');
+  const [duration, setDuration] = useState('');
+  const [prompt, setPrompt] = useState('A cat walking in a sunny garden, cinematic');
   const [generating, setGenerating] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
 
@@ -34,7 +35,7 @@ export function ImageStudioPage() {
     void (async () => {
       setLoadingModels(true);
       try {
-        const envelope = await gatewayGet<{ data?: unknown }>('/gateway/models?type=image');
+        const envelope = await gatewayGet<{ data?: unknown }>('/gateway/models?type=video');
         const list = parseModelsEnvelope(envelope);
         setModels(list);
         if (list[0]) {
@@ -42,6 +43,7 @@ export function ImageStudioPage() {
           setRatio(list[0].ratios[0] || '');
           setMode(list[0].modes[0] || '');
           setResolution(list[0].resolutions[0] || '');
+          setDuration(list[0].durations[0] || '');
         }
       } catch (err) {
         toast.error(err instanceof ApiError ? err.message : 'Không tải được models');
@@ -58,7 +60,10 @@ export function ImageStudioPage() {
     if (selected.resolutions.length && !selected.resolutions.includes(resolution)) {
       setResolution(selected.resolutions[0]);
     }
-  }, [selected, ratio, mode, resolution]);
+    if (selected.durations.length && !selected.durations.includes(duration)) {
+      setDuration(selected.durations[0]);
+    }
+  }, [selected, ratio, mode, resolution, duration]);
 
   async function generate() {
     if (!modelSlug) {
@@ -69,6 +74,10 @@ export function ImageStudioPage() {
       toast.error('Chọn ratio từ catalog');
       return;
     }
+    if (!duration && selected?.durations.length) {
+      toast.error('Chọn duration từ catalog');
+      return;
+    }
     setGenerating(true);
     setResultUrl(null);
     try {
@@ -76,19 +85,20 @@ export function ImageStudioPage() {
       if (ratio) fields.ratio = ratio;
       if (mode) fields.mode = mode;
       if (resolution) fields.resolution = resolution;
+      if (duration) fields.duration = duration;
 
-      const res = await gatewayPost<{ data?: unknown }>('/gateway/jobs/image', {
+      const res = await gatewayPost<{ data?: unknown }>('/gateway/jobs/video', {
         modelSlug,
         wait: true,
         fields,
       });
-      const url = pickJobResultUrl(res, 'image');
+      const url = pickJobResultUrl(res, 'video');
       if (!url) throw new Error('Job xong nhưng không có result URL');
       setResultUrl(url);
       await refreshCredits();
-      toast.success('Ảnh đã sẵn sàng');
+      toast.success('Video đã sẵn sàng');
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Tạo ảnh thất bại');
+      toast.error(err instanceof ApiError ? err.message : 'Tạo video thất bại');
     } finally {
       setGenerating(false);
     }
@@ -99,10 +109,10 @@ export function ImageStudioPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            Image Studio
+            <Video className="h-5 w-5 text-primary" />
+            Video Studio
           </CardTitle>
-          <CardDescription>Catalog từ GET /gateway/models — không đoán ratio/mode.</CardDescription>
+          <CardDescription>Catalog từ GET /gateway/models?type=video — poll tới khi có URL.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {loadingModels ? (
@@ -110,7 +120,7 @@ export function ImageStudioPage() {
               <Loader2 className="h-4 w-4 animate-spin" /> Loading models…
             </p>
           ) : models.length === 0 ? (
-            <p className="text-sm text-muted">Không có model image. Kiểm tra token và gateway.</p>
+            <p className="text-sm text-muted">Không có model video. Kiểm tra token và gateway.</p>
           ) : (
             <>
               <div className="space-y-2">
@@ -179,6 +189,23 @@ export function ImageStudioPage() {
                   </Select>
                 </div>
               )}
+              {selected && selected.durations.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Duration</Label>
+                  <Select value={duration} onValueChange={setDuration}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selected.durations.map((d) => (
+                        <SelectItem key={d} value={d}>
+                          {d}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Prompt</Label>
                 <Textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={4} />
@@ -189,7 +216,7 @@ export function ImageStudioPage() {
                     <Loader2 className="h-4 w-4 animate-spin" /> Generating…
                   </>
                 ) : (
-                  'Generate image'
+                  'Generate video'
                 )}
               </Button>
             </>
@@ -200,25 +227,26 @@ export function ImageStudioPage() {
       <Card>
         <CardHeader>
           <CardTitle>Result</CardTitle>
-          <CardDescription>wait: true — poll tới khi có URL</CardDescription>
+          <CardDescription>wait: true — có thể mất vài phút</CardDescription>
         </CardHeader>
         <CardContent>
           {!resultUrl && !generating && (
             <div className="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-accent/30 p-8 text-center text-sm text-muted">
-              Ảnh sẽ hiển thị ở đây sau khi job hoàn thành.
+              Video sẽ hiển thị ở đây sau khi job hoàn thành.
             </div>
           )}
           {generating && (
-            <div className="flex min-h-[320px] items-center justify-center rounded-xl bg-accent/40">
+            <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 rounded-xl bg-accent/40">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted">Đang render video…</p>
             </div>
           )}
           {resultUrl && (
             <div className="space-y-4">
-              <img
+              <video
                 src={resultUrl}
-                alt="Generated"
-                className="w-full rounded-xl border border-border object-contain"
+                controls
+                className="w-full rounded-xl border border-border bg-black"
               />
               <Button asChild variant="secondary" className="w-full">
                 <a href={resultUrl} download target="_blank" rel="noreferrer">

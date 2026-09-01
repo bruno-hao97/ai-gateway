@@ -148,7 +148,7 @@ Không — billing là nạp tùy chọn. User cần credit Gommo (tài khoản 
 <details>
 <summary>Dùng Cursor gommo_* MCP thay gateway được không?</summary>
 
-MCP tools trong Cursor cho **hỗ trợ IDE**, không phải API production. Xem [MCP & agents](./mcp.md).
+MCP `gommo_*` tích hợp sẵn trong Cursor gọi **thẳng Gommo** — không qua gateway deploy của bạn. Để agent IDE dùng **platform của bạn**, cấu hình [`@ai-gateway/mcp-server`](./mcp/setup-cursor.md). Production dùng HTTP `/gateway/*`. Xem [MCP & agents](./mcp/).
 
 </details>
 

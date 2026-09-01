@@ -7,8 +7,8 @@ import { HomePage } from '@/pages/HomePage';
 import { ImageStudioPage } from '@/pages/ImageStudioPage';
 import { WalletPage } from '@/pages/WalletPage';
 import { ChatPage } from '@/pages/ChatPage';
-import { PlaceholderPage } from '@/pages/PlaceholderPage';
-import { Video, AudioLines } from 'lucide-react';
+import { VideoStudioPage } from '@/pages/VideoStudioPage';
+import { AudioStudioPage } from '@/pages/AudioStudioPage';
 import { isLoggedIn } from '@/lib/authStore';
 
 export default function App() {
@@ -30,9 +30,9 @@ export default function App() {
         >
           <Route index element={<HomePage />} />
           <Route path="image" element={<ImageStudioPage />} />
-          <Route path="video" element={<PlaceholderPage title="Video Studio" description="Tạo video qua /gateway/jobs/video" icon={Video} />} />
+          <Route path="video" element={<VideoStudioPage />} />
           <Route path="chat" element={<ChatPage />} />
-          <Route path="audio" element={<PlaceholderPage title="Audio Studio" description="TTS & voices qua /gateway/audio" icon={AudioLines} />} />
+          <Route path="audio" element={<AudioStudioPage />} />
           <Route path="wallet" element={<WalletPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

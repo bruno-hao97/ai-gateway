@@ -148,7 +148,7 @@ No — billing is optional topup. Users need Gommo credits (from upstream accoun
 <details>
 <summary>Can I use Cursor gommo_* MCP instead of this gateway?</summary>
 
-MCP tools in Cursor are for **IDE assistance**, not your production API. See [MCP & agents](./mcp.md).
+Cursor's built-in `gommo_*` tools call Gommo **directly** — not your deployed gateway. For IDE agents on **your** platform, use the official [`@ai-gateway/mcp-server`](./mcp/setup-cursor.md). For production apps, use HTTP `/gateway/*`. See [MCP & agents](./mcp/).
 
 </details>
 

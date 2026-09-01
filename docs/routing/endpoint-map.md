@@ -44,8 +44,13 @@ Mode A/C create body (form): `domain`, `project_id`, `prompt`, `ratio`, …
 |-----------|--------|--------|--------|
 | Chat (JSON) | `POST api…/api/v2/chat` | `POST {gateway}/gateway/chat` | `POST {gateway}/api/v2/chat` |
 | Chat (stream) | Same + SSE | Same — gateway pipes stream | Same — proxy pipes stream |
+| **OpenAI shim** | — | `POST {gateway}/v1/chat/completions` | — |
 
 Stream triggers when URL contains `/chat` or `Content-Type: text/event-stream`.
+
+OpenAI shim accepts standard `messages[]` + optional `stream: true`. Model format: `model::server` (e.g. `gpt-5.5::cheap`) or server default from env.
+
+→ [OpenAI-compatible chat](../guides/openai-chat.md)
 
 ## Audio
 

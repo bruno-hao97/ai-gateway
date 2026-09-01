@@ -14,6 +14,7 @@ servers:
 
 tags:
   - name: Health
+  - name: OpenAI
   - name: Gateway
   - name: Billing
   - name: Admin
@@ -30,6 +31,77 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
+
+  /v1/models:
+    get:
+      tags: [OpenAI]
+      summary: List chat models (OpenAI-compatible)
+      description: Returns configured Gommo chat model as an OpenAI-style model list.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Model list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object:
+                    type: string
+                    example: list
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        object:
+                          type: string
+                        owned_by:
+                          type: string
+
+  /v1/chat/completions:
+    post:
+      tags: [OpenAI]
+      summary: Chat completions (OpenAI-compatible)
+      description: |
+        OpenAI-compatible chat endpoint mapped to Gommo upstream chat.
+        Use `model` as `gpt-5.5::cheap` (model::server) or rely on server defaults.
+        Set `stream: true` for SSE chunks in OpenAI format.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messages]
+              properties:
+                model:
+                  type: string
+                  example: gpt-5.5::cheap
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    required: [role, content]
+                    properties:
+                      role:
+                        type: string
+                        enum: [system, user, assistant, developer, tool]
+                      content:
+                        oneOf:
+                          - type: string
+                          - type: array
+                stream:
+                  type: boolean
+                  default: false
+      responses:
+        '200':
+          description: JSON completion or SSE stream (OpenAI format)
 
   /gateway/auth/login:
     post:

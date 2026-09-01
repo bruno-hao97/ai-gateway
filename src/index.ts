@@ -8,6 +8,7 @@ import usageRoutes from './routes/usage.js';
 import adminRoutes from './routes/admin.js';
 import billingRoutes from './routes/billing.js';
 import portalRoutes from './routes/portal.js';
+import openaiRoutes from './routes/openai.js';
 import { config, isAdminConfigured, isGommoMerchantConfigured, isPayOsConfigured, isPortalEnabled } from './config.js';
 import { gatewayCors } from './middleware/cors.js';
 import { adminRateLimit, billingRateLimit, gatewayRateLimit } from './middleware/rateLimit.js';
@@ -57,6 +58,8 @@ app.use('/gateway', gatewayRateLimit, gatewayMount);
 app.use('/admin', adminRateLimit, adminRoutes);
 
 app.use('/billing', billingRateLimit, billingRoutes);
+
+app.use('/v1', gatewayRateLimit, openaiRoutes);
 
 app.use((_req, res) => {
   sendError(res, 404, 'Not found');

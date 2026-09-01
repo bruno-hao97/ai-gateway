@@ -45,10 +45,13 @@ Hoặc từ repo root: `npm run web:dev`
 - `/` Landing
 - `/login` — proxy login
 - `/app` Home (credits)
-- `/app/image` Image Studio
-- `/app/chat` Chat (stream / non-stream)
-- `/app/wallet` PayOS topup (cần billing config server)
-- `/app/video`, `/app/audio` — placeholder
+- `/app/image` Image Studio (`POST /gateway/jobs/image`)
+- `/app/video` Video Studio (`POST /gateway/jobs/video`)
+- `/app/chat` Chat (stream / non-stream via `/gateway/chat`)
+- `/app/audio` TTS (`POST /gateway/audio/tts`)
+- `/app/wallet` Nạp credit Gommo VietQR (`POST /billing/payment/create`)
+
+OpenAI-compatible chat: dùng `POST /v1/chat/completions` trực tiếp từ SDK/script (không qua web UI).
 
 ## Build
 

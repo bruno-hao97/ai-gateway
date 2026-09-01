@@ -265,7 +265,7 @@ export function WalletPage() {
                 <div className="flex items-start justify-between gap-2 pr-12">
                   <CardTitle className="text-base">{pkg.name}</CardTitle>
                   {pkg.bonusPercent > 0 && (
-                    <Badge variant="secondary">+{pkg.bonusPercent}% Thưởng</Badge>
+                    <Badge>+{pkg.bonusPercent}% Thưởng</Badge>
                   )}
                 </div>
                 <CardDescription className="space-y-1">

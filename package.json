@@ -20,7 +20,9 @@
     "billing:verify": "tsx scripts/billing-verify-packages.ts",
     "portal:dev": "npx --yes serve apps/docs-portal -l 5180",
     "web:dev": "npm run dev --prefix apps/web",
-    "web:build": "npm run build --prefix apps/web"
+    "web:build": "npm run build --prefix apps/web",
+    "mcp:build": "npm run build --workspace=@ai-gateway/mcp-server",
+    "mcp:start": "npm run start --workspace=@ai-gateway/mcp-server"
   },
   "dependencies": {
     "@ai-gateway/client": "^0.1.0",
