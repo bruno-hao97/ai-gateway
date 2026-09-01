@@ -36,7 +36,7 @@ Source: `packages/gateway-client`. Local dev: `npm run client:build` then `npm i
 For copy-paste recipes without a package, use [Cookbook](../cookbook/).
 
 ::: info Agent SDK
-AI Gateway does **not** ship a separate Agent SDK yet. Multi-turn agents: use `client.chat` + your orchestration, or [MCP & agents](../mcp.md) for Cursor IDE tools.
+AI Gateway does **not** ship a separate Agent SDK yet. Multi-turn agents: use `client.chat` + your orchestration, or [MCP & agents](../mcp/) for Cursor IDE tools.
 :::
 
 ## Quick example

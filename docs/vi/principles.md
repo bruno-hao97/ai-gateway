@@ -86,4 +86,4 @@ Code thường gặp: `UNAUTHORIZED`, `UPSTREAM_ERROR`, `RATE_LIMITED`, `NOT_CON
 
 ## Tiếp theo
 
-→ [Models](./models/) · [Quickstart](./quickstart.md) · [MCP & agents](./mcp.md)
+→ [Models](./models/) · [Quickstart](./quickstart.md) · [MCP & agents](./mcp/)

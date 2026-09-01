@@ -44,7 +44,7 @@ Giúp cải thiện docs và hành vi API AI Gateway.
 
 ## MCP vs HTTP
 
-Vấn đề liên quan **Cursor MCP**, ghi riêng khỏi HTTP gateway — xem [MCP & agents](./mcp.md).
+Vấn đề liên quan **Cursor MCP**, ghi riêng khỏi HTTP gateway — xem [MCP & agents](./mcp/).
 
 ## Tiếp theo
 

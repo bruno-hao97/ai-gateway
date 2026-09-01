@@ -65,7 +65,7 @@ If the repo enables [GitHub Discussions](https://docs.github.com/en/discussions)
 | Topic | Where |
 |-------|--------|
 | End-user studio / site-ai UI | Out of scope — API platform only |
-| Cursor MCP `gommo_*` runtime | IDE tooling — see [MCP & agents](./../mcp.md) |
+| Cursor MCP `gommo_*` runtime | IDE tooling — see [MCP & agents](../mcp/) |
 | Gommo account billing disputes | Gommo support / your merchant admin |
 
 ## Security reports

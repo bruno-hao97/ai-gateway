@@ -44,7 +44,7 @@ Help us improve AI Gateway docs and API behavior.
 
 ## MCP vs HTTP
 
-If the issue involves **Cursor MCP** tools, note that separately from HTTP gateway — see [MCP & agents](./mcp.md).
+If the issue involves **Cursor MCP** tools, note that separately from HTTP gateway — see [MCP & agents](./mcp/).
 
 ## Next
 

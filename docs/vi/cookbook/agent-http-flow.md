@@ -51,7 +51,7 @@ Code thường gặp: `VALIDATION_ERROR`, `UNAUTHORIZED`, `UPSTREAM_ERROR`.
 
 ## MCP vs HTTP
 
-**MCP tools** Cursor (`gommo_*`) tách biệt với gateway này. Production integration dùng HTTP — xem [MCP & agents](../mcp.md).
+**MCP tools** Cursor (`gommo_*`) tách biệt với gateway này. Production integration dùng HTTP — xem [MCP & agents](../mcp/).
 
 ## Tiếp theo
 

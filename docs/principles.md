@@ -86,4 +86,4 @@ Common codes: `UNAUTHORIZED`, `UPSTREAM_ERROR`, `RATE_LIMITED`, `NOT_CONFIGURED`
 
 ## Next
 
-→ [Models](./models/) · [Quickstart](./quickstart.md) · [MCP & agents](./mcp.md)
+→ [Models](./models/) · [Quickstart](./quickstart.md) · [MCP & agents](./mcp/)

@@ -51,7 +51,7 @@ Common codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `UPSTREAM_ERROR`.
 
 ## MCP vs HTTP
 
-Cursor **MCP tools** (`gommo_*`) are separate from this gateway. For production integrations use HTTP — see [MCP & agents](../mcp.md).
+Cursor **MCP tools** (`gommo_*`) are separate from this gateway. For production integrations use HTTP — see [MCP & agents](../mcp/).
 
 ## Next
 

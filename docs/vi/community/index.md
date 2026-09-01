@@ -61,7 +61,7 @@ Chưa có Discord/forum chính thức:
 | Chủ đề | Ghi chú |
 |--------|---------|
 | Studio / site-ai UI | Out of scope — chỉ API platform |
-| Cursor MCP `gommo_*` | IDE — xem [MCP](../mcp.md) |
+| Cursor MCP `gommo_*` | IDE — xem [MCP](../mcp/) |
 | Tranh chấp billing Gommo | Gommo / merchant admin |
 
 ## Bảo mật
