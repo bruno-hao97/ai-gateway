@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue';
 import {
   formatCredits,
   formatOrderDate,
@@ -7,7 +8,7 @@ import {
   type TopupOrderStatus,
 } from '../models/user-api';
 
-defineProps<{
+const props = defineProps<{
   isVi: boolean;
   prefix: string;
   credits: number;
@@ -18,6 +19,23 @@ defineProps<{
 const emit = defineEmits<{
   refresh: [];
 }>();
+
+const PENDING_STALE_MS = 24 * 60 * 60 * 1000;
+const showStalePending = ref(false);
+
+const visibleTopupOrders = computed(() => {
+  if (showStalePending.value) return props.topupOrders;
+  const now = Date.now();
+  return props.topupOrders.filter((order) => {
+    if (order.status !== 'pending') return true;
+    const created = Date.parse(order.createdAt);
+    return Number.isFinite(created) && now - created < PENDING_STALE_MS;
+  });
+});
+
+const hiddenPendingCount = computed(
+  () => props.topupOrders.length - visibleTopupOrders.value.length,
+);
 
 function orderStatusClass(status: TopupOrderStatus): string {
   if (status === 'credited' || status === 'paid') return 'or-app-order-status--ok';
@@ -77,10 +95,26 @@ function orderStatusClass(status: TopupOrderStatus): string {
     <p v-if="ordersLoading && topupOrders.length === 0" class="or-app-muted">
       {{ isVi ? 'Đang tải…' : 'Loading…' }}
     </p>
-    <p v-else-if="topupOrders.length === 0" class="or-app-muted or-app-orders-empty">
+    <p v-else-if="visibleTopupOrders.length === 0" class="or-app-muted or-app-orders-empty">
       {{ isVi ? 'Chưa có đơn nạp trên gateway này.' : 'No top-ups on this gateway yet.' }}
     </p>
     <div v-else class="or-app-orders-table-wrap">
+      <button
+        v-if="hiddenPendingCount > 0"
+        type="button"
+        class="or-app-orders-pending-toggle"
+        @click="showStalePending = !showStalePending"
+      >
+        {{
+          showStalePending
+            ? isVi
+              ? 'Ẩn đơn chờ cũ'
+              : 'Hide stale pending'
+            : isVi
+              ? `Hiện thêm ${hiddenPendingCount} đơn chờ cũ`
+              : `Show ${hiddenPendingCount} stale pending`
+        }}
+      </button>
       <table class="or-app-orders-table">
         <thead>
           <tr>
@@ -91,7 +125,7 @@ function orderStatusClass(status: TopupOrderStatus): string {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="order in topupOrders.slice(0, 10)" :key="order.orderCode">
+          <tr v-for="order in visibleTopupOrders.slice(0, 10)" :key="order.orderCode">
             <td><code>#{{ order.orderCode }}</code></td>
             <td>{{ formatCredits(order.credits) }}</td>
             <td>
@@ -104,7 +138,7 @@ function orderStatusClass(status: TopupOrderStatus): string {
         </tbody>
       </table>
     </div>
-    <p v-if="topupOrders.length > 0" class="or-app-muted">
+    <p v-if="visibleTopupOrders.length > 0" class="or-app-muted">
       <a :href="`${prefix}/app/credits/`">{{ isVi ? 'Nạp thêm trên Credits' : 'Top up on Credits' }} →</a>
     </p>
   </div>

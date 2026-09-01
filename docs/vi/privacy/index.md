@@ -1,6 +1,6 @@
 ---
 title: Privacy & security
-description: Credential, secret, logging và bảo mật webhook PayOS
+description: Credential, secret, logging và bảo mật billing
 ---
 
 # Privacy & security
@@ -16,7 +16,7 @@ User password      →      proxy login            →      api.gommo.net
 User access_token  →      Bearer /gateway/*      →      v2 + platform
                           GOMMO_ACCESS_TOKEN     →      /admin, billing fulfill
                           ADMIN_API_KEY          →      bảo vệ /admin/*
-                          PayOS keys             →      verify webhook
+                          PayOS keys (legacy)    →      verify webhook
 ```
 
 **Quy tắc:** secret cột server **không bao giờ** đưa ra browser, mobile, hoặc repo public.
@@ -27,9 +27,9 @@ User access_token  →      Bearer /gateway/*      →      v2 + platform
 |------------|--------|--------------|----------|
 | User `access_token` | Client (sau login) | Có — Bearer | `/gateway/*`, proxy |
 | Mật khẩu user | Form login | Không lưu lâu dài | Login một lần |
-| `GOMMO_ACCESS_TOKEN` | Server env | **Không** | `/admin/*`, fulfill PayOS |
+| `GOMMO_ACCESS_TOKEN` | Server env | **Không** | `/admin/*`, fulfill Gommo, sync `credit_plans` |
 | `ADMIN_API_KEY` | Server env | **Không** | `x-admin-key` trên `/admin/*` |
-| PayOS keys | Server env | **Không** | Order + webhook |
+| PayOS keys (legacy) | Server env | **Không** | Topup PayOS cũ |
 
 → [Authentication](../authentication.md)
 
@@ -37,7 +37,7 @@ User access_token  →      Bearer /gateway/*      →      v2 + platform
 
 Mode B REST **không** trả hoặc nhận merchant token, admin key, PayOS secret.
 
-Billing topup dùng **user Bearer** — fulfill merchant **nội bộ** gateway.
+Billing dùng **user Bearer** — fulfill merchant **nội bộ** gateway.
 
 ## `/admin` chỉ server
 
@@ -49,7 +49,23 @@ Thiếu `ADMIN_API_KEY` → `503 NOT_CONFIGURED`.
 Không embed `ADMIN_API_KEY` hoặc `GOMMO_ACCESS_TOKEN` trong SPA/mobile bundle.
 :::
 
-## Bảo mật webhook PayOS
+## Billing Gommo (mặc định)
+
+Luồng nạp credit VietQR qua Gommo:
+
+1. Client `POST /billing/payment/create` (user Bearer).
+2. User chuyển khoản / quét VietQR theo nội dung CK trong response.
+3. Client poll `POST /billing/payment/sync` cho đến khi paid.
+4. Gateway gửi credit nội bộ — client không gọi merchant API.
+
+- Cần `GOMMO_ACCESS_TOKEN` để fulfill và sync gói live (`GET /billing/packages`).
+- Nội dung chuyển khoản phải khớp chính xác.
+
+→ [Billing & credits](../guides/billing-credits.md)
+
+## Bảo mật webhook PayOS (legacy)
+
+Topup PayOS cũ (`POST /billing/topup/create`) vẫn hỗ trợ khi cấu hình PayOS:
 
 1. Client `POST /billing/topup/create` (user Bearer).
 2. User thanh toán PayOS.
@@ -59,8 +75,6 @@ Không embed `ADMIN_API_KEY` hoặc `GOMMO_ACCESS_TOKEN` trong SPA/mobile bundle
 
 - Webhook URL phải **HTTPS public**.
 - Đăng ký URL trên [PayOS dashboard](https://my.payos.vn).
-
-→ [Billing & credits](../guides/billing-credits.md)
 
 ## Logging
 

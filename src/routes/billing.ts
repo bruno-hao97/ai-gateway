@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { config, isGommoMerchantConfigured, isPayOsConfigured } from '../config.js';
-import { CREDIT_PACKAGES, getCreditPackage } from '../services/creditPackages.js';
+import { CREDIT_PACKAGES } from '../services/creditPackages.js';
+import { listCreditPackages, resolveCreditPackage } from '../services/gommoCreditPlans.js';
 import {
   createGommoPayment,
   mapGommoPaymentError,
@@ -46,8 +47,15 @@ router.get('/status', (_req, res) => {
   });
 });
 
-router.get('/packages', (_req, res) => {
-  res.json({ success: true, data: CREDIT_PACKAGES });
+router.get('/packages', async (_req, res) => {
+  try {
+    const data = await listCreditPackages();
+    res.json({ success: true, data });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[billing/packages]', message);
+    res.json({ success: true, data: CREDIT_PACKAGES });
+  }
 });
 
 /** POST /billing/payment/create — Bearer + body { packageId, invoiceBuyer?, device_* } */
@@ -56,7 +64,7 @@ router.post('/payment/create', async (req, res) => {
     const accessToken = bearerAccessToken(String(req.headers.authorization || ''));
     const username = String(req.body?.username || '').trim();
     const packageId = String(req.body?.packageId || '').trim();
-    const creditPackage = getCreditPackage(packageId);
+    const creditPackage = await resolveCreditPackage(packageId);
 
     if (!username) {
       sendError(res, 400, 'username bắt buộc', 'VALIDATION_ERROR');
@@ -157,7 +165,7 @@ router.post('/topup/create', async (req, res) => {
   try {
     const username = String(req.body?.username || '').trim();
     const packageId = String(req.body?.packageId || '').trim();
-    const creditPackage = getCreditPackage(packageId);
+    const creditPackage = await resolveCreditPackage(packageId);
 
     if (!username) {
       sendError(res, 400, 'username bắt buộc', 'VALIDATION_ERROR');

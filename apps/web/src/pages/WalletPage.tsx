@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, Loader2, Wallet, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -52,6 +52,8 @@ interface TopupOrder {
   createdAt: string;
 }
 
+const PENDING_STALE_MS = 24 * 60 * 60 * 1000;
+
 const VAT_RATE = 0.05;
 const CONSUMER_INVOICE = {
   type: 'consumer',
@@ -69,6 +71,11 @@ function maskAccount(acc: string): string {
   const value = acc.trim();
   if (value.length <= 7) return value;
   return `${value.slice(0, 3)}****${value.slice(-4)}`;
+}
+
+function formatPayTotalLine(amountVnd: number): string {
+  const { totalVnd } = calcTotals(amountVnd);
+  return `Thanh toán ${totalVnd.toLocaleString('vi-VN')} ₫ (đã gồm VAT 5%)`;
 }
 
 function formatOrderStatus(status: TopupOrderStatus): string {
@@ -93,7 +100,20 @@ export function WalletPage() {
   const [creating, setCreating] = useState(false);
   const [payment, setPayment] = useState<TopupPayment | null>(null);
   const [paymentWaiting, setPaymentWaiting] = useState(false);
+  const [showStalePending, setShowStalePending] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const visibleOrders = useMemo(() => {
+    if (showStalePending) return orders;
+    const now = Date.now();
+    return orders.filter((order) => {
+      if (order.status !== 'pending') return true;
+      const created = Date.parse(order.createdAt);
+      return Number.isFinite(created) && now - created < PENDING_STALE_MS;
+    });
+  }, [orders, showStalePending]);
+
+  const hiddenPendingCount = orders.length - visibleOrders.length;
 
   async function loadPackages() {
     const res = await gatewayGet<{ data?: CreditPackage[] }>('/billing/packages');
@@ -208,7 +228,7 @@ export function WalletPage() {
   const checkoutTotals = checkoutPkg ? calcTotals(checkoutPkg.amountVnd) : null;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-bold">
           <Wallet className="h-7 w-7 text-primary" />
@@ -230,16 +250,30 @@ export function WalletPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {packages.map((pkg) => (
-            <Card key={pkg.id} className={pkg.featured ? 'border-primary/40 ring-1 ring-primary/20' : ''}>
+            <Card
+              key={pkg.id}
+              className={`relative overflow-hidden ${pkg.featured ? 'border-primary/40 ring-1 ring-primary/20' : ''}`}
+            >
+              {pkg.featured && (
+                <span className="absolute right-3 top-3 rounded bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
+                  BEST
+                </span>
+              )}
               <CardHeader>
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-2 pr-12">
                   <CardTitle className="text-base">{pkg.name}</CardTitle>
-                  {pkg.bonusPercent > 0 && <Badge>+{pkg.bonusPercent}%</Badge>}
+                  {pkg.bonusPercent > 0 && (
+                    <Badge variant="secondary">+{pkg.bonusPercent}% Thưởng</Badge>
+                  )}
                 </div>
-                <CardDescription>
-                  {formatCredits(pkg.credits)} credits · {pkg.amountVnd.toLocaleString('vi-VN')} ₫
+                <CardDescription className="space-y-1">
+                  <span className="block text-lg font-semibold text-foreground">
+                    {pkg.amountVnd.toLocaleString('vi-VN')} ₫
+                  </span>
+                  <span className="block">{formatCredits(pkg.credits)} credits</span>
+                  <span className="block text-xs">{formatPayTotalLine(pkg.amountVnd)}</span>
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -274,22 +308,34 @@ export function WalletPage() {
         <CardContent>
           {ordersLoading && orders.length === 0 ? (
             <p className="text-sm text-muted">Đang tải…</p>
-          ) : orders.length === 0 ? (
+          ) : visibleOrders.length === 0 ? (
             <p className="text-sm text-muted">Chưa có đơn nạp. Tạo đơn VietQR ở trên để bắt đầu.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted">
-                    <th className="pb-2 pr-3">Mã đơn</th>
-                    <th className="pb-2 pr-3">Credits</th>
-                    <th className="pb-2 pr-3">Số tiền</th>
-                    <th className="pb-2 pr-3">Trạng thái</th>
-                    <th className="pb-2">Thời gian</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map((order) => (
+            <>
+              {hiddenPendingCount > 0 && (
+                <button
+                  type="button"
+                  className="mb-3 text-sm text-primary hover:underline"
+                  onClick={() => setShowStalePending((value) => !value)}
+                >
+                  {showStalePending
+                    ? 'Ẩn đơn chờ cũ'
+                    : `Hiện thêm ${hiddenPendingCount} đơn chờ cũ`}
+                </button>
+              )}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-muted">
+                      <th className="pb-2 pr-3">Mã đơn</th>
+                      <th className="pb-2 pr-3">Credits</th>
+                      <th className="pb-2 pr-3">Số tiền</th>
+                      <th className="pb-2 pr-3">Trạng thái</th>
+                      <th className="pb-2">Thời gian</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleOrders.map((order) => (
                     <tr key={order.orderCode} className="border-b border-border/50">
                       <td className="py-2 pr-3 font-mono text-xs">{order.orderCode}</td>
                       <td className="py-2 pr-3">{formatCredits(order.credits)}</td>
@@ -303,6 +349,7 @@ export function WalletPage() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -410,10 +457,7 @@ export function WalletPage() {
                       {payment.acc && (
                         <div className="flex justify-between gap-2">
                           <span className="text-muted">STK</span>
-                          <span className="font-mono">
-                            {maskAccount(payment.acc)}
-                            {payment.store ? ` · ${payment.store}` : ''}
-                          </span>
+                          <span className="font-mono">{maskAccount(payment.acc)}</span>
                         </div>
                       )}
                       {payment.bank && (
