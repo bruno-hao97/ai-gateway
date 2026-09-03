@@ -1,79 +1,103 @@
 ---
 title: MCP tool reference
-description: gommo_* tools mapped to AI Gateway HTTP endpoints
+description: All 10 gommo_* tools on 79ai remote MCP
 ---
 
 # MCP tool reference
 
-Package: **`@ai-gateway/mcp-server`** · Transport: **stdio**
+**Host:** [79ai remote MCP](./other-hosts.md) — `https://api.gommo.net/api/v2/gommo-mcp`  
+**Tools enabled when connected:** 10
+
+Optional [self-hosted](./self-hosted.md) `@ai-gateway/mcp-server` exposes a subset (no `gommo_tasks_list` / `gommo_notify_send` in v0.1).
+
+## Tool overview
+
+| Tool | Purpose | Costs credits |
+|------|---------|---------------|
+| `gommo_account_info` | Profile, partner info, balances | No |
+| `gommo_credit_balance` | Quick `credits_ai` check | No |
+| `gommo_models_list` | Catalog — ratio/mode/duration enums | No |
+| `gommo_image_create` | Start async image job → `id_base` | **Yes** |
+| `gommo_image_status` | One-shot image job status | No |
+| `gommo_video_create` | Start async video job → `id_base` | **Yes** |
+| `gommo_video_status` | One-shot video job status | No |
+| `gommo_tasks_list` | Recent image/video tasks | No |
+| `gommo_task_stream` | Poll until done / fail / timeout | No |
+| `gommo_notify_send` | Inbox + push + Telegram alert | No |
 
 ## Rules (all media tools)
 
 1. Call **`gommo_models_list`** before create
 2. **Never invent** `ratio`, `mode`, `resolution`, `duration`
-3. After create, keep **`id_base`** — poll with status or `gommo_task_stream`
+3. After create, keep **`id_base`** — poll with status, stream, or tasks list
 4. Image/video create **consumes credits** — check `gommo_credit_balance` first
 
----
-
-## `gommo_models_list`
-
-List catalog models for a media type.
-
-| Param | Type | Required |
-|-------|------|----------|
-| `type` | `image` \| `video` \| `audio` | yes |
-
-`audio` maps to gateway `music` catalog.
-
-**Gateway:** `GET /gateway/models?type={type}`
-
----
-
-## `gommo_credit_balance`
-
-Latest credit balance for authenticated user.
-
-**Gateway:** `POST /api/apps/go-mmo/ai/me` (via proxy)
+Example prompts: [Use cases & prompts](./use-cases.md)
 
 ---
 
 ## `gommo_account_info`
 
-Full profile + balances from `/ai/me`.
+Full account profile and balance payload from `/ai/me`.
 
-**Gateway:** `POST /api/apps/go-mmo/ai/me`
+**Use when:** user asks who they are, subscription, full balance breakdown.
+
+---
+
+## `gommo_credit_balance`
+
+Latest **`credits_ai`** for the authenticated user (faster than full account info).
+
+**Use when:** before any paid generation.
+
+---
+
+## `gommo_models_list`
+
+List models and valid enums for a media type.
+
+| Param | Type | Required |
+|-------|------|----------|
+| `type` | `image` \| `video` \| `audio` | yes |
+
+`audio` maps to the music catalog.
+
+**Use when:** always before `gommo_image_create` or `gommo_video_create`.
 
 ---
 
 ## `gommo_image_create`
 
-Create async image job. Returns `id_base`.
+Create async image job. Returns **`id_base`**.
 
 | Param | Required | Notes |
 |-------|----------|-------|
 | `model` | yes | From models list |
 | `prompt` | yes | |
-| `ratio`, `resolution`, `mode` | catalog | Confirm with user |
+| `ratio`, `resolution`, `mode` | catalog | From models list only |
 | `images`, `references`, `subjects` | optional | `{ url }[]` |
 
-**Gateway:** `POST /gateway/jobs/image` (`wait: false`)
+**Use when:** user wants a new image. Follow with `gommo_task_stream` or `gommo_image_status`.
 
 ---
 
 ## `gommo_image_status`
 
+Latest status and output URL for one image job.
+
 | Param | Required |
 |-------|----------|
 | `id_base` | yes |
 
-**Gateway:** `GET /gateway/jobs/{id}?media=image`
+**Use when:** single status check. Prefer `gommo_task_stream` to wait automatically.
 
 ---
 
 ## `gommo_video_create`
 
-Create async video job. Supports start/end frames, references, motion, extend, multi-shot (see tool schema).
+Create async video job. Returns **`id_base`**.
+
+Supports start/end frames, references, motion, extend, multi-shot (see tool schema in client).
 
 | Param | Required |
 |-------|----------|
@@ -81,23 +105,32 @@ Create async video job. Supports start/end frames, references, motion, extend, m
 | `prompt` | often |
 | `ratio`, `resolution`, `duration`, `mode` | from catalog |
 
-**Gateway:** `POST /gateway/jobs/video` (`wait: false`)
-
 ---
 
 ## `gommo_video_status`
 
-| Param | Required |
-|-------|----------|
-| `id_base` | yes |
+One-shot status for a video job by `id_base`.
 
-**Gateway:** `GET /gateway/jobs/{id}?media=video`
+---
+
+## `gommo_tasks_list`
+
+List recent image and/or video tasks.
+
+| Param | Type | Default |
+|-------|------|---------|
+| `type` | `all` \| `image` \| `video` | `all` |
+| `limit` | 1–100 | — |
+| `project_id` | string | optional |
+| `after_id` | string | pagination |
+
+**Use when:** find past jobs, fallback if status by id fails, audit history.
 
 ---
 
 ## `gommo_task_stream`
 
-Poll until done, fail, or timeout.
+Poll until success, failure, or timeout.
 
 | Param | Default | Description |
 |-------|---------|-------------|
@@ -106,26 +139,51 @@ Poll until done, fail, or timeout.
 | `interval_seconds` | 30 | 5–60 |
 | `max_wait_seconds` | 1800 | Up to 30 min |
 
-**Gateway:** repeated `GET /gateway/jobs/{id}?media=`
+**Use when:** waiting for generation to finish (recommended after create).
 
 ---
 
-## Example agent flow
+## `gommo_notify_send`
+
+Send notification to the authenticated user: inbox + optional OneSignal push + linked Telegram.
+
+| Param | Description |
+|-------|-------------|
+| `title` | Notification title |
+| `message` | Body / Telegram text |
+| `url` | Optional deep link (default `/chat`) |
+| `send_push` | Default `true` |
+| `send_telegram` | Default `true` |
+| `images` | Optional image URLs for Telegram |
+
+**Use when:** user asks to be pinged after a long job. Agent must call **intentionally** — not automatic.
+
+---
+
+## Example flows
+
+**Image:**
 
 ```
-1. gommo_credit_balance
-2. gommo_models_list { type: "image" }
-3. gommo_image_create { model, prompt, ratio }
-4. gommo_task_stream { type: "image", id_base }
+gommo_credit_balance → gommo_models_list → gommo_image_create → gommo_task_stream
 ```
 
-## Coming soon
+**Video + notify:**
 
-| Tool | Notes |
-|------|-------|
-| `gommo_tasks_list` | Recent jobs list |
-| `gommo_notify_send` | Push/inbox when job done |
+```
+gommo_models_list (video) → gommo_video_create → gommo_task_stream → gommo_notify_send
+```
+
+**Debug:**
+
+```
+gommo_tasks_list → gommo_image_status (id_base)
+```
+
+## HTTP equivalents
+
+Building an app instead of IDE? Map tools to [`/gateway/*`](../routing/endpoint-map.md) — see [OpenAPI](/openapi.yaml).
 
 ## Next
 
-→ [Setup Cursor](./setup-cursor.md) · [Media jobs](../features/media-jobs.md) · [OpenAPI](/openapi.yaml)
+→ [Use cases](./use-cases.md) · [Other hosts](./other-hosts.md)

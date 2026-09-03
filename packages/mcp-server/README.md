@@ -1,7 +1,11 @@
 # @ai-gateway/mcp-server
 
-Official **Model Context Protocol** server for [AI Gateway](https://github.com/bruno-hao97/ai-gateway).  
-Wraps your deployed gateway (`/gateway/*`) so Cursor, Claude Desktop, and other MCP hosts can create images, videos, and check credits.
+**Optional (self-hosted)** Model Context Protocol server for [AI Gateway](https://github.com/bruno-hao97/ai-gateway).  
+Routes Cursor / Claude tools through **your** deployed gateway (`/gateway/*`).
+
+::: tip Most users
+Use **[79ai remote MCP](https://github.com/bruno-hao97/ai-gateway/blob/main/docs/mcp/other-hosts.md)** instead — sign in on the developer site, copy your token, no `npx` or `GATEWAY_URL` required.
+:::
 
 ## Requirements
 

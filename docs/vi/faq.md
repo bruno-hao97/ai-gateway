@@ -143,12 +143,53 @@ Không — billing là nạp tùy chọn. User cần credit Gommo (tài khoản 
 
 </details>
 
-## MCP & Cursor
+## MCP & Cursor {#mcp-cursor}
 
 <details>
-<summary>Dùng Cursor gommo_* MCP thay gateway được không?</summary>
+<summary>Nên dùng MCP nào trong Cursor?</summary>
 
-MCP `gommo_*` tích hợp sẵn trong Cursor gọi **thẳng Gommo** — không qua gateway deploy của bạn. Để agent IDE dùng **platform của bạn**, cấu hình [`@ai-gateway/mcp-server`](./mcp/setup-cursor.md). Production dùng HTTP `/gateway/*`. Xem [MCP & agents](./mcp/).
+**Khuyên dùng:** **[79ai remote MCP](./mcp/other-hosts.md)** — 10 tools, token [/vi/app/token/](/vi/app/token/). JSON cho Cursor, Claude, ChatGPT và [host khác](/vi/mcp/other-hosts.md).
+
+**App production:** HTTP [`/gateway/*`](/vi/routing/endpoint-map.md).
+
+**Tùy chọn:** [Self-hosted](/vi/mcp/self-hosted.md) khi IDE phải gọi `GATEWAY_URL` riêng.
+
+</details>
+
+<details>
+<summary>79ai MCP làm được gì?</summary>
+
+**10 tools:** tài khoản/credit, catalog, tạo ảnh/video, poll status/stream, lịch sử job, thông báo. Xem [tools](/vi/mcp/tools.md) và [use cases](/vi/mcp/use-cases.md).
+
+</details>
+
+<details>
+<summary>Dùng 79ai MCP ngoài Cursor được không?</summary>
+
+**Có** — client MCP hỗ trợ remote `url` + headers. [Host khác](/vi/mcp/other-hosts.md). ChatGPT/Gemini web không dùng MCP — dùng HTTP.
+
+</details>
+
+<details>
+<summary>Token /app/token/ có dùng được 79ai MCP không?</summary>
+
+Có. Đăng nhập/đăng ký trả **`access_token` user Gommo**. Dùng trong header 79ai MCP (`Gommo-Token` + `Authorization: Bearer …`) và `Authorization: Bearer …` cho HTTP `/gateway/*` trong app.
+
+</details>
+
+<details>
+<summary>Có cần chạy gateway để dùng MCP?</summary>
+
+**Không** với [79ai MCP](/vi/mcp/other-hosts.md) — tool gọi MCP host sẵn của Gommo.
+
+**Có** chỉ với [self-hosted MCP](/vi/mcp/self-hosted.md) (`@ai-gateway/mcp-server` + `GATEWAY_URL`).
+
+</details>
+
+<details>
+<summary>@ai-gateway/mcp-server là gì?</summary>
+
+Package tùy chọn cho merchant muốn tool Cursor gọi **gateway URL riêng** thay vì 79ai remote MCP. Xem [Self-hosted](/vi/mcp/self-hosted.md). Đa số user dùng 79ai MCP.
 
 </details>
 

@@ -23,6 +23,10 @@ Sau đăng nhập/đăng ký thành công, trình duyệt chuyển tới **`/vi/
 Trên `/vi/login/`, tab **Bearer token** để dán sẵn `access_token` Gommo (test không cần email/password).
 :::
 
+::: info Cursor MCP (79ai)
+Sau đăng nhập, copy token [/vi/app/token/](/vi/app/token/) vào **[79ai MCP](/vi/mcp/other-hosts.md)** — xem [10 tools](/vi/mcp/tools.md) và [prompt mẫu](/vi/mcp/use-cases.md).
+:::
+
 ## Gateway auth API (Mode B — khuyên dùng)
 
 JSON endpoint cho app/script của bạn. Gateway tự điền `domain` từ `GOMMO_API_DOMAIN` nếu client bỏ qua.

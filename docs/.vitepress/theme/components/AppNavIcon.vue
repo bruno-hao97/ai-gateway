@@ -64,6 +64,10 @@ defineProps<{ name: string }>();
       <path d="M14 2H6a2 2 0 0 0-2 2v16l4-2 4 2 4-2 4 2V8z" />
       <path d="M10 9h4M10 13h4" />
     </template>
+    <!-- message / chat -->
+    <template v-else-if="name === 'message'">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </template>
     <!-- chevron -->
     <template v-else-if="name === 'chevron'">
       <path d="m6 9 6 6 6-6" />

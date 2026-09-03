@@ -143,12 +143,53 @@ No — billing is optional topup. Users need Gommo credits (from upstream accoun
 
 </details>
 
-## MCP & Cursor
+## MCP & Cursor {#mcp-cursor}
 
 <details>
-<summary>Can I use Cursor gommo_* MCP instead of this gateway?</summary>
+<summary>Which MCP should I use in Cursor?</summary>
 
-Cursor's built-in `gommo_*` tools call Gommo **directly** — not your deployed gateway. For IDE agents on **your** platform, use the official [`@ai-gateway/mcp-server`](./mcp/setup-cursor.md). For production apps, use HTTP `/gateway/*`. See [MCP & agents](./mcp/).
+**Recommended:** **[79ai remote MCP](./mcp/other-hosts.md)** — 10 tools, token from [/app/token/](/app/token/). JSON for Cursor, Claude, ChatGPT, and [other hosts](./mcp/other-hosts.md).
+
+**Production apps:** HTTP [`/gateway/*`](./routing/endpoint-map.md) — not MCP.
+
+**Optional:** [`@ai-gateway/mcp-server`](./mcp/self-hosted.md) only if IDE must call your own `GATEWAY_URL`.
+
+</details>
+
+<details>
+<summary>What can 79ai MCP do?</summary>
+
+All **10 tools**: account/credit, model catalog, image & video create, status & stream polling, task history, and notifications. See [tool reference](./mcp/tools.md) and [use cases & prompts](./mcp/use-cases.md).
+
+</details>
+
+<details>
+<summary>Can I use 79ai MCP outside Cursor?</summary>
+
+**Yes** — any MCP client that supports remote `url` + custom headers. See [Other MCP hosts](./mcp/other-hosts.md). ChatGPT/Gemini web apps cannot use MCP; use HTTP instead.
+
+</details>
+
+<details>
+<summary>Is the token from /app/token/ the same as 79ai MCP?</summary>
+
+Yes. Login/register returns a **Gommo user `access_token`**. Use it in 79ai MCP headers (`Gommo-Token` and `Authorization: Bearer …`) and as `Authorization: Bearer …` for HTTP `/gateway/*` in your apps.
+
+</details>
+
+<details>
+<summary>Do I need to run the gateway for MCP?</summary>
+
+**No** for [79ai MCP](./mcp/other-hosts.md) — tools call Gommo’s hosted MCP directly.
+
+**Yes** only for the optional [self-hosted MCP](./mcp/self-hosted.md) (`@ai-gateway/mcp-server` + `GATEWAY_URL`).
+
+</details>
+
+<details>
+<summary>What is @ai-gateway/mcp-server?</summary>
+
+An optional package for merchants who want Cursor tools to call **their** gateway URL instead of 79ai remote MCP. See [Self-hosted MCP](./mcp/self-hosted.md). Most users should use 79ai MCP.
 
 </details>
 

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "79-ai": {
+      "url": "https://api.gommo.net/api/v2/gommo-mcp",
+      "headers": {
+        "Gommo-Token": "PASTE_USER_ACCESS_TOKEN_FROM_APP_TOKEN",
+        "Authorization": "Bearer PASTE_USER_ACCESS_TOKEN_FROM_APP_TOKEN"
+      }
+    }
+  }
+}

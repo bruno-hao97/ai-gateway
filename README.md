@@ -27,20 +27,9 @@ npm run dev          # http://localhost:3001  (+ /portal/ in dev)
 
 Playground (signed-in): **`/app/playground/`** on docs (`:5173`) — embeds `:3001/portal/playground.html`.
 
-`GATEWAY_CORS_ORIGIN` — khi browser client khác origin (docs prod, `apps/web`, v.v.).
+`GATEWAY_CORS_ORIGIN` — khi browser client khác origin (docs prod, v.v.).
 
-## Optional: `apps/web` (React)
-
-React 19 + Tailwind — port **5175**.
-
-```bash
-npm run dev      # gateway
-npm run web:dev  # :5175 — cần CORS nếu gọi API cross-origin
-```
-
-Chi tiết: [`apps/web/README.md`](./apps/web/README.md)
-
-Developer docs: `npm run docs:dev` → port **5173**.
+Developer docs: `npm run docs:dev` → port **5173** (portal `/app/`, models, **chat**, playground).
 
 ## Docs portal & playground
 

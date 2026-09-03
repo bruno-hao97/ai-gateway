@@ -1,77 +1,72 @@
 ---
 title: MCP & agents
-description: Bring AI Gateway tools into Cursor and Claude — official MCP server
+description: 79ai MCP — Cursor, Claude Desktop, and compatible hosts
 ---
 
 # MCP & agents
 
-**Đưa công cụ AI Gateway vào AI của bạn** — Cursor, Claude Desktop, hoặc bất kỳ host MCP nào.  
-Một kết nối, nhiều việc thực tế: tạo ảnh/video, xem credit, theo dõi job.
+Use **79ai MCP** in Cursor, Claude Desktop, Windsurf, or any host that supports **remote MCP** — create images/videos, check credits, and track jobs with your account on this site.
 
-::: tip Official MCP server
-Package **`@ai-gateway/mcp-server`** — stdio transport, wrap REST `/gateway/*` trên server bạn deploy.
+::: tip Recommended — 79ai MCP
+Remote MCP at `https://api.gommo.net/api/v2/gommo-mcp` — **10 `gommo_*` tools**. Only your token from [/app/token/](/app/token/); no local gateway required.
 :::
 
-## Một kết nối. Nhiều việc thực tế.
+## Where you can use it
 
-| Use case | MCP tool | Mô tả |
-|----------|----------|--------|
-| **Tạo ảnh & video** | `gommo_image_create`, `gommo_video_create` | Agent gọi model + prompt; poll status hoặc `gommo_task_stream` |
-| **Xem hồ sơ & credit** | `gommo_account_info`, `gommo_credit_balance` | Số dư trước khi gen |
-| **Theo dõi job** | `gommo_image_status`, `gommo_video_status`, `gommo_task_stream` | Không cần ngồi chờ đoán mò |
-| **Catalog** | `gommo_models_list` | Luôn gọi trước create — **không đoán** ratio/mode/duration |
+| Host | Support | Guide |
+|------|---------|-------|
+| **Cursor** | ✅ | [Other hosts](./other-hosts.md) |
+| **Claude Desktop** | ✅ | [Other hosts](./other-hosts.md) |
+| **Windsurf** | ✅ | [Other hosts](./other-hosts.md) |
+| **VS Code / Zed** | ⚠️ Depends on extension | [Other hosts](./other-hosts.md) |
+| **Apps / backends** | HTTP, not MCP | [`/gateway/*`](../routing/endpoint-map.md) |
 
-## AI nhận công cụ, không nhận bí mật của bạn
+## 10 tools when connected
 
-| Secret | MCP server | Cursor |
-|--------|------------|--------|
-| User `access_token` | Env `GATEWAY_ACCESS_TOKEN` | Không embed trong prompt |
-| Merchant `GOMMO_ACCESS_TOKEN` | **Không dùng** | Không expose |
-| `ADMIN_API_KEY` | **Không dùng** | Không expose |
+| Group | Tools |
+|-------|-------|
+| Account | `gommo_account_info`, `gommo_credit_balance` |
+| Catalog | `gommo_models_list` |
+| Create media | `gommo_image_create`, `gommo_video_create` |
+| Track jobs | `gommo_image_status`, `gommo_video_status`, `gommo_task_stream` |
+| History | `gommo_tasks_list` |
+| Notify | `gommo_notify_send` |
 
-MCP chỉ gọi **HTTP gateway** với user Bearer — billing và fulfill chạy server-side như portal.
+Details: [Tool reference](./tools.md) · Example prompts: [Use cases](./use-cases.md)
 
-## Quick start
+## User flow
 
-1. Chạy gateway: `npm run dev` → `:3001`
-2. Lấy user token: [Authentication](../authentication.md) hoặc Playground login
-3. Cấu hình Cursor: [Setup Cursor](./setup-cursor.md)
-4. Tool reference: [MCP tools](./tools.md)
+1. [Sign in](/login/) → copy token from [/app/token/](/app/token/)
+2. Copy JSON for your AI client — [Other MCP hosts](./other-hosts.md) (Cursor · Claude · ChatGPT)
+3. Restart IDE → chat with `gommo_*` tools
 
 ```json
 {
   "mcpServers": {
-    "ai-gateway": {
-      "command": "npx",
-      "args": ["-y", "@ai-gateway/mcp-server"],
-      "env": {
-        "GATEWAY_URL": "http://localhost:3001",
-        "GATEWAY_ACCESS_TOKEN": "<user-access-token>"
+    "79-ai": {
+      "url": "https://api.gommo.net/api/v2/gommo-mcp",
+      "headers": {
+        "Authorization": "Bearer <token>"
       }
     }
   }
 }
 ```
 
-## MCP vs HTTP vs Cursor `gommo_*` IDE tools
+Templates: [Cursor](/mcp-cursor-79ai.example.json) · [Claude](/mcp-claude-79ai.example.json) · [Extended](/cursor-mcp-79ai.example.json)
 
-| | **@ai-gateway/mcp-server** | **HTTP `/gateway/*`** | **Cursor built-in `gommo_*`** |
-|---|---------------------------|----------------------|------------------------------|
-| Chạy qua gateway deploy | ✅ | ✅ | ❌ Gommo trực tiếp |
-| Cursor / Claude MCP | ✅ | ❌ | ✅ (IDE only) |
-| Production white-label | ✅ | ✅ | ❌ |
+## MCP vs HTTP
 
-Dùng **MCP server này** khi muốn agent trong IDE gọi **gateway của bạn**. Dùng **HTTP** cho app/backend. Cursor `gommo_*` riêng chỉ để dev — xem [FAQ](../faq.md#mcp-cursor).
+| | **79ai MCP** | **HTTP `/gateway/*`** |
+|---|-------------|----------------------|
+| Cursor / Claude / IDE | ✅ | ❌ |
+| Website / mobile / scripts | ❌ | ✅ |
+| Needs gateway running | ❌ | ✅ (deployed API) |
 
-## Roadmap
+Same login token — different integration style.
 
-| Tool | Trạng thái |
-|------|------------|
-| models, image/video create+status, task_stream, account/credit | ✅ v0.1 |
-| `gommo_tasks_list` | 🔜 |
-| `gommo_notify_send` | 🔜 (cần gateway route) |
-| Remote MCP (SSE) | 🔜 |
+Optional [self-hosted MCP](./self-hosted.md) routes IDE tools through `GATEWAY_URL`.
 
 ## Next
 
-→ [Setup Cursor](./setup-cursor.md) · [Tool reference](./tools.md) · [Agent HTTP flow](../cookbook/agent-http-flow.md)
+→ [Other hosts](./other-hosts.md) · [Tools](./tools.md) · [Use cases](./use-cases.md)

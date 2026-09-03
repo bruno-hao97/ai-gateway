@@ -23,6 +23,10 @@ After a successful sign-in or sign-up, the browser redirects to **`/app/`** (Ove
 On `/login/`, switch to the **Bearer token** tab to paste an existing Gommo `access_token` (useful for testing without email/password).
 :::
 
+::: info Cursor MCP (79ai)
+After sign-in, copy your token from [/app/token/](/app/token/) into **[79ai MCP](./mcp/other-hosts.md)**. See [all 10 tools](./mcp/tools.md) and [example prompts](./mcp/use-cases.md).
+:::
+
 ## Gateway auth API (Mode B — recommended)
 
 Use these JSON endpoints from your own app or scripts. The gateway fills `domain` from `GOMMO_API_DOMAIN` when omitted.

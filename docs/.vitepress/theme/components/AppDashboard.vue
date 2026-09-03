@@ -24,6 +24,7 @@ import {
 } from '../models/user-api';
 import { appendUsageRecord, type UsageJobType } from '../models/usage-history';
 import AppNavIcon from './AppNavIcon.vue';
+import AppChatPanel from './AppChatPanel.vue';
 import CreditsCheckoutModal from './CreditsCheckoutModal.vue';
 import ProfileUsagePanel from './ProfileUsagePanel.vue';
 import ProfileActivityPanel from './ProfileActivityPanel.vue';
@@ -43,7 +44,7 @@ type ProfileSection = 'general' | 'usage' | 'api' | 'activity' | 'logs';
 const PROFILE_SECTIONS = new Set<ProfileSection>(['general', 'usage', 'api', 'activity', 'logs']);
 
 const props = defineProps<{
-  view: 'overview' | 'profile' | 'playground' | 'token' | 'credits';
+  view: 'overview' | 'profile' | 'playground' | 'chat' | 'token' | 'credits';
 }>();
 
 const { lang } = useData();
@@ -130,6 +131,7 @@ const navDeveloper = computed((): AppNavItem[] => [
     icon: 'key',
   },
   { id: 'playground', label: 'Playground', href: `${prefix.value}/app/playground/`, icon: 'terminal' },
+  { id: 'chat', label: 'Chat', href: `${prefix.value}/app/chat/`, icon: 'message' },
   { label: isVi.value ? 'Models' : 'Models', href: `${prefix.value}/models/`, icon: 'grid' },
   { label: isVi.value ? 'So sánh' : 'Compare', href: `${prefix.value}/models/compare/`, icon: 'compare' },
   {
@@ -198,6 +200,10 @@ const apiBaseDisplay = computed(() => {
 
 function isActive(id: string): boolean {
   return props.view === id;
+}
+
+function isImmersiveView(): boolean {
+  return props.view === 'playground' || props.view === 'chat';
 }
 
 function isAccountNavActive(item: AppNavItem): boolean {
@@ -411,8 +417,8 @@ watch(
 </script>
 
 <template>
-  <div class="or-catalog or-app" :class="{ 'or-app-has-playground': view === 'playground' }">
-    <aside class="or-sidebar">
+  <div class="or-catalog or-app" :class="{ 'or-app-has-playground': isImmersiveView(), 'or-app-chat-layout': view === 'chat' }">
+    <aside v-if="view !== 'chat'" class="or-sidebar">
       <div class="or-app-brand">
         <a :href="`${prefix}/app/`" class="or-app-brand-link">
           <span class="or-app-logo">⬡</span>
@@ -470,13 +476,14 @@ watch(
       </div>
     </aside>
 
-    <div class="or-main or-app-main" :class="{ 'or-app-main-playground': view === 'playground' }">
-      <header class="or-app-header">
+    <div class="or-main or-app-main" :class="{ 'or-app-main-playground': isImmersiveView() }">
+      <header v-if="view !== 'chat'" class="or-app-header">
         <div>
           <h1 class="or-app-title">
             <template v-if="view === 'overview'">{{ isVi ? 'Tổng quan' : 'Overview' }}</template>
             <template v-else-if="view === 'profile'">{{ isVi ? 'Hồ sơ' : 'Profile' }}</template>
             <template v-else-if="view === 'playground'">Playground</template>
+            <template v-else-if="view === 'chat'">Chat</template>
             <template v-else-if="view === 'token'">Access token</template>
             <template v-else>{{ isVi ? 'Credits' : 'Credits' }}</template>
           </h1>
@@ -564,7 +571,7 @@ watch(
         {{ isVi ? 'Đang tải…' : 'Loading…' }}
       </div>
 
-      <div v-else-if="loadError && view !== 'playground'" class="or-app-alert">{{ loadError }}</div>
+      <div v-else-if="loadError && view !== 'playground' && view !== 'chat'" class="or-app-alert">{{ loadError }}</div>
 
       <template v-else>
         <!-- Playground embed -->
@@ -576,6 +583,11 @@ watch(
             title="AI Gateway Playground"
             @load="onPlaygroundLoad"
           />
+        </section>
+
+        <!-- Chat -->
+        <section v-else-if="view === 'chat'" class="or-app-chat-wrap">
+          <AppChatPanel :on-credits-refresh="refreshProfile" />
         </section>
 
         <!-- Overview -->
@@ -599,6 +611,11 @@ watch(
               <h3>{{ isVi ? 'So sánh models' : 'Compare models' }}</h3>
               <p>{{ isVi ? 'Credits và metadata side-by-side.' : 'Credits and metadata side-by-side.' }}</p>
               <span class="or-app-card-cta">{{ isVi ? 'So sánh' : 'Compare' }} →</span>
+            </a>
+            <a :href="`${prefix}/app/chat/`" class="or-app-card">
+              <h3>Chat</h3>
+              <p>{{ isVi ? 'Trò chuyện với Auto Router — stream SSE, lịch sử local.' : 'Chat with Auto Router — SSE stream, local history.' }}</p>
+              <span class="or-app-card-cta">{{ isVi ? 'Mở chat' : 'Open chat' }} →</span>
             </a>
             <a :href="`${prefix}/app/playground/`" class="or-app-card">
               <h3>Playground</h3>
@@ -792,6 +809,24 @@ watch(
             <button type="button" class="or-app-btn or-app-btn-ghost" @click="copySnippet">
               {{ isVi ? 'Copy curl' : 'Copy curl' }}
             </button>
+          </div>
+
+          <div class="or-app-panel">
+            <h3 class="or-app-panel-title">{{ isVi ? '79ai MCP (Cursor & IDE)' : '79ai MCP (Cursor & IDE)' }}</h3>
+            <p class="or-app-panel-desc">
+              {{
+                isVi
+                  ? 'Token này dùng cho 79ai MCP — 10 tools: ảnh, video, credit, thông báo… Cursor, Claude Desktop và host tương thích. Không cần gateway local.'
+                  : 'Use this token for 79ai MCP — 10 tools: images, video, credits, notifications… Works in Cursor, Claude Desktop, and compatible hosts. No local gateway required.'
+              }}
+            </p>
+            <p class="or-app-panel-desc or-app-muted">
+              <a :href="`${prefix}/mcp/other-hosts`">{{ isVi ? 'Cấu hình JSON (Cursor / Claude / ChatGPT)' : 'JSON config (Cursor / Claude / ChatGPT)' }}</a>
+              ·
+              <a :href="`${prefix}/mcp/tools`">{{ isVi ? '10 tools' : '10 tools' }}</a>
+              ·
+              <a :href="`${prefix}/mcp/use-cases`">{{ isVi ? 'Prompt mẫu' : 'Example prompts' }}</a>
+            </p>
           </div>
         </section>
 

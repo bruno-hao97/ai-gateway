@@ -21,9 +21,10 @@ Auth: `Authorization: Bearer {user_access_token}`.
 
 | `action` | Behavior |
 |----------|----------|
-| `chat` | Single JSON response |
+| `chat` | Single JSON or SSE response |
 | `stream` | **SSE** stream — gateway pipes without buffering |
 | `set_model` | Change chat model for session |
+| `agent` | **set_model** (best-effort) then **chat** — text agent flow |
 
 ## REST request
 
@@ -51,8 +52,39 @@ Upstream `action=chat` requires **`messages` with at least one entry** — e.g. 
 | `GOMMO_CHAT_SERVER` | Chat server (default `cheap`) |
 | `GOMMO_CHAT_MODEL` | Model id (default `gpt-5.5::cheap`) |
 | `GOMMO_CHAT_AGENT_ID` | Agent id when needed |
+| `GOMMO_CHAT_MODELS_FILE` | Optional JSON catalog for portal picker (`data/chat-models.json`) |
 
 Override per request via REST fields or upstream form params.
+
+## Portal model picker
+
+`GET /gateway/chat-models` (Bearer required) returns the catalog for `/app/chat/`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "defaultId": "auto-router",
+    "models": [
+      {
+        "id": "auto-router",
+        "label": "Auto Router",
+        "autoRouter": true,
+        "model": "gpt-5.5::cheap",
+        "server": "cheap"
+      }
+    ]
+  }
+}
+```
+
+Edit `data/chat-models.json` (or path from `GOMMO_CHAT_MODELS_FILE`) to add models without redeploying code.
+
+## Chat sessions (`/gateway/chat-sessions`)
+
+Gateway REST still supports `save_message` / `list_sessions` for API clients. **Portal chat is local-only** — it does not sync with Gommo/79ai history.
+
+Use **Export/Import JSON** in the chat sidebar for local backup.
 
 ## Streaming
 

@@ -170,14 +170,18 @@ const sdkSidebarVi = [
 
 const mcpSidebarEn = [
   { text: 'Overview', link: '/mcp/' },
-  { text: 'Setup Cursor', link: '/mcp/setup-cursor' },
-  { text: 'Tool reference', link: '/mcp/tools' },
+  { text: 'Other MCP hosts', link: '/mcp/other-hosts' },
+  { text: 'Tool reference (10)', link: '/mcp/tools' },
+  { text: 'Use cases & prompts', link: '/mcp/use-cases' },
+  { text: 'Self-hosted (advanced)', link: '/mcp/self-hosted' },
 ];
 
 const mcpSidebarVi = [
   { text: 'Tổng quan', link: '/vi/mcp/' },
-  { text: 'Cấu hình Cursor', link: '/vi/mcp/setup-cursor' },
-  { text: 'Tool reference', link: '/vi/mcp/tools' },
+  { text: 'Host MCP khác', link: '/vi/mcp/other-hosts' },
+  { text: 'Tool reference (10)', link: '/vi/mcp/tools' },
+  { text: 'Use cases & prompt', link: '/vi/mcp/use-cases' },
+  { text: 'Self-hosted (nâng cao)', link: '/vi/mcp/self-hosted' },
 ];
 
 /** Docs guide sidebar (tab Docs). */
@@ -202,12 +206,14 @@ const docsSidebarVi = [
 const navEn = [
   { text: 'Models', link: '/models/' },
   { text: 'Playground', link: '/app/playground/' },
+  { text: 'Chat', link: '/app/chat/' },
   { text: 'Docs', link: '/quickstart' },
 ];
 
 const navVi = [
   { text: 'Models', link: '/vi/models/' },
   { text: 'Playground', link: '/vi/app/playground/' },
+  { text: 'Chat', link: '/vi/app/chat/' },
   { text: 'Docs', link: '/vi/quickstart' },
 ];
 
