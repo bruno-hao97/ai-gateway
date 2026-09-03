@@ -69,13 +69,15 @@ function pickCatalogValue(item) {
   if (item && typeof item === 'object') {
     const v =
       item.value ??
+      item.type ??
       item.ratio ??
       item.mode ??
       item.resolution ??
       item.duration ??
-      item.id ??
-      item.name;
+      item.id;
     if (v != null && String(v).trim()) return String(v).trim();
+    const name = item.name ?? item.label;
+    if (name != null && String(name).trim()) return String(name).trim();
   }
   return '';
 }

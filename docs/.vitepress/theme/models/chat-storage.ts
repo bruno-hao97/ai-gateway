@@ -4,12 +4,24 @@ export interface ChatAttachment {
   name?: string;
 }
 
+export interface ChatMessageMeta {
+  latencyMs?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  modelLabel?: string;
+  jobType?: 'image';
+  imageRatio?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   text: string;
   createdAt: number;
   attachments?: ChatAttachment[];
+  meta?: ChatMessageMeta;
+  isError?: boolean;
 }
 
 export interface ChatSession {
@@ -57,12 +69,19 @@ function normalizeMessage(raw: unknown): ChatMessage | null {
   const attachments = Array.isArray(m.attachments)
     ? m.attachments.map(normalizeAttachment).filter((a): a is ChatAttachment => Boolean(a))
     : undefined;
+  const metaRaw = m.meta;
+  const meta =
+    metaRaw && typeof metaRaw === 'object' && !Array.isArray(metaRaw)
+      ? (metaRaw as ChatMessage['meta'])
+      : undefined;
   return {
     id,
     role,
     text,
     createdAt,
     attachments: attachments?.length ? attachments : undefined,
+    meta,
+    isError: m.isError === true,
   };
 }
 
@@ -203,6 +222,19 @@ export function chatAppPath(localePrefix: '' | '/vi', sessionId?: string): strin
   const base = `${localePrefix}/app/chat/`;
   if (!sessionId) return base;
   return `${base}?session=${encodeURIComponent(sessionId)}`;
+}
+
+export function renameChatSession(sessionId: string, title: string): void {
+  const trimmed = title.trim();
+  if (!trimmed || !getChatSession(sessionId)) return;
+  touchChatSession(sessionId, { title: trimmed.length > 80 ? `${trimmed.slice(0, 80)}…` : trimmed });
+}
+
+export function clearAllChatSessions(): void {
+  for (const session of readSessions()) {
+    localStorage.removeItem(messagesKey(session.id));
+  }
+  localStorage.removeItem(SESSIONS_KEY);
 }
 
 export function purgeRemoteChatSessions(): number {

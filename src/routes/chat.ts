@@ -34,9 +34,15 @@ const SKIP_RESPONSE_HEADERS = new Set([
 const router = Router();
 router.use(gatewayAuth);
 
-/** GET /gateway/chat-models — catalog for portal model picker */
-router.get('/chat-models', (_req, res) => {
-  res.json(chatModelsCatalogResponse());
+/** GET /gateway/chat-models — catalog for portal model picker (Gommo action=models) */
+router.get('/chat-models', async (req, res) => {
+  try {
+    const auth = getGatewayAuth(req);
+    const payload = await chatModelsCatalogResponse(auth.accessToken, readDomain(req));
+    res.json(payload);
+  } catch (err) {
+    sendGommoError(res, err);
+  }
 });
 
 function readDevice(body: Record<string, unknown> | undefined): ChatDeviceFields | undefined {
@@ -60,6 +66,16 @@ function readDevice(body: Record<string, unknown> | undefined): ChatDeviceFields
   };
 }
 
+function readChatTools(body: Record<string, unknown>): ChatGatewayRequest['chatTools'] | undefined {
+  const raw = body.chatTools ?? body.chat_tools;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const row = raw as Record<string, unknown>;
+  return {
+    web_search: row.web_search === true,
+    web_fetch: row.web_fetch === true,
+  };
+}
+
 function buildChatRequest(req: Request, action: ChatAction): ChatGatewayRequest {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const auth = getGatewayAuth(req);
@@ -76,6 +92,7 @@ function buildChatRequest(req: Request, action: ChatAction): ChatGatewayRequest 
       typeof body.systemCustomPrompt === 'string' ? body.systemCustomPrompt : undefined,
     customSystemPrompt:
       typeof body.customSystemPrompt === 'string' ? body.customSystemPrompt : undefined,
+    chatTools: readChatTools(body),
     accessToken: auth.accessToken,
     domain: readDomain(req),
     device: readDevice(body),

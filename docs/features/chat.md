@@ -51,34 +51,49 @@ Upstream `action=chat` requires **`messages` with at least one entry** — e.g. 
 |-----|---------|
 | `GOMMO_CHAT_SERVER` | Chat server (default `cheap`) |
 | `GOMMO_CHAT_MODEL` | Model id (default `gpt-5.5::cheap`) |
-| `GOMMO_CHAT_AGENT_ID` | Agent id when needed |
-| `GOMMO_CHAT_MODELS_FILE` | Optional JSON catalog for portal picker (`data/chat-models.json`) |
+| `GOMMO_CHAT_AGENT_ID` | Moon Chat agent (default text) |
+| `GOMMO_CHAT_WORKFLOW_AGENT_ID` | Composer / workflow agent |
+| `GOMMO_CHAT_WORKFLOW_PROJECT_ID` | Project id for workflow stream |
+| `GOMMO_CHAT_MODELS_FILE` | Optional JSON overrides (`data/chat-models.json`) |
+| `GOMMO_CHAT_MODELS_TTL_MS` | Upstream catalog cache TTL (default 5 min) |
 
 Override per request via REST fields or upstream form params.
 
 ## Portal model picker
 
-`GET /gateway/chat-models` (Bearer required) returns the catalog for `/app/chat/`:
+`GET /gateway/chat-models` (Bearer required) loads the catalog from Gommo **`action=models`** (`POST /api/v2/chat`), cached server-side. Response includes `source: "upstream" | "fallback"`.
 
 ```json
 {
   "success": true,
   "data": {
     "defaultId": "auto-router",
+    "source": "upstream",
     "models": [
       {
         "id": "auto-router",
         "label": "Auto Router",
         "autoRouter": true,
+        "chatApiMode": "agent",
         "model": "gpt-5.5::cheap",
         "server": "cheap"
+      },
+      {
+        "id": "composer-2.5--cursorai",
+        "label": "Composer 2.5 (Standard)",
+        "chatApiMode": "stream",
+        "model": "composer-2.5",
+        "server": "cursorai"
       }
     ]
   }
 }
 ```
 
-Edit `data/chat-models.json` (or path from `GOMMO_CHAT_MODELS_FILE`) to add models without redeploying code.
+- **Auto Router** — env defaults, `action=agent` (set_model + chat)
+- **Other models** — `chatApiMode: stream` when upstream `body_type` is `chat_completions` or server is `cursorai`
+
+Optional `data/chat-models.json` can override labels, hide models (`hidden: true`), or disable upstream (`"upstream": false`).
 
 ## Chat sessions (`/gateway/chat-sessions`)
 

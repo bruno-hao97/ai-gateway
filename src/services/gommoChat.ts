@@ -17,6 +17,11 @@ export interface ChatDeviceFields {
   debug_info?: string;
 }
 
+export interface ChatToolsConfig {
+  web_search?: boolean;
+  web_fetch?: boolean;
+}
+
 export interface ChatGatewayRequest {
   action: ChatAction;
   query?: string;
@@ -31,6 +36,7 @@ export interface ChatGatewayRequest {
   device?: ChatDeviceFields;
   systemCustomPrompt?: string;
   customSystemPrompt?: string;
+  chatTools?: ChatToolsConfig;
 }
 
 export interface SaveMessageRequest {
@@ -144,7 +150,14 @@ export function buildChatForm(req: ChatGatewayRequest): URLSearchParams {
   form.set('assistant_message_id', assistantMessageId);
   form.set('messages', serializeMessages(req.messages));
   form.set('source', config.gommo.chatSource);
-  form.set('chat_tools', JSON.stringify({ web_search: false, web_fetch: false }));
+  const tools = req.chatTools ?? {};
+  form.set(
+    'chat_tools',
+    JSON.stringify({
+      web_search: tools.web_search === true,
+      web_fetch: tools.web_fetch === true,
+    }),
+  );
   if (req.customSystemPrompt?.trim()) {
     form.set('custom_system_prompt', req.customSystemPrompt.trim());
   }

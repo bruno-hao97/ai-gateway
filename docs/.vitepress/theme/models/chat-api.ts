@@ -9,6 +9,23 @@ export interface ChatTurnMessage {
   attachments?: unknown[];
 }
 
+export interface ChatToolsOptions {
+  web_search?: boolean;
+  web_fetch?: boolean;
+}
+
+export interface ChatUsageMeta {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+}
+
+export interface ChatReplyResult {
+  text: string;
+  latencyMs: number;
+  usage?: ChatUsageMeta;
+}
+
 export interface AgentChatOptions {
   sessionId: string;
   query: string;
@@ -16,7 +33,10 @@ export interface AgentChatOptions {
   agentId?: string;
   server?: string;
   model?: string;
+  projectId?: string;
   useStream?: boolean;
+  chatTools?: ChatToolsOptions;
+  signal?: AbortSignal;
 }
 
 export interface SaveChatMessageOptions {
@@ -58,6 +78,33 @@ export function parseGatewayError(payload: unknown, status: number): string {
   if (typeof p.message === 'string' && p.message) return p.message;
   if (typeof p.error === 'string' && p.error) return p.error;
   return `HTTP ${status}`;
+}
+
+/** Parse usage from SSE event data (OpenAI-style or Gommo variants). */
+export function extractSseUsage(payload: string): ChatUsageMeta | null {
+  if (!payload || payload === '[DONE]') return null;
+  try {
+    const parsed = JSON.parse(payload) as Record<string, unknown>;
+    const usage =
+      parsed.usage && typeof parsed.usage === 'object' && !Array.isArray(parsed.usage)
+        ? (parsed.usage as Record<string, unknown>)
+        : parsed;
+    const prompt =
+      (typeof usage.prompt_tokens === 'number' && usage.prompt_tokens) ||
+      (typeof usage.input_tokens === 'number' && usage.input_tokens) ||
+      undefined;
+    const completion =
+      (typeof usage.completion_tokens === 'number' && usage.completion_tokens) ||
+      (typeof usage.output_tokens === 'number' && usage.output_tokens) ||
+      undefined;
+    const total =
+      (typeof usage.total_tokens === 'number' && usage.total_tokens) ||
+      (prompt !== undefined && completion !== undefined ? prompt + completion : undefined);
+    if (prompt === undefined && completion === undefined && total === undefined) return null;
+    return { promptTokens: prompt, completionTokens: completion, totalTokens: total };
+  } catch {
+    return null;
+  }
 }
 
 /** Extract text chunk from SSE data line per Gommo spec. */
@@ -112,26 +159,56 @@ export function extractJsonChatReply(payload: unknown): string {
 export async function consumeChatSseStream(
   body: ReadableStream<Uint8Array> | null,
   onChunk: (text: string) => void,
+  signal?: AbortSignal,
+  onUsage?: (usage: ChatUsageMeta) => void,
 ): Promise<void> {
   if (!body) throw new Error('No stream body');
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let eventName = '';
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
-    for (const line of lines) {
-      if (line.startsWith('event:')) continue;
-      if (!line.startsWith('data:')) continue;
-      const payload = line.slice(5).trim();
-      if (payload === '[DONE]') return;
-      const chunk = extractSseChatChunk(payload);
-      if (chunk) onChunk(chunk);
+  const onAbort = () => {
+    void reader.cancel();
+  };
+  signal?.addEventListener('abort', onAbort, { once: true });
+
+  try {
+    while (true) {
+      if (signal?.aborted) {
+        throw new DOMException('Chat stopped', 'AbortError');
+      }
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (line.startsWith('event:')) {
+          eventName = line.slice(6).trim();
+          continue;
+        }
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (payload === '[DONE]') return;
+        if (eventName === 'usage') {
+          const usage = extractSseUsage(payload);
+          if (usage) onUsage?.(usage);
+          eventName = '';
+          continue;
+        }
+        eventName = '';
+        const chunk = extractSseChatChunk(payload);
+        if (chunk) onChunk(chunk);
+        else {
+          const usage = extractSseUsage(payload);
+          if (usage) onUsage?.(usage);
+        }
+      }
     }
+  } finally {
+    signal?.removeEventListener('abort', onAbort);
+    reader.releaseLock();
   }
 }
 
@@ -276,11 +353,14 @@ async function dispatchChat(
   action: 'agent' | 'stream',
   opts: AgentChatOptions,
   onChunk?: (text: string) => void,
-): Promise<string> {
+): Promise<ChatReplyResult> {
+  const started = Date.now();
+  let usage: ChatUsageMeta | undefined;
   const base = apiBase();
   const res = await fetch(`${base}/gateway/chat`, {
     method: 'POST',
     headers: authHeaders(),
+    signal: opts.signal,
     body: JSON.stringify({
       action,
       query: opts.query,
@@ -289,6 +369,8 @@ async function dispatchChat(
       agentId: opts.agentId,
       server: opts.server,
       model: opts.model,
+      projectId: opts.projectId,
+      chatTools: opts.chatTools,
       ...devicePayload(),
     }),
   });
@@ -297,12 +379,19 @@ async function dispatchChat(
 
   if (contentType.includes('text/event-stream')) {
     let reply = '';
-    await consumeChatSseStream(res.body, (chunk) => {
-      reply += chunk;
-      onChunk?.(reply);
-    });
+    await consumeChatSseStream(
+      res.body,
+      (chunk) => {
+        reply += chunk;
+        onChunk?.(reply);
+      },
+      opts.signal,
+      (u) => {
+        usage = { ...usage, ...u };
+      },
+    );
     if (!reply.trim()) throw new Error('Empty chat response');
-    return reply;
+    return { text: reply, latencyMs: Date.now() - started, usage };
   }
 
   const raw = await res.json().catch(async () => {
@@ -315,14 +404,20 @@ async function dispatchChat(
   const reply = extractJsonChatReply(raw);
   if (!reply.trim()) throw new Error('Empty chat response');
   onChunk?.(reply);
-  return reply;
+
+  if (raw && typeof raw === 'object') {
+    const parsedUsage = extractSseUsage(JSON.stringify((raw as Record<string, unknown>).usage ?? raw));
+    if (parsedUsage) usage = parsedUsage;
+  }
+
+  return { text: reply, latencyMs: Date.now() - started, usage };
 }
 
 /** Agent text chat: set_model + chat (gateway action=agent). Optional onChunk for SSE. */
 export async function sendAgentChat(
   opts: AgentChatOptions,
   onChunk?: (text: string) => void,
-): Promise<string> {
+): Promise<ChatReplyResult> {
   const action = opts.useStream ? 'stream' : 'agent';
   return dispatchChat(action, opts, onChunk);
 }

@@ -16,9 +16,15 @@ export const config = {
     managerId: (process.env.GOMMO_MANAGER_ID || 'c8f06b2317880f42').trim(),
     registerExpiredTime: (process.env.GOMMO_REGISTER_EXPIRED_TIME || '999').trim(),
     chatAgentId: (process.env.GOMMO_CHAT_AGENT_ID || '560ee19d40623da6851a1bd0af0930dd').trim(),
+    chatWorkflowAgentId: (
+      process.env.GOMMO_CHAT_WORKFLOW_AGENT_ID || 'd234b19ae119f741696eafa913d246cc'
+    ).trim(),
     chatServer: (process.env.GOMMO_CHAT_SERVER || 'cheap').trim(),
     chatModel: (process.env.GOMMO_CHAT_MODEL || 'gpt-5.5::cheap').trim(),
     chatProjectId: (process.env.GOMMO_CHAT_PROJECT_ID || 'default').trim(),
+    chatWorkflowProjectId: (
+      process.env.GOMMO_CHAT_WORKFLOW_PROJECT_ID || '55004151b482b646'
+    ).trim(),
     chatSource: (process.env.GOMMO_CHAT_SOURCE || 'vmedia').trim(),
   },
   topup: {

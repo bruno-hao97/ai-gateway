@@ -171,6 +171,20 @@ export interface CatalogModel {
   raw: Record<string, unknown>;
 }
 
+export interface CatalogOption {
+  value: string;
+  label: string;
+}
+
+export type CatalogJobField = 'ratio' | 'mode' | 'resolution' | 'duration';
+
+const CATALOG_FIELD_KEYS: Record<CatalogJobField, string[]> = {
+  ratio: ['ratios', 'ratio'],
+  mode: ['modes', 'mode'],
+  resolution: ['resolutions', 'resolution'],
+  duration: ['durations', 'duration'],
+};
+
 const TYPE_ORDER = new Map(JOB_TYPES.map((t, i) => [t.id, i]));
 
 function uniqStrings(values: string[]): string[] {
@@ -262,14 +276,65 @@ export function modelTags(m: CatalogModel): string[] {
 }
 
 function pickCatalogValue(item: unknown): string {
-  if (typeof item === 'string' || typeof item === 'number') return String(item);
+  const opt = pickCatalogOption(item);
+  return opt?.value ?? '';
+}
+
+export function pickCatalogOption(item: unknown): CatalogOption | null {
+  if (typeof item === 'string' || typeof item === 'number') {
+    const v = String(item).trim();
+    return v ? { value: v, label: v } : null;
+  }
   if (item && typeof item === 'object') {
     const row = item as Record<string, unknown>;
-    const v =
-      row.value ?? row.ratio ?? row.mode ?? row.resolution ?? row.duration ?? row.id ?? row.name;
-    if (v != null && String(v).trim()) return String(v).trim();
+    const value = String(
+      row.value ??
+        row.type ??
+        row.ratio ??
+        row.mode ??
+        row.resolution ??
+        row.duration ??
+        row.id ??
+        '',
+    ).trim();
+    if (value) {
+      const label = String(row.name ?? row.label ?? row.title ?? value).trim() || value;
+      return { value, label };
+    }
+    const name = String(row.name ?? row.label ?? row.title ?? '').trim();
+    if (name) return { value: name, label: name };
   }
-  return '';
+  return null;
+}
+
+function pickCatalogOptionList(model: Record<string, unknown>, ...keys: string[]): CatalogOption[] {
+  for (const key of keys) {
+    const val = model[key];
+    if (Array.isArray(val) && val.length) {
+      const options = val.map(pickCatalogOption).filter((o): o is CatalogOption => Boolean(o));
+      if (options.length) return options;
+    }
+  }
+  return [];
+}
+
+export function catalogOptionsForField(model: CatalogModel, field: CatalogJobField): CatalogOption[] {
+  const keys = CATALOG_FIELD_KEYS[field];
+  const fromRaw = pickCatalogOptionList(model.raw, ...keys);
+  if (fromRaw.length) return fromRaw;
+  const fallback =
+    field === 'ratio'
+      ? model.ratios
+      : field === 'mode'
+        ? model.modes
+        : field === 'resolution'
+          ? model.resolutions
+          : model.durations;
+  return fallback.map((value) => ({ value, label: value }));
+}
+
+export function catalogValuesForField(model: CatalogModel, field: CatalogJobField): string[] {
+  return catalogOptionsForField(model, field).map((o) => o.value);
 }
 
 function pickCatalogList(model: Record<string, unknown>, ...keys: string[]): string[] {
@@ -391,7 +456,7 @@ export function normalizeCatalogModel(
   const { credits, label } = parseCredits(m);
   const { vi, en } = pickDescriptionFields(m);
   const modes = uniqStrings([
-    ...pickCatalogList(m, 'modes', 'mode'),
+    ...pickCatalogOptionList(m, 'modes', 'mode').map((o) => o.value),
     ...pickModesFromPrices(m),
   ]);
   return {
@@ -399,10 +464,10 @@ export function normalizeCatalogModel(
     name: String(m.name || slug),
     jobType,
     group,
-    ratios: pickCatalogList(m, 'ratios', 'ratio'),
+    ratios: pickCatalogOptionList(m, 'ratios', 'ratio').map((o) => o.value),
     modes,
-    resolutions: pickCatalogList(m, 'resolutions', 'resolution'),
-    durations: pickCatalogList(m, 'durations', 'duration'),
+    resolutions: pickCatalogOptionList(m, 'resolutions', 'resolution').map((o) => o.value),
+    durations: pickCatalogOptionList(m, 'durations', 'duration').map((o) => o.value),
     descriptionVi: vi,
     descriptionEn: en,
     provider: String(m.provider || m.server || m.vendor || m.brand || '').trim(),

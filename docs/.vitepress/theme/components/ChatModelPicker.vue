@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import type { ChatModelOption } from '../models/chat-models';
-import { modelPickerLabel, modelSubtitle } from '../models/chat-models';
+import {
+  categoryLabel,
+  modelCapabilityBadges,
+  modelPickerLabel,
+  modelSubtitle,
+} from '../models/chat-models';
 
 const props = defineProps<{
   modelId: string;
@@ -16,15 +21,25 @@ const emit = defineEmits<{
 
 const open = ref(false);
 const search = ref('');
+const category = ref('');
 const root = ref<HTMLElement | null>(null);
 
 const activeModel = computed(() => props.models.find((m) => m.id === props.modelId) ?? null);
 
+const categories = computed(() => {
+  const set = new Set<string>();
+  for (const m of props.models) {
+    for (const c of m.categories ?? []) set.add(c);
+  }
+  return [...set].sort();
+});
+
 const filtered = computed(() => {
   const q = search.value.trim().toLowerCase();
-  if (!q) return props.models;
   return props.models.filter((m) => {
-    const hay = `${m.label} ${m.model} ${m.server} ${m.description || ''}`.toLowerCase();
+    if (category.value && !(m.categories ?? []).includes(category.value)) return false;
+    if (!q) return true;
+    const hay = `${m.label} ${m.model} ${m.server} ${m.description || ''} ${(m.categories ?? []).join(' ')}`.toLowerCase();
     return hay.includes(q);
   });
 });
@@ -32,13 +47,15 @@ const filtered = computed(() => {
 function toggle() {
   if (props.disabled) return;
   open.value = !open.value;
-  if (open.value) search.value = '';
+  if (open.value) {
+    search.value = '';
+    category.value = '';
+  }
 }
 
 function select(id: string) {
   emit('update:modelId', id);
   open.value = false;
-  search.value = '';
 }
 
 function onDocClick(e: MouseEvent) {
@@ -79,6 +96,26 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
         />
         <span class="or-chat-model-count">{{ filtered.length }}</span>
       </div>
+      <div v-if="categories.length" class="or-chat-model-cats">
+        <button
+          type="button"
+          class="or-chat-model-cat"
+          :class="{ active: !category }"
+          @click="category = ''"
+        >
+          {{ isVi ? 'Tất cả' : 'All' }}
+        </button>
+        <button
+          v-for="cat in categories"
+          :key="cat"
+          type="button"
+          class="or-chat-model-cat"
+          :class="{ active: category === cat }"
+          @click="category = cat"
+        >
+          {{ categoryLabel(cat, !!isVi) }}
+        </button>
+      </div>
       <ul class="or-chat-model-list">
         <li v-for="model in filtered" :key="model.id">
           <button
@@ -89,7 +126,18 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
             :aria-selected="model.id === modelId"
             @click="select(model.id)"
           >
-            <span class="or-chat-model-item-label">{{ model.label }}</span>
+            <span class="or-chat-model-item-top">
+              <span class="or-chat-model-item-label">{{ model.label }}</span>
+              <span v-if="modelCapabilityBadges(model, !!isVi).length" class="or-chat-model-badges">
+                <span
+                  v-for="badge in modelCapabilityBadges(model, !!isVi)"
+                  :key="badge"
+                  class="or-chat-model-badge"
+                >
+                  {{ badge }}
+                </span>
+              </span>
+            </span>
             <span class="or-chat-model-item-sub">{{ modelSubtitle(model) }}</span>
             <span v-if="model.description" class="or-chat-model-item-desc">{{ model.description }}</span>
           </button>

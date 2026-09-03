@@ -587,7 +587,7 @@ watch(
 
         <!-- Chat -->
         <section v-else-if="view === 'chat'" class="or-app-chat-wrap">
-          <AppChatPanel :on-credits-refresh="refreshProfile" />
+          <AppChatPanel :credits="credits" :on-credits-refresh="refreshProfile" />
         </section>
 
         <!-- Overview -->
