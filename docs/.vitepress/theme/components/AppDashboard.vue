@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useData, useRoute } from 'vitepress';
 import { getStoredToken, getStoredDomain, importSessionFromUrl, loginUrlWithRedirect } from '../models/auth-api';
-import { playgroundEmbedUrl, playgroundOrigin, playgroundUrl } from '../models/gateway-base';
+import { playgroundUrl } from '../models/gateway-base';
 import {
   fetchBillingPackages,
   fetchBillingStatus,
@@ -22,9 +22,9 @@ import {
   type TopupOrder,
   type TopupOrderStatus,
 } from '../models/user-api';
-import { appendUsageRecord, type UsageJobType } from '../models/usage-history';
 import AppNavIcon from './AppNavIcon.vue';
 import AppChatPanel from './AppChatPanel.vue';
+import AppPlaygroundPanel from './AppPlaygroundPanel.vue';
 import CreditsCheckoutModal from './CreditsCheckoutModal.vue';
 import ProfileUsagePanel from './ProfileUsagePanel.vue';
 import ProfileActivityPanel from './ProfileActivityPanel.vue';
@@ -96,11 +96,9 @@ const checkoutOpen = ref(false);
 const checkoutPackage = ref<CreditPackage | null>(null);
 const checkoutToast = ref('');
 let checkoutToastTimer: ReturnType<typeof setTimeout> | null = null;
-const playgroundFrame = ref<HTMLIFrameElement | null>(null);
 const usagePanelRef = ref<InstanceType<typeof ProfileUsagePanel> | null>(null);
 const logsPanelRef = ref<InstanceType<typeof ProfileUsagePanel> | null>(null);
 
-const embedSrc = computed(() => playgroundEmbedUrl(embedQuery.value));
 const playgroundExternalUrl = computed(() => playgroundUrl());
 
 const credits = computed(() => getCredits(me.value));
@@ -325,53 +323,11 @@ async function copySnippet() {
   }
 }
 
-function sendTokenToPlayground() {
-  const iframe = playgroundFrame.value;
-  const origin = playgroundOrigin();
-  const t = getStoredToken();
-  if (!iframe?.contentWindow || !origin || !t) return;
-  iframe.contentWindow.postMessage(
-    { type: 'ai-gateway-token', token: t, domain: getStoredDomain() },
-    origin,
-  );
-}
-
-function onPlaygroundLoad() {
-  sendTokenToPlayground();
-  window.setTimeout(sendTokenToPlayground, 300);
-}
-
 async function loadProfileView() {
   profileSection.value = readProfileSectionFromLocation();
   await refreshProfile();
   await loadTopupOrders();
   await reloadUsagePanels();
-}
-
-function onPlaygroundUsageMessage(event: MessageEvent) {
-  const origin = playgroundOrigin();
-  if (origin && event.origin !== origin) return;
-  const data = event.data;
-  if (!data || data.type !== 'ai-gateway-usage' || !data.record) return;
-  const r = data.record as {
-    jobType?: UsageJobType;
-    model?: string;
-    prompt?: string;
-    status?: 'success' | 'failed' | 'pending';
-    credits?: number | null;
-    jobId?: string;
-    resultUrl?: string;
-  };
-  appendUsageRecord({
-    jobType: r.jobType || 'other',
-    model: r.model || '—',
-    prompt: r.prompt || '',
-    status: r.status || 'success',
-    credits: r.credits ?? null,
-    jobId: r.jobId,
-    resultUrl: r.resultUrl,
-    source: 'playground',
-  });
 }
 
 onMounted(async () => {
@@ -392,11 +348,6 @@ onMounted(async () => {
     await loadProfileView();
   }
   ready.value = true;
-  window.addEventListener('message', onPlaygroundUsageMessage);
-});
-
-onUnmounted(() => {
-  window.removeEventListener('message', onPlaygroundUsageMessage);
 });
 
 watch(
@@ -531,8 +482,8 @@ watch(
           <p v-else class="or-app-subtitle">
             {{
               isVi
-                ? 'Thử jobs, chat, upload — token được đồng bộ từ dashboard.'
-                : 'Try jobs, chat, upload — token syncs from your dashboard session.'
+                ? 'Tạo ảnh/video — catalog từ gateway, job async wait.'
+                : 'Generate image/video — catalog from gateway, async wait jobs.'
             }}
           </p>
         </div>
@@ -544,7 +495,7 @@ watch(
             rel="noreferrer"
             class="or-app-btn or-app-btn-ghost"
           >
-            {{ isVi ? 'Mở tab mới' : 'Open in new tab' }} ↗
+            {{ isVi ? 'API explorer ↗' : 'API explorer ↗' }}
           </a>
           <button
             v-if="view === 'profile'"
@@ -555,9 +506,8 @@ watch(
           >
             {{ isVi ? 'Lưu thay đổi' : 'Save edits' }}
           </button>
-          <span v-if="view !== 'playground'" class="or-app-credits-pill">{{ formatCredits(credits) }} credits</span>
+          <span class="or-app-credits-pill">{{ formatCredits(credits) }} credits</span>
           <button
-            v-if="view !== 'playground'"
             type="button"
             class="or-app-btn or-app-btn-ghost"
             @click="view === 'profile' ? loadProfileView() : refreshProfile()"
@@ -576,12 +526,11 @@ watch(
       <template v-else>
         <!-- Playground embed -->
         <section v-if="view === 'playground'" class="or-app-playground-wrap">
-          <iframe
-            ref="playgroundFrame"
-            :src="embedSrc"
-            class="or-app-playground-frame"
-            title="AI Gateway Playground"
-            @load="onPlaygroundLoad"
+          <AppPlaygroundPanel
+            :credits="credits"
+            :initial-type="embedQuery.type"
+            :initial-model="embedQuery.model"
+            :on-credits-refresh="refreshProfile"
           />
         </section>
 
