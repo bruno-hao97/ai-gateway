@@ -2,14 +2,18 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useData } from 'vitepress';
 import ChatMessageBody from './ChatMessageBody.vue';
+import ChatMessageActionBar from './ChatMessageActionBar.vue';
 import ChatModelPicker from './ChatModelPicker.vue';
 import ChatComposer from './ChatComposer.vue';
+import ChatIcon from './ChatIcon.vue';
+import ChatRoomMenu from './ChatRoomMenu.vue';
 import {
   chatAppPath,
   clearAllChatSessions,
   createChatSession,
   deleteChatSession,
   downloadChatBackup,
+  duplicateChatSession,
   getChatSession,
   groupSessionsByDate,
   importChatBackup,
@@ -18,6 +22,8 @@ import {
   purgeRemoteChatSessions,
   renameChatSession,
   saveChatMessages,
+  togglePinChatSession,
+  backfillChatSessionPreviews,
   titleFromMessage,
   touchChatSession,
   type ChatAttachment,
@@ -50,12 +56,19 @@ import {
   repairStaleModelIds,
   resolveValidModelId,
   writeLastChatModelId,
+  modelRequiresStream,
   type ChatModelOption,
 } from '../models/chat-models';
 import { formatChatError } from '../models/chat-errors';
 import { sliceHistoryForUpstream } from '../models/chat-memory';
 import { readChatSettings, type ChatSettings } from '../models/chat-settings';
-import { fetchMe, formatCredits, getCredits } from '../models/user-api';
+import {
+  fetchMe,
+  formatCredits,
+  getCachedMe,
+  getCredits,
+  resolveChatCostCredits,
+} from '../models/user-api';
 import { appendUsageRecord } from '../models/usage-history';
 
 const LOW_CREDIT_THRESHOLD = 15_000;
@@ -84,6 +97,8 @@ const input = ref('');
 const streaming = ref(false);
 const error = ref('');
 const messagesEnd = ref<HTMLElement | null>(null);
+const messagesScrollRef = ref<HTMLElement | null>(null);
+const showScrollDown = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
 const importInput = ref<HTMLInputElement | null>(null);
 const pendingAttachments = ref<ChatAttachment[]>([]);
@@ -94,6 +109,9 @@ const chatAbort = ref<AbortController | null>(null);
 const editingTitle = ref(false);
 const titleDraft = ref('');
 const titleInputRef = ref<HTMLInputElement | null>(null);
+const editingRoomId = ref('');
+const roomTitleDraft = ref('');
+const roomTitleInputRef = ref<HTMLInputElement | null>(null);
 const searchInputRef = ref<HTMLInputElement | null>(null);
 const sidebarOpen = ref(false);
 const chatSettings = ref<ChatSettings>(readChatSettings());
@@ -145,9 +163,11 @@ function setImageField(field: CatalogJobField, value: string) {
   if (model) writeImageFieldValues(model.slug, imageFieldValues.value);
 }
 
-const activeSession = computed(() =>
-  activeSessionId.value ? getChatSession(activeSessionId.value) : null,
-);
+const activeSession = computed(() => {
+  const id = activeSessionId.value;
+  if (!id) return null;
+  return sessions.value.find((s) => s.id === id) ?? getChatSession(id);
+});
 
 const activeModelId = computed({
   get() {
@@ -167,7 +187,6 @@ const activeModelId = computed({
 });
 
 const activeModel = computed(() => findChatModel(chatModels.value, activeModelId.value));
-const assistantLabel = computed(() => activeModel.value?.label || 'Assistant');
 
 const filteredSessions = computed(() => {
   const q = search.value.trim().toLowerCase();
@@ -194,6 +213,14 @@ async function refreshCreditsBalance() {
   } catch {
     /* ignore */
   }
+}
+
+function readCreditsBalance(): number | null {
+  if (typeof props.credits === 'number') return props.credits;
+  if (localCredits.value != null) return localCredits.value;
+  const cached = getCachedMe();
+  if (cached) return getCredits(cached);
+  return null;
 }
 
 async function ensureImageCatalog() {
@@ -292,10 +319,27 @@ function handleNewChat() {
 }
 
 function handleSelect(sessionId: string) {
+  if (editingRoomId.value && editingRoomId.value !== sessionId) {
+    cancelRenameRoom();
+  }
   navigateToSession(sessionId);
 }
 
 function handleDelete(sessionId: string) {
+  const session = getChatSession(sessionId);
+  if (!session) return;
+  const label = session.title || (isVi.value ? 'phòng chat' : 'chat');
+  const msg = isVi.value
+    ? `Xóa "${label}"? Không thể hoàn tác.`
+    : `Delete "${label}"? This cannot be undone.`;
+  if (!confirm(msg)) return;
+
+  if (editingRoomId.value === sessionId) {
+    cancelRenameRoom();
+  }
+  if (streaming.value && activeSessionId.value === sessionId) {
+    handleStop();
+  }
   deleteChatSession(sessionId);
   refreshSessions();
   if (activeSessionId.value !== sessionId) return;
@@ -308,14 +352,97 @@ function handleDelete(sessionId: string) {
   }
 }
 
+function handlePinRoom(sessionId: string) {
+  togglePinChatSession(sessionId);
+  refreshSessions();
+}
+
+function startRenameRoom(sessionId: string) {
+  if (streaming.value && sessionId === activeSessionId.value) return;
+  const session = getChatSession(sessionId);
+  if (!session) return;
+  editingRoomId.value = sessionId;
+  roomTitleDraft.value = session.title;
+  nextTick(() => {
+    roomTitleInputRef.value?.focus();
+    roomTitleInputRef.value?.select();
+  });
+}
+
+function commitRenameRoom(sessionId: string) {
+  if (editingRoomId.value !== sessionId) return;
+  renameChatSession(sessionId, roomTitleDraft.value);
+  const trimmed = roomTitleDraft.value.trim();
+  editingRoomId.value = '';
+  refreshSessions();
+  if (activeSessionId.value === sessionId) {
+    titleDraft.value = trimmed || getChatSession(sessionId)?.title || 'Chat';
+  }
+}
+
+function cancelRenameRoom() {
+  editingRoomId.value = '';
+}
+
+function onRoomTitleKeydown(e: KeyboardEvent, sessionId: string) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    commitRenameRoom(sessionId);
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    cancelRenameRoom();
+    (e.target as HTMLInputElement).blur();
+  }
+}
+
+function handleDuplicateRoom(sessionId: string) {
+  const copy = duplicateChatSession(sessionId);
+  if (!copy) return;
+  refreshSessions();
+  navigateToSession(copy.id);
+}
+
 function scrollToBottom() {
   nextTick(() => {
     messagesEnd.value?.scrollIntoView({ behavior: 'smooth' });
+    showScrollDown.value = false;
   });
+}
+
+function updateScrollDownState() {
+  const el = messagesScrollRef.value;
+  if (!el) {
+    showScrollDown.value = false;
+    return;
+  }
+  const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+  showScrollDown.value = distance > 120;
+}
+
+function onMessagesScroll() {
+  updateScrollDownState();
+}
+
+function isStreamingMessage(messageId: string): boolean {
+  if (!streaming.value) return false;
+  const last = messages.value[messages.value.length - 1];
+  return last?.id === messageId && last.role === 'assistant';
+}
+
+/** Lock edit/delete/regenerate on the in-flight user+assistant pair while streaming. */
+function messageActionsLocked(messageId: string): boolean {
+  if (!streaming.value) return false;
+  const idx = messages.value.findIndex((m) => m.id === messageId);
+  if (idx < 0) return true;
+  const lastIdx = messages.value.length - 1;
+  const last = messages.value[lastIdx];
+  if (last?.role !== 'assistant') return true;
+  return idx >= lastIdx - 1;
 }
 
 watch(messages, scrollToBottom, { deep: true });
 watch(streaming, scrollToBottom);
+watch(messages, () => nextTick(updateScrollDownState), { deep: true });
 
 function buildUpstreamMessages(history: ChatMessage[]) {
   const sliced = sliceHistoryForUpstream(
@@ -425,8 +552,8 @@ async function runTurn(history: ChatMessage[], userMsg: ChatMessage, assistantId
   const upstreamHistory = buildUpstreamMessages(history);
   const useStream =
     hasAttachments(history) ||
-    model?.chatApiMode === 'stream' ||
-    chatSettings.value.preferStream;
+    chatSettings.value.preferStream ||
+    modelRequiresStream(model);
   const tools =
     useStream && model
       ? {
@@ -439,6 +566,7 @@ async function runTurn(history: ChatMessage[], userMsg: ChatMessage, assistantId
   chatAbort.value = controller;
   streaming.value = true;
   chatErrorHint.value = null;
+  const balanceBefore = readCreditsBalance();
 
   try {
     const result = await sendAgentChat(
@@ -461,12 +589,24 @@ async function runTurn(history: ChatMessage[], userMsg: ChatMessage, assistantId
       },
     );
 
+    const me = await fetchMe().catch(() => null);
+    const balanceAfter = me ? getCredits(me) : null;
+    if (balanceAfter != null) localCredits.value = balanceAfter;
+
+    const costCredits = resolveChatCostCredits({
+      balanceBefore,
+      balanceAfter,
+      usageCredits: result.usage?.credits,
+    });
+
     const meta = {
       latencyMs: result.latencyMs,
       totalTokens: result.usage?.totalTokens,
       promptTokens: result.usage?.promptTokens,
       completionTokens: result.usage?.completionTokens,
       modelLabel: model?.label,
+      costCredits,
+      balanceAfter: balanceAfter ?? undefined,
     };
 
     messages.value = messages.value.map((m) =>
@@ -474,7 +614,6 @@ async function runTurn(history: ChatMessage[], userMsg: ChatMessage, assistantId
     );
     saveChatMessages(sessionId, messages.value);
 
-    await fetchMe().catch(() => undefined);
     await props.onCreditsRefresh?.();
     touchChatSession(sessionId);
     refreshSessions();
@@ -540,6 +679,7 @@ async function runImageTurn(history: ChatMessage[], userMsg: ChatMessage, assist
       modelLabel: result.modelLabel,
       jobType: 'image' as const,
       imageRatio: result.fields.ratio,
+      costCredits: result.credits ?? undefined,
     };
 
     messages.value = messages.value.map((m) =>
@@ -731,7 +871,7 @@ async function commitEditMessage(messageId: string) {
 
 function handleDeleteMessage(messageId: string) {
   const sessionId = activeSessionId.value;
-  if (!sessionId || streaming.value) return;
+  if (!sessionId || messageActionsLocked(messageId)) return;
   const idx = messages.value.findIndex((m) => m.id === messageId);
   if (idx < 0) return;
 
@@ -777,6 +917,10 @@ function onGlobalKeydown(e: KeyboardEvent) {
     }
     if (editingTitle.value) {
       cancelRenameTitle();
+      return;
+    }
+    if (editingRoomId.value) {
+      cancelRenameRoom();
     }
   }
 }
@@ -800,6 +944,11 @@ function startRenameTitle() {
     titleInputRef.value?.focus();
     titleInputRef.value?.select();
   });
+}
+
+function closeActiveTab() {
+  if (!activeSessionId.value || streaming.value) return;
+  handleDelete(activeSessionId.value);
 }
 
 function commitRenameTitle() {
@@ -849,6 +998,7 @@ onMounted(() => {
   }
   if (props.credits == null) void refreshCreditsBalance();
   purgeRemoteChatSessions();
+  backfillChatSessionPreviews();
   void loadChatModelCatalog().finally(() => ensureSession());
   window.addEventListener('popstate', onPopState);
   window.addEventListener('keydown', onGlobalKeydown);
@@ -868,11 +1018,12 @@ onUnmounted(() => {
       @click="sidebarOpen = false"
     />
     <aside class="or-app-chat-sidebar">
-      <div class="or-app-chat-sidebar-head">
+      <div class="or-app-chat-sidebar-bar">
         <h2 class="or-app-chat-sidebar-title">Chat</h2>
+      </div>
+      <div class="or-app-chat-sidebar-head">
         <button type="button" class="or-app-btn or-app-btn-ghost or-app-chat-new" @click="handleNewChat">
           {{ isVi ? '+ Chat mới' : '+ New chat' }}
-          <kbd class="or-chat-kbd">⌘/</kbd>
         </button>
         <input
           ref="searchInputRef"
@@ -897,45 +1048,48 @@ onUnmounted(() => {
                     class="or-app-chat-room"
                     :class="{ active: session.id === activeSessionId }"
                   >
+                    <div
+                      v-if="editingRoomId === session.id"
+                      class="or-app-chat-room-btn or-app-chat-room-btn-edit"
+                    >
+                      <input
+                        ref="roomTitleInputRef"
+                        v-model="roomTitleDraft"
+                        type="text"
+                        class="or-app-chat-room-title-input"
+                        maxlength="80"
+                        :aria-label="isVi ? 'Tên phòng chat' : 'Chat room name'"
+                        @keydown="onRoomTitleKeydown($event, session.id)"
+                        @blur="commitRenameRoom(session.id)"
+                      />
+                    </div>
                     <button
+                      v-else
                       type="button"
                       class="or-app-chat-room-btn"
                       @click="handleSelect(session.id)"
                     >
-                      {{ session.title }}
+                      <span class="or-app-chat-room-title">
+                        <ChatIcon v-if="session.pinned" name="pin" class="or-app-chat-room-pin" />
+                        {{ session.title }}
+                      </span>
+                      <span v-if="session.preview" class="or-app-chat-room-preview">{{ session.preview }}</span>
                     </button>
-                    <button
-                      type="button"
-                      class="or-app-chat-room-delete"
-                      :aria-label="isVi ? 'Xóa' : 'Delete'"
-                      @click="handleDelete(session.id)"
-                    >
-                      ×
-                    </button>
+                    <ChatRoomMenu
+                      :pinned="session.pinned"
+                      :is-vi="isVi"
+                      :disabled="streaming && session.id === activeSessionId"
+                      @pin="handlePinRoom(session.id)"
+                      @rename="startRenameRoom(session.id)"
+                      @duplicate="handleDuplicateRoom(session.id)"
+                      @delete="handleDelete(session.id)"
+                    />
                   </div>
                 </li>
               </ul>
             </template>
           </div>
         </template>
-      </div>
-
-      <div class="or-app-chat-sidebar-actions">
-        <button type="button" class="or-app-btn or-app-btn-ghost or-app-chat-side-btn" @click="handleExportBackup">
-          Export
-        </button>
-        <button type="button" class="or-app-btn or-app-btn-ghost or-app-chat-side-btn" @click="handleImportClick">
-          Import
-        </button>
-        <button
-          type="button"
-          class="or-app-btn or-app-btn-ghost or-app-chat-side-btn or-app-chat-side-btn-danger"
-          :disabled="streaming || filteredSessions.length === 0"
-          @click="handleClearAll"
-        >
-          {{ isVi ? 'Xóa hết' : 'Clear all' }}
-        </button>
-        <input ref="importInput" type="file" accept="application/json,.json" hidden @change="handleImportFile" />
       </div>
       <p v-if="activeModel" class="or-app-chat-sidebar-foot">{{ modelSubtitle(activeModel) }}</p>
     </aside>
@@ -950,90 +1104,133 @@ onUnmounted(() => {
         >
           ☰
         </button>
-        <ChatModelPicker
-          v-model:model-id="activeModelId"
-          :models="chatModels"
-          :disabled="streaming || modelsLoading || chatModels.length === 0"
-          :is-vi="isVi"
-        />
-        <div class="or-app-chat-thread-head">
-          <input
-            v-if="editingTitle"
-            ref="titleInputRef"
-            v-model="titleDraft"
-            type="text"
-            class="or-app-chat-title-input"
-            maxlength="80"
-            @keydown="onTitleKeydown"
-            @blur="commitRenameTitle"
-          />
-          <template v-else>
-            <h3 class="or-app-chat-thread-title">{{ activeSession?.title || 'Chat' }}</h3>
-            <button
-              v-if="activeSessionId"
-              type="button"
-              class="or-app-chat-title-edit"
-              :aria-label="isVi ? 'Chia sẻ link' : 'Share link'"
-              :disabled="streaming"
-              @click="shareChatLink"
-            >
-              ⛓
-            </button>
-            <button
-              v-if="activeSessionId"
-              type="button"
-              class="or-app-chat-title-edit"
-              :aria-label="isVi ? 'Đổi tên' : 'Rename'"
-              :disabled="streaming"
-              @click="startRenameTitle"
-            >
-              ✎
-            </button>
-          </template>
-        </div>
-        <p v-if="copiedToast" class="or-app-chat-toast">{{ copiedToast }}</p>
-      </header>
 
-      <div v-if="showLowCreditBanner" class="or-app-chat-low-credit">
-        <p>
-          {{
-            isVi
-              ? `Còn ${formatCredits(creditsBalance ?? 0)} credits — nạp thêm để tránh gián đoạn khi chat hoặc tạo ảnh.`
-              : `${formatCredits(creditsBalance ?? 0)} credits left — top up to avoid interruptions while chatting or generating images.`
-          }}
-        </p>
-        <div class="or-app-chat-low-credit-actions">
-          <a :href="`${prefix}/app/credits/`" class="or-app-btn or-app-btn-ghost or-app-chat-low-credit-link">
-            {{ isVi ? 'Nạp credits' : 'Top up' }}
-          </a>
-          <button type="button" class="or-app-chat-action" @click="dismissLowCreditBanner">×</button>
-        </div>
-      </div>
-
-      <div v-if="staleModelNotice" class="or-app-alert or-app-chat-notice">{{ staleModelNotice }}</div>
-      <div v-if="error" class="or-app-alert or-app-chat-error">
-        <p>{{ error }}</p>
-        <div v-if="chatErrorHint" class="or-app-chat-error-actions">
+        <div class="or-app-chat-toolbar-start">
           <button
-            v-if="chatErrorHint.suggestModel"
             type="button"
-            class="or-app-btn or-app-btn-ghost or-app-chat-error-btn"
-            @click="switchToDefaultModel"
+            class="or-chat-toolbar-icon"
+            :disabled="streaming"
+            :aria-label="isVi ? 'Chat mới' : 'New chat'"
+            :title="isVi ? 'Chat mới' : 'New chat'"
+            @click="handleNewChat"
           >
-            {{ isVi ? 'Đổi sang Auto Router' : 'Switch to Auto Router' }}
+            <ChatIcon name="plus" />
+          </button>
+          <span class="or-chat-toolbar-divider" aria-hidden="true" />
+
+          <div v-if="editingTitle" class="or-chat-thread-tab or-chat-thread-tab-edit">
+            <input
+              ref="titleInputRef"
+              v-model="titleDraft"
+              type="text"
+              class="or-chat-thread-tab-input"
+              maxlength="80"
+              @keydown="onTitleKeydown"
+              @blur="commitRenameTitle"
+            />
+          </div>
+          <div v-else-if="activeSessionId" class="or-chat-thread-tab is-active">
+            <span
+              class="or-chat-thread-tab-label"
+              :title="activeSession?.title || 'Chat'"
+              @dblclick="startRenameTitle"
+            >
+              {{ activeSession?.title || 'Chat' }}
+            </span>
+            <button
+              type="button"
+              class="or-chat-thread-tab-close"
+              :disabled="streaming"
+              :aria-label="isVi ? 'Đóng phòng' : 'Close chat'"
+              @click="closeActiveTab"
+            >
+              <ChatIcon name="x" />
+            </button>
+          </div>
+        </div>
+
+        <div class="or-app-chat-toolbar-end">
+          <ChatModelPicker
+            v-model:model-id="activeModelId"
+            class="or-chat-model-picker--toolbar"
+            :models="chatModels"
+            :disabled="streaming || modelsLoading || chatModels.length === 0"
+            :is-vi="isVi"
+          />
+          <button
+            v-if="activeSessionId"
+            type="button"
+            class="or-chat-toolbar-icon"
+            :aria-label="isVi ? 'Chia sẻ link' : 'Share link'"
+            :disabled="streaming"
+            @click="shareChatLink"
+          >
+            <ChatIcon name="link" />
+          </button>
+          <button
+            v-if="activeSessionId"
+            type="button"
+            class="or-chat-toolbar-icon"
+            :aria-label="isVi ? 'Đổi tên' : 'Rename'"
+            :disabled="streaming"
+            @click="startRenameTitle"
+          >
+            <ChatIcon name="edit" />
           </button>
         </div>
+      </header>
+
+      <Teleport to="body">
+        <p v-if="copiedToast" class="or-chat-toast-float" role="status">{{ copiedToast }}</p>
+      </Teleport>
+
+      <div v-if="showLowCreditBanner" class="or-app-chat-col">
+        <div class="or-app-chat-low-credit">
+          <p>
+            {{
+              isVi
+                ? `Còn ${formatCredits(creditsBalance ?? 0)} credits — nạp thêm để tránh gián đoạn khi chat hoặc tạo ảnh.`
+                : `${formatCredits(creditsBalance ?? 0)} credits left — top up to avoid interruptions while chatting or generating images.`
+            }}
+          </p>
+          <div class="or-app-chat-low-credit-actions">
+            <a :href="`${prefix}/app/credits/`" class="or-app-btn or-app-btn-ghost or-app-chat-low-credit-link">
+              {{ isVi ? 'Nạp credits' : 'Top up' }}
+            </a>
+            <button type="button" class="or-app-chat-action" @click="dismissLowCreditBanner">×</button>
+          </div>
+        </div>
       </div>
 
-      <div class="or-app-chat-messages">
+      <div v-if="staleModelNotice" class="or-app-chat-col">
+        <div class="or-app-alert or-app-chat-notice">{{ staleModelNotice }}</div>
+      </div>
+      <div v-if="error" class="or-app-chat-col">
+        <div class="or-app-alert or-app-chat-error">
+          <p>{{ error }}</p>
+          <div v-if="chatErrorHint" class="or-app-chat-error-actions">
+            <button
+              v-if="chatErrorHint.suggestModel"
+              type="button"
+              class="or-app-btn or-app-btn-ghost or-app-chat-error-btn"
+              @click="switchToDefaultModel"
+            >
+              {{ isVi ? 'Đổi sang Auto Router' : 'Switch to Auto Router' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div ref="messagesScrollRef" class="or-app-chat-messages" @scroll="onMessagesScroll">
+        <div class="or-app-chat-col or-app-chat-thread">
         <template v-if="messages.length === 0">
           <div class="or-app-chat-welcome">
             <p class="or-app-chat-welcome-title">{{ isVi ? 'Hỏi bất cứ điều gì' : 'Ask anything' }}</p>
             <p class="or-app-chat-welcome-desc">
               {{
                 isVi
-                  ? '⌘/ chat mới · ⌘K tìm phòng · + tạo ảnh · ∞ stream/memory · ⚙ web tools.'
-                  : '⌘/ new chat · ⌘K search rooms · + generate image · ∞ stream/memory · ⚙ web tools.'
+                  ? '+ tạo ảnh · ∞ memory/stream · ⚙ web tools.'
+                  : '+ generate image · ∞ memory/stream · ⚙ web tools.'
               }}
             </p>
           </div>
@@ -1048,18 +1245,20 @@ onUnmounted(() => {
               message.isError ? 'is-error' : '',
             ]"
           >
-            <p v-if="message.role === 'assistant'" class="or-app-chat-msg-label">{{ assistantLabel }}</p>
-            <div class="or-app-chat-bubble">
-              <div v-if="message.attachments?.length" class="or-app-chat-attachments">
-                <img
-                  v-for="(att, i) in message.attachments"
-                  :key="`${message.id}-att-${i}`"
-                  :src="att.url"
-                  :alt="att.name || 'attachment'"
-                  class="or-app-chat-attachment-img"
-                />
-              </div>
-              <div v-if="message.text || (streaming && message.role === 'assistant')" class="or-app-chat-bubble-row">
+            <div class="or-app-chat-msg-body">
+              <div
+                class="or-app-chat-bubble"
+                :class="{ 'has-attachments': (message.attachments?.length ?? 0) > 0 }"
+              >
+                <div v-if="message.attachments?.length" class="or-app-chat-attachments">
+                  <img
+                    v-for="(att, i) in message.attachments"
+                    :key="`${message.id}-att-${i}`"
+                    :src="att.url"
+                    :alt="att.name || 'attachment'"
+                    class="or-app-chat-attachment-img"
+                  />
+                </div>
                 <textarea
                   v-if="editingMessageId === message.id && message.role === 'user'"
                   ref="messageEditRef"
@@ -1070,61 +1269,49 @@ onUnmounted(() => {
                   @blur="commitEditMessage(message.id)"
                 />
                 <ChatMessageBody
-                  v-else
-                  :text="message.text || (streaming ? '…' : '')"
+                  v-else-if="message.text || (streaming && message.role === 'assistant')"
+                  :text="message.text || (streaming ? '' : '')"
                   :markdown="message.role === 'assistant' && !message.isError"
+                  :streaming="isStreamingMessage(message.id)"
+                  :is-vi="isVi"
                 />
-                <div v-if="message.text && editingMessageId !== message.id" class="or-app-chat-msg-actions">
-                  <button
-                    type="button"
-                    class="or-app-chat-action"
-                    :aria-label="isVi ? 'Sao chép' : 'Copy'"
-                    @click="copyMessage(message.text)"
-                  >
-                    ⧉
-                  </button>
-                  <button
-                    v-if="message.role === 'user' && !streaming"
-                    type="button"
-                    class="or-app-chat-action"
-                    :aria-label="isVi ? 'Sửa' : 'Edit'"
-                    @click="startEditMessage(message.id)"
-                  >
-                    ✎
-                  </button>
-                  <button
-                    v-if="!streaming"
-                    type="button"
-                    class="or-app-chat-action"
-                    :aria-label="isVi ? 'Xóa' : 'Delete'"
-                    @click="handleDeleteMessage(message.id)"
-                  >
-                    ×
-                  </button>
-                  <button
-                    v-if="message.role === 'assistant' && !streaming"
-                    type="button"
-                    class="or-app-chat-action"
-                    :aria-label="isVi ? 'Tạo lại' : 'Regenerate'"
-                    @click="handleRegenerate(message.id)"
-                  >
-                    ↻
-                  </button>
-                </div>
               </div>
-              <p
-                v-if="message.role === 'assistant' && message.meta && formatReplyMeta(message.meta, isVi)"
-                class="or-app-chat-msg-meta"
-              >
-                {{ formatReplyMeta(message.meta, isVi) }}
-              </p>
+              <ChatMessageActionBar
+                v-if="message.text && editingMessageId !== message.id"
+                :role="message.role"
+                :actions-locked="messageActionsLocked(message.id)"
+                :is-vi="isVi"
+                :message-meta="message.role === 'assistant' ? message.meta : undefined"
+                :created-at="message.createdAt"
+                :meta-summary="
+                  message.role === 'assistant' && message.meta
+                    ? formatReplyMeta(message.meta, isVi)
+                    : undefined
+                "
+                @copy="copyMessage(message.text)"
+                @edit="startEditMessage(message.id)"
+                @delete="handleDeleteMessage(message.id)"
+                @regenerate="handleRegenerate(message.id)"
+              />
             </div>
           </div>
         </template>
-        <div ref="messagesEnd" />
+          <div ref="messagesEnd" />
+        </div>
       </div>
 
-      <div v-if="imageGenMode" class="or-chat-image-gen-bar">
+      <button
+        v-if="showScrollDown"
+        type="button"
+        class="or-chat-scroll-fab"
+        :aria-label="isVi ? 'Cuộn xuống' : 'Scroll to bottom'"
+        @click="scrollToBottom"
+      >
+        <ChatIcon name="chevron-down" />
+      </button>
+
+      <div v-if="imageGenMode" class="or-app-chat-col">
+        <div class="or-chat-image-gen-bar">
         <label class="or-chat-image-gen-field">
           <span>{{ isVi ? 'Model ảnh' : 'Image model' }}</span>
           <select v-model="imageModelSlug" :disabled="streaming || imageModelsLoading || !imageModels.length">
@@ -1152,15 +1339,19 @@ onUnmounted(() => {
         <span v-if="imageModelsLoading" class="or-chat-image-gen-loading">
           {{ isVi ? 'Đang tải catalog…' : 'Loading catalog…' }}
         </span>
+        </div>
       </div>
 
-      <div v-if="pendingAttachments.length" class="or-app-chat-pending or-app-chat-pending-above">
+      <div v-if="pendingAttachments.length" class="or-app-chat-col">
+        <div class="or-app-chat-pending or-app-chat-pending-above">
         <div v-for="(att, i) in pendingAttachments" :key="`pending-${i}`" class="or-app-chat-pending-item">
           <img :src="att.url" :alt="att.name" class="or-app-chat-pending-img" />
           <button type="button" class="or-app-chat-pending-remove" @click="removePendingAttachment(i)">×</button>
         </div>
+        </div>
       </div>
       <input ref="fileInput" type="file" accept="image/*" hidden @change="handleImageSelected" />
+      <input ref="importInput" type="file" accept="application/json,.json" hidden @change="handleImportFile" />
       <ChatComposer
         v-model:input="input"
         :streaming="streaming"
@@ -1175,6 +1366,7 @@ onUnmounted(() => {
         @cancel-image-gen="handleCancelImageGen"
         @export-backup="handleExportBackup"
         @import-backup="handleImportClick"
+        @clear-all="handleClearAll"
         @settings-change="handleSettingsChange"
       />
     </div>

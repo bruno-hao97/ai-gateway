@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import DefaultTheme from 'vitepress/theme';
 import { useData, useRoute } from 'vitepress';
 import { clearAuth, getStoredToken } from './models/auth-api';
-import { getDocsZone, showDocsSubNav } from './models/docs-nav';
+import { getDocsZone, isChatImmersivePath, showDocsSubNav } from './models/docs-nav';
 
 const { Layout } = DefaultTheme;
 const { lang } = useData();
@@ -15,6 +15,7 @@ const signedIn = ref(false);
 const subNavEl = ref<HTMLElement | null>(null);
 
 const showSubNav = computed(() => showDocsSubNav(route.path));
+const chatImmersive = computed(() => isChatImmersivePath(route.path));
 
 const docsSubNav = computed(() => {
   const p = prefix.value;
@@ -51,6 +52,7 @@ function patchDocsNavActive() {
 function syncSubNavBodyClass() {
   if (typeof document === 'undefined') return;
   document.body.classList.toggle('gw-has-docs-subnav', showSubNav.value);
+  document.body.classList.toggle('gw-chat-immersive', chatImmersive.value);
 }
 
 function placeSubNavAfterNav() {

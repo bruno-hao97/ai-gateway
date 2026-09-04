@@ -204,6 +204,23 @@ export function formatCredits(n: number): string {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(n);
 }
 
+/** Prefer upstream-reported credits; fall back to wallet balance delta. */
+export function resolveChatCostCredits(opts: {
+  balanceBefore?: number | null;
+  balanceAfter?: number | null;
+  usageCredits?: number | null;
+}): number | undefined {
+  if (typeof opts.usageCredits === 'number' && opts.usageCredits > 0) {
+    return opts.usageCredits;
+  }
+  const { balanceBefore, balanceAfter } = opts;
+  if (balanceBefore != null && balanceAfter != null) {
+    const delta = balanceBefore - balanceAfter;
+    if (delta >= 0) return delta;
+  }
+  return undefined;
+}
+
 function normalizeMeResponse(raw: Record<string, unknown>): MeResponse {
   const nested =
     raw.data && typeof raw.data === 'object' && !Array.isArray(raw.data)

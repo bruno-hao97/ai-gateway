@@ -12,6 +12,9 @@ export interface ChatMessageMeta {
   modelLabel?: string;
   jobType?: 'image';
   imageRatio?: string;
+  costCredits?: number;
+  balanceAfter?: number;
+  reasoning?: string;
 }
 
 export interface ChatMessage {
@@ -33,6 +36,10 @@ export interface ChatSession {
   modelId?: string;
   /** Set when merged from Gommo server */
   remote?: boolean;
+  /** Last message snippet for sidebar preview */
+  preview?: string;
+  pinned?: boolean;
+  pinnedAt?: number;
 }
 
 export interface ChatBackup {
@@ -95,7 +102,30 @@ function normalizeSession(raw: unknown): ChatSession | null {
   const updatedAt = typeof s.updatedAt === 'number' ? s.updatedAt : createdAt;
   const modelId = typeof s.modelId === 'string' ? s.modelId.trim() : undefined;
   const remote = s.remote === true;
-  return { id, title, createdAt, updatedAt, modelId: modelId || undefined, remote: remote || undefined };
+  const preview = typeof s.preview === 'string' ? s.preview.trim() : undefined;
+  const pinned = s.pinned === true;
+  const pinnedAt = typeof s.pinnedAt === 'number' ? s.pinnedAt : undefined;
+  return {
+    id,
+    title,
+    createdAt,
+    updatedAt,
+    modelId: modelId || undefined,
+    remote: remote || undefined,
+    preview: preview || undefined,
+    pinned: pinned || undefined,
+    pinnedAt: pinned ? pinnedAt ?? updatedAt : undefined,
+  };
+}
+
+function previewFromMessages(messages: ChatMessage[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (!msg.text.trim() || msg.isError) continue;
+    const line = msg.text.replace(/\s+/g, ' ').trim();
+    return line.length > 56 ? `${line.slice(0, 56)}…` : line;
+  }
+  return '';
 }
 
 function readSessions(): ChatSession[] {
@@ -115,7 +145,15 @@ function writeSessions(sessions: ChatSession[]) {
 }
 
 export function listChatSessions(): ChatSession[] {
-  return readSessions().sort((a, b) => b.updatedAt - a.updatedAt);
+  return readSessions().sort((a, b) => {
+    const aPin = a.pinned ? 1 : 0;
+    const bPin = b.pinned ? 1 : 0;
+    if (aPin !== bPin) return bPin - aPin;
+    if (a.pinned && b.pinned) {
+      return (b.pinnedAt ?? b.updatedAt) - (a.pinnedAt ?? a.updatedAt);
+    }
+    return b.updatedAt - a.updatedAt;
+  });
 }
 
 export function getChatSession(sessionId: string): ChatSession | null {
@@ -154,7 +192,7 @@ export function upsertChatSession(session: ChatSession, messages: ChatMessage[] 
 
 export function touchChatSession(
   sessionId: string,
-  patch?: Partial<Pick<ChatSession, 'title' | 'modelId'>>,
+  patch?: Partial<Pick<ChatSession, 'title' | 'modelId' | 'preview'>>,
 ) {
   const sessions = readSessions();
   const idx = sessions.findIndex((s) => s.id === sessionId);
@@ -186,7 +224,16 @@ export function loadChatMessages(sessionId: string): ChatMessage[] {
 
 export function saveChatMessages(sessionId: string, messages: ChatMessage[]) {
   localStorage.setItem(messagesKey(sessionId), JSON.stringify(messages));
-  touchChatSession(sessionId);
+  const preview = previewFromMessages(messages);
+  touchChatSession(sessionId, preview ? { preview } : undefined);
+}
+
+export function backfillChatSessionPreviews(): void {
+  for (const session of readSessions()) {
+    if (session.preview) continue;
+    const preview = previewFromMessages(loadChatMessages(session.id));
+    if (preview) touchChatSession(session.id, { preview });
+  }
 }
 
 export function titleFromMessage(text: string): string {
@@ -228,6 +275,40 @@ export function renameChatSession(sessionId: string, title: string): void {
   const trimmed = title.trim();
   if (!trimmed || !getChatSession(sessionId)) return;
   touchChatSession(sessionId, { title: trimmed.length > 80 ? `${trimmed.slice(0, 80)}…` : trimmed });
+}
+
+export function togglePinChatSession(sessionId: string): boolean {
+  const sessions = readSessions();
+  const idx = sessions.findIndex((s) => s.id === sessionId);
+  if (idx < 0) return false;
+  const nextPinned = !sessions[idx]!.pinned;
+  sessions[idx] = {
+    ...sessions[idx]!,
+    pinned: nextPinned || undefined,
+    pinnedAt: nextPinned ? Date.now() : undefined,
+  };
+  writeSessions(sessions);
+  return nextPinned;
+}
+
+export function duplicateChatSession(sessionId: string): ChatSession | null {
+  const source = getChatSession(sessionId);
+  if (!source) return null;
+  const messages = loadChatMessages(sessionId);
+  const copy = createChatSession(source.modelId);
+  const title = source.title === 'New chat' ? 'New chat' : `${source.title} (copy)`;
+  touchChatSession(copy.id, {
+    title: title.length > 80 ? `${title.slice(0, 80)}…` : title,
+    preview: source.preview,
+  });
+  const copiedMessages = messages.map((m) => ({
+    ...m,
+    id: crypto.randomUUID(),
+    meta: m.meta ? { ...m.meta } : undefined,
+    attachments: m.attachments ? m.attachments.map((a) => ({ ...a })) : undefined,
+  }));
+  saveChatMessages(copy.id, copiedMessages);
+  return getChatSession(copy.id);
 }
 
 export function clearAllChatSessions(): void {

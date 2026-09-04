@@ -1,6 +1,7 @@
 import { getStoredToken } from './auth-api';
 import { apiBase } from './gateway-base';
 import { gommoClientDeviceFields } from './gommo-device';
+import { sanitizeChatReply, extractUserFacingTail } from './chat-reply-sanitize';
 import type { ChatAttachment } from './chat-storage';
 
 export interface ChatTurnMessage {
@@ -18,12 +19,14 @@ export interface ChatUsageMeta {
   promptTokens?: number;
   completionTokens?: number;
   totalTokens?: number;
+  credits?: number;
 }
 
 export interface ChatReplyResult {
   text: string;
   latencyMs: number;
   usage?: ChatUsageMeta;
+  reasoning?: string;
 }
 
 export interface AgentChatOptions {
@@ -100,16 +103,30 @@ export function extractSseUsage(payload: string): ChatUsageMeta | null {
     const total =
       (typeof usage.total_tokens === 'number' && usage.total_tokens) ||
       (prompt !== undefined && completion !== undefined ? prompt + completion : undefined);
-    if (prompt === undefined && completion === undefined && total === undefined) return null;
-    return { promptTokens: prompt, completionTokens: completion, totalTokens: total };
+    const credits =
+      (typeof usage.credit === 'number' && usage.credit > 0 && usage.credit) ||
+      (typeof usage.credit_fee === 'number' && usage.credit_fee > 0 && usage.credit_fee) ||
+      (typeof usage.credits === 'number' && usage.credits > 0 && usage.credits) ||
+      (typeof usage.credits_used === 'number' && usage.credits_used > 0 && usage.credits_used) ||
+      (typeof parsed.credit === 'number' && parsed.credit > 0 && parsed.credit) ||
+      (typeof parsed.credit_fee === 'number' && parsed.credit_fee > 0 && parsed.credit_fee) ||
+      undefined;
+    if (prompt === undefined && completion === undefined && total === undefined && credits === undefined) {
+      return null;
+    }
+    return { promptTokens: prompt, completionTokens: completion, totalTokens: total, credits };
   } catch {
     return null;
   }
 }
 
-/** Extract text chunk from SSE data line per Gommo spec. */
+/** Extract text / reasoning chunk from SSE data line per Gommo spec. */
 export function extractSseChatChunk(payload: string): string {
-  if (!payload || payload === '[DONE]') return '';
+  return extractSseChatParts(payload).content;
+}
+
+export function extractSseChatParts(payload: string): { content: string; reasoning: string } {
+  if (!payload || payload === '[DONE]') return { content: '', reasoning: '' };
   try {
     const parsed = JSON.parse(payload) as Record<string, unknown>;
     if (parsed.error !== undefined && parsed.error !== 0 && parsed.error !== false) {
@@ -120,20 +137,30 @@ export function extractSseChatChunk(payload: string): string {
     if (Array.isArray(choices) && choices[0] && typeof choices[0] === 'object') {
       const delta = (choices[0] as Record<string, unknown>).delta;
       if (delta && typeof delta === 'object') {
-        const content = (delta as Record<string, unknown>).content;
-        if (typeof content === 'string') return content;
+        const d = delta as Record<string, unknown>;
+        const content = typeof d.content === 'string' ? d.content : '';
+        const reasoning =
+          (typeof d.reasoning_content === 'string' && d.reasoning_content) ||
+          (typeof d.reasoning === 'string' && d.reasoning) ||
+          '';
+        if (content || reasoning) return { content, reasoning };
       }
     }
-    if (typeof parsed.text === 'string') return parsed.text;
-    if (typeof parsed.content === 'string') return parsed.content;
-    if (typeof parsed.reply === 'string') return parsed.reply;
+    if (typeof parsed.text === 'string') return { content: parsed.text, reasoning: '' };
+    if (typeof parsed.content === 'string') return { content: parsed.content, reasoning: '' };
+    if (typeof parsed.reply === 'string') return { content: parsed.reply, reasoning: '' };
     const message = parsed.message;
-    if (typeof message === 'string') return message;
+    if (typeof message === 'string') return { content: message, reasoning: '' };
+    const reasoning =
+      (typeof parsed.reasoning === 'string' && parsed.reasoning) ||
+      (typeof parsed.reasoning_content === 'string' && parsed.reasoning_content) ||
+      '';
+    if (reasoning) return { content: '', reasoning };
   } catch (err) {
     if (err instanceof Error) throw err;
-    if (!payload.startsWith('{')) return payload;
+    if (!payload.startsWith('{')) return { content: payload, reasoning: '' };
   }
-  return '';
+  return { content: '', reasoning: '' };
 }
 
 /** Parse JSON chat response — text | content | reply. */
@@ -161,6 +188,7 @@ export async function consumeChatSseStream(
   onChunk: (text: string) => void,
   signal?: AbortSignal,
   onUsage?: (usage: ChatUsageMeta) => void,
+  onReasoning?: (text: string) => void,
 ): Promise<void> {
   if (!body) throw new Error('No stream body');
   const reader = body.getReader();
@@ -198,8 +226,11 @@ export async function consumeChatSseStream(
           continue;
         }
         eventName = '';
-        const chunk = extractSseChatChunk(payload);
-        if (chunk) onChunk(chunk);
+        const parts = extractSseChatParts(payload);
+        if (parts.reasoning) {
+          onReasoning?.(parts.reasoning);
+        }
+        if (parts.content) onChunk(parts.content);
         else {
           const usage = extractSseUsage(payload);
           if (usage) onUsage?.(usage);
@@ -353,6 +384,7 @@ async function dispatchChat(
   action: 'agent' | 'stream',
   opts: AgentChatOptions,
   onChunk?: (text: string) => void,
+  onReasoning?: (text: string) => void,
 ): Promise<ChatReplyResult> {
   const started = Date.now();
   let usage: ChatUsageMeta | undefined;
@@ -383,7 +415,7 @@ async function dispatchChat(
       res.body,
       (chunk) => {
         reply += chunk;
-        onChunk?.(reply);
+        onChunk?.(sanitizeChatReply(reply).display);
       },
       opts.signal,
       (u) => {
@@ -391,7 +423,15 @@ async function dispatchChat(
       },
     );
     if (!reply.trim()) throw new Error('Empty chat response');
-    return { text: reply, latencyMs: Date.now() - started, usage };
+    const cleaned = sanitizeChatReply(reply);
+    const text = cleaned.display || extractUserFacingTail(reply) || reply;
+    if (!text.trim()) throw new Error('Empty chat response');
+    return {
+      text,
+      latencyMs: Date.now() - started,
+      usage,
+      reasoning: undefined,
+    };
   }
 
   const raw = await res.json().catch(async () => {
@@ -403,23 +443,33 @@ async function dispatchChat(
 
   const reply = extractJsonChatReply(raw);
   if (!reply.trim()) throw new Error('Empty chat response');
-  onChunk?.(reply);
+  const cleaned = sanitizeChatReply(reply);
+  const text = cleaned.display || extractUserFacingTail(reply) || reply;
+  if (!text.trim()) throw new Error('Empty chat response');
+  onChunk?.(text);
 
   if (raw && typeof raw === 'object') {
-    const parsedUsage = extractSseUsage(JSON.stringify((raw as Record<string, unknown>).usage ?? raw));
+    const r = raw as Record<string, unknown>;
+    const parsedUsage = extractSseUsage(JSON.stringify(r.usage ?? raw));
     if (parsedUsage) usage = parsedUsage;
   }
 
-  return { text: reply, latencyMs: Date.now() - started, usage };
+  return {
+    text,
+    latencyMs: Date.now() - started,
+    usage,
+    reasoning: undefined,
+  };
 }
 
 /** Agent text chat: set_model + chat (gateway action=agent). Optional onChunk for SSE. */
 export async function sendAgentChat(
   opts: AgentChatOptions,
   onChunk?: (text: string) => void,
+  onReasoning?: (text: string) => void,
 ): Promise<ChatReplyResult> {
   const action = opts.useStream ? 'stream' : 'agent';
-  return dispatchChat(action, opts, onChunk);
+  return dispatchChat(action, opts, onChunk, onReasoning);
 }
 
 /** Portal chat is local-only — Gommo save_message disabled. */

@@ -1,6 +1,7 @@
 import { getStoredToken } from './auth-api';
 import { apiBase } from './gateway-base';
-import { listChatSessions, touchChatSession } from './chat-storage';
+import { listChatSessions, touchChatSession, type ChatMessageMeta } from './chat-storage';
+import { formatCredits } from './user-api';
 
 export interface ChatModelOption {
   id: string;
@@ -19,6 +20,14 @@ export interface ChatModelOption {
   inputs?: string[];
   webSearch?: boolean;
   webFetch?: boolean;
+}
+
+/** Auto Router + workflow models need SSE — agent JSON often returns empty. */
+export function modelRequiresStream(model?: ChatModelOption | null): boolean {
+  if (!model) return false;
+  if (model.autoRouter) return true;
+  if (model.chatApiMode === 'stream') return true;
+  return model.server === 'cursorai';
 }
 
 const LAST_MODEL_KEY = 'gw_portal_chat_last_model_v1';
@@ -143,11 +152,16 @@ export function modelCapabilityBadges(model: ChatModelOption, isVi: boolean): st
 }
 
 export function formatReplyMeta(
-  meta: { latencyMs?: number; totalTokens?: number } | undefined,
+  meta:
+    | { latencyMs?: number; totalTokens?: number; costCredits?: number }
+    | undefined,
   isVi: boolean,
 ): string {
   if (!meta) return '';
   const parts: string[] = [];
+  if (typeof meta.costCredits === 'number' && meta.costCredits > 0) {
+    parts.push(isVi ? `${formatCredits(meta.costCredits)} cr` : `${formatCredits(meta.costCredits)} cr`);
+  }
   if (typeof meta.totalTokens === 'number' && meta.totalTokens > 0) {
     parts.push(`${meta.totalTokens} tok`);
   }
@@ -156,4 +170,91 @@ export function formatReplyMeta(
     parts.push(sec >= 10 ? `${sec.toFixed(0)}s` : `${sec.toFixed(1)}s`);
   }
   return parts.join(' · ');
+}
+
+export interface MetaDetailRow {
+  label: string;
+  value: string;
+}
+
+function formatDurationSec(latencyMs: number): string {
+  const sec = latencyMs / 1000;
+  return sec >= 10 ? `${sec.toFixed(0)}s` : `${sec.toFixed(1)}s`;
+}
+
+export function buildMessageMetaRows(
+  meta: ChatMessageMeta | undefined,
+  isVi: boolean,
+): MetaDetailRow[] {
+  if (!meta) return [];
+  const rows: MetaDetailRow[] = [];
+
+  if (meta.modelLabel) {
+    rows.push({ label: isVi ? 'Model' : 'Model', value: meta.modelLabel });
+  }
+  if (meta.jobType === 'image') {
+    rows.push({ label: isVi ? 'Loại' : 'Type', value: isVi ? 'Tạo ảnh' : 'Image job' });
+    if (meta.imageRatio) {
+      rows.push({ label: isVi ? 'Tỷ lệ' : 'Ratio', value: meta.imageRatio });
+    }
+  }
+
+  if (typeof meta.promptTokens === 'number' && meta.promptTokens > 0) {
+    rows.push({
+      label: isVi ? 'Input tokens' : 'Input tokens',
+      value: String(meta.promptTokens),
+    });
+  }
+  if (typeof meta.completionTokens === 'number' && meta.completionTokens > 0) {
+    rows.push({
+      label: isVi ? 'Output tokens' : 'Output tokens',
+      value: String(meta.completionTokens),
+    });
+  }
+  if (typeof meta.totalTokens === 'number' && meta.totalTokens > 0) {
+    rows.push({
+      label: isVi ? 'Tổng tokens' : 'Token count',
+      value: `${meta.totalTokens} tokens`,
+    });
+  }
+
+  if (
+    typeof meta.completionTokens === 'number' &&
+    meta.completionTokens > 0 &&
+    typeof meta.latencyMs === 'number' &&
+    meta.latencyMs > 0
+  ) {
+    const tps = meta.completionTokens / (meta.latencyMs / 1000);
+    rows.push({
+      label: isVi ? 'Tokens/giây' : 'Tokens per second',
+      value: `~${tps.toFixed(1)} tok/s`,
+    });
+  }
+
+  if (typeof meta.costCredits === 'number' && meta.costCredits > 0) {
+    rows.push({
+      label: isVi ? 'Đã trừ' : 'Credits charged',
+      value: `${formatCredits(meta.costCredits)} credits`,
+    });
+  }
+
+  if (typeof meta.balanceAfter === 'number' && meta.balanceAfter >= 0) {
+    rows.push({
+      label: isVi ? 'Số dư còn' : 'Balance after',
+      value: `${formatCredits(meta.balanceAfter)} credits`,
+    });
+  }
+
+  if (typeof meta.latencyMs === 'number' && meta.latencyMs > 0) {
+    rows.push({
+      label: isVi ? 'Thời gian' : 'Duration',
+      value: formatDurationSec(meta.latencyMs),
+    });
+  }
+
+  return rows;
+}
+
+export function hasMessageMetaDetails(meta: ChatMessageMeta | undefined): boolean {
+  return buildMessageMetaRows(meta, false).length > 0;
 }

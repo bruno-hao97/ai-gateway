@@ -74,3 +74,9 @@ export function isAppShellPath(path: string): boolean {
   if (p.startsWith('/models')) return true;
   return false;
 }
+
+/** Chat full-height layout below VPNav (nav stays visible). */
+export function isChatImmersivePath(path: string): boolean {
+  const { path: p } = stripLocale(path);
+  return p === '/app/chat' || p.startsWith('/app/chat/');
+}
