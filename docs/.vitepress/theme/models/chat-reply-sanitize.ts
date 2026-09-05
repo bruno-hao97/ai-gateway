@@ -57,6 +57,55 @@ const USER_FACING_TAIL_PATTERNS: RegExp[] = [
   /(Chào bạn![\s\S]*)$/i,
 ];
 
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&quot;/gi, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>');
+}
+
+function looksLikeToolCallJson(block: string): boolean {
+  const t = block.trim();
+  if (!t.startsWith('{') || !t.endsWith('}')) return false;
+  return /capabilityId|models\.read|gommo_action/i.test(t);
+}
+
+/** Remove inline agent tool-call JSON (often HTML-entity encoded) from user-visible replies. */
+export function stripToolCallJson(text: string): string {
+  const decoded = decodeHtmlEntities(text);
+  let out = '';
+  let i = 0;
+  while (i < decoded.length) {
+    if (decoded[i] === '{') {
+      let depth = 0;
+      let j = i;
+      for (; j < decoded.length; j++) {
+        if (decoded[j] === '{') depth++;
+        else if (decoded[j] === '}') {
+          depth--;
+          if (depth === 0) break;
+        }
+      }
+      if (depth === 0 && j < decoded.length) {
+        const block = decoded.slice(i, j + 1);
+        if (looksLikeToolCallJson(block)) {
+          i = j + 1;
+          continue;
+        }
+      }
+    }
+    out += decoded[i];
+    i++;
+  }
+  return out
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
 function normalizeNewlines(text: string): string {
   return text.replace(/\r\n/g, '\n');
 }
@@ -90,10 +139,10 @@ function flattenToLines(text: string): string[] {
 }
 
 export function isAgentMonologueLine(line: string): boolean {
-  const t = line.trim();
+  const t = stripToolCallJson(line).trim();
   if (!t) return true;
   if (INTERNAL_START_PATTERNS.some((rx) => rx.test(t))) return true;
-  if (t.length < 120 && INTERNAL_LINE_PATTERNS.some((rx) => rx.test(t))) return true;
+  if (INTERNAL_LINE_PATTERNS.some((rx) => rx.test(t))) return true;
   return false;
 }
 
@@ -159,7 +208,7 @@ function sanitizeLines(lines: string[]): SanitizedChatReply {
 
 /** Remove agent monologue; keep user-facing lines. Never returns empty if raw has a recoverable tail. */
 export function sanitizeChatReply(text: string): SanitizedChatReply {
-  const raw = text ?? '';
+  const raw = stripToolCallJson(text ?? '');
   if (!raw.trim()) return { display: '', thoughts: '' };
 
   const tail = extractUserFacingTail(raw);

@@ -11,39 +11,39 @@ import {
   type MediaJobResult,
 } from './media-job';
 
-export type ImageJobResult = MediaJobResult;
+export type VideoJobResult = MediaJobResult;
 
-const IMAGE_MODEL_KEY = 'gw_portal_chat_image_model_v1';
+const VIDEO_MODEL_KEY = 'gw_portal_chat_video_model_v1';
 
-export function readLastImageModelSlug(): string {
+export function readLastVideoModelSlug(): string {
   const legacy = (() => {
     try {
-      return localStorage.getItem(IMAGE_MODEL_KEY)?.trim() || '';
+      return localStorage.getItem(VIDEO_MODEL_KEY)?.trim() || '';
     } catch {
       return '';
     }
   })();
-  return legacy || readLastMediaModelSlug('image');
+  return legacy || readLastMediaModelSlug('video');
 }
 
-export function writeLastImageModelSlug(slug: string) {
+export function writeLastVideoModelSlug(slug: string) {
   try {
-    localStorage.setItem(IMAGE_MODEL_KEY, slug.trim());
+    localStorage.setItem(VIDEO_MODEL_KEY, slug.trim());
   } catch {
     /* ignore */
   }
-  writeLastMediaModelSlug('image', slug);
+  writeLastMediaModelSlug('video', slug);
 }
 
-export function resolveImageModel(models: CatalogModel[], slug?: string): CatalogModel | null {
+export function resolveVideoModel(models: CatalogModel[], slug?: string): CatalogModel | null {
   return resolveMediaModel(models, slug);
 }
 
-export async function fetchImageCatalogModels(): Promise<CatalogModel[]> {
-  return filterModelsForPlaygroundTab(await fetchMediaCatalogModels('image'), 'image');
+export async function fetchVideoCatalogModels(): Promise<CatalogModel[]> {
+  return filterModelsForPlaygroundTab(await fetchMediaCatalogModels('video'), 'video');
 }
 
-export async function createImageJobWait(
+export async function createVideoJobWait(
   model: CatalogModel,
   prompt: string,
   fieldValues: CatalogJobFieldValues,

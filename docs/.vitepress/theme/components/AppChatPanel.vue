@@ -30,13 +30,19 @@ import {
   type ChatMessage,
   type ChatSession,
 } from '../models/chat-storage';
-import { sendAgentChat, uploadChatImage } from '../models/chat-api';
+import { sendAgentChat, uploadChatImage, uploadChatVideo, isVideoUploadFile, isImageUploadFile } from '../models/chat-api';
 import {
   createImageJobWait,
   fetchImageCatalogModels,
   readLastImageModelSlug,
   resolveImageModel,
 } from '../models/chat-image-job';
+import {
+  createVideoJobWait,
+  fetchVideoCatalogModels,
+  readLastVideoModelSlug,
+  resolveVideoModel,
+} from '../models/chat-video-job';
 import type { CatalogModel } from '../models/catalog-api';
 import { modelCatalogUnavailable, modelUnavailableSuffix } from '../models/catalog-api';
 import {
@@ -72,6 +78,8 @@ import {
   resolveChatCostCredits,
 } from '../models/user-api';
 import { appendUsageRecord } from '../models/usage-history';
+import { modelAcceptsJobRefType } from '../models/media-job';
+import { attachmentBadgeLabel } from '../models/chat-attachment-label';
 
 const LOW_CREDIT_THRESHOLD = 15_000;
 const LOW_CREDIT_DISMISS_KEY = 'gw_portal_chat_low_credit_dismiss_v1';
@@ -102,8 +110,18 @@ const messagesEnd = ref<HTMLElement | null>(null);
 const messagesScrollRef = ref<HTMLElement | null>(null);
 const showScrollDown = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
+const videoFileInput = ref<HTMLInputElement | null>(null);
+const jobImageFileInput = ref<HTMLInputElement | null>(null);
+const jobVideoFileInput = ref<HTMLInputElement | null>(null);
 const importInput = ref<HTMLInputElement | null>(null);
 const pendingAttachments = ref<ChatAttachment[]>([]);
+const jobRefs = ref<ChatAttachment[]>([]);
+const uploadingAttachments = ref(false);
+const uploadingJobRefs = ref(false);
+
+const MAX_PENDING_ATTACHMENTS = 10;
+const MAX_JOB_IMAGE_REFS = 4;
+const MAX_JOB_VIDEO_REFS = 1;
 const chatModels = ref<ChatModelOption[]>([]);
 const defaultModelId = ref('auto-router');
 const modelsLoading = ref(true);
@@ -130,6 +148,11 @@ const imageModels = ref<CatalogModel[]>([]);
 const imageModelsLoading = ref(false);
 const imageModelSlug = ref('');
 const imageFieldValues = ref<CatalogJobFieldValues>({});
+const videoGenMode = ref(false);
+const videoModels = ref<CatalogModel[]>([]);
+const videoModelsLoading = ref(false);
+const videoModelSlug = ref('');
+const videoFieldValues = ref<CatalogJobFieldValues>({});
 const lowCreditDismissed = ref(false);
 const localCredits = ref<number | null>(null);
 
@@ -147,8 +170,33 @@ const showLowCreditBanner = computed(() => {
 });
 
 const activeImageModel = computed(() => resolveImageModel(imageModels.value, imageModelSlug.value));
+const activeVideoModel = computed(() => resolveVideoModel(videoModels.value, videoModelSlug.value));
 
 const imageFieldDefs = computed(() => catalogJobFieldDefs(activeImageModel.value));
+const videoFieldDefs = computed(() => catalogJobFieldDefs(activeVideoModel.value));
+
+const imageGenAllowsImageRef = computed(() => modelAcceptsJobRefType(activeImageModel.value, 'image'));
+const videoGenAllowsImageRef = computed(() => modelAcceptsJobRefType(activeVideoModel.value, 'image'));
+const videoGenAllowsVideoRef = computed(() => modelAcceptsJobRefType(activeVideoModel.value, 'video'));
+
+const activeGenAllowsImageRef = computed(() =>
+  imageGenMode.value
+    ? imageGenAllowsImageRef.value
+    : videoGenMode.value
+      ? videoGenAllowsImageRef.value
+      : false,
+);
+const activeGenAllowsVideoRef = computed(() => videoGenMode.value && videoGenAllowsVideoRef.value);
+
+function activeJobTarget(): 'image' | 'video' | null {
+  if (imageGenMode.value) return 'image';
+  if (videoGenMode.value) return 'video';
+  return null;
+}
+
+function toMediaJobRefs(refs: ChatAttachment[]) {
+  return refs.map((r) => ({ type: r.type, url: r.url }));
+}
 
 function syncImageFieldValues(model?: CatalogModel | null) {
   const m = model ?? activeImageModel.value;
@@ -163,6 +211,21 @@ function setImageField(field: CatalogJobField, value: string) {
   imageFieldValues.value = { ...imageFieldValues.value, [field]: value };
   const model = activeImageModel.value;
   if (model) writeImageFieldValues(model.slug, imageFieldValues.value);
+}
+
+function syncVideoFieldValues(model?: CatalogModel | null) {
+  const m = model ?? activeVideoModel.value;
+  if (!m) {
+    videoFieldValues.value = {};
+    return;
+  }
+  videoFieldValues.value = resolveImageFieldValues(m, videoFieldValues.value);
+}
+
+function setVideoField(field: CatalogJobField, value: string) {
+  videoFieldValues.value = { ...videoFieldValues.value, [field]: value };
+  const model = activeVideoModel.value;
+  if (model) writeImageFieldValues(model.slug, videoFieldValues.value);
 }
 
 const activeSession = computed(() => {
@@ -251,22 +314,68 @@ async function ensureImageCatalog() {
   }
 }
 
+async function ensureVideoCatalog() {
+  if (videoModels.value.length) return;
+  videoModelsLoading.value = true;
+  try {
+    videoModels.value = await fetchVideoCatalogModels();
+    const hint = readLastVideoModelSlug();
+    const preferred =
+      hint && videoModels.value.some((m) => m.slug === hint && !modelCatalogUnavailable(m))
+        ? hint
+        : videoModels.value.find((m) => !modelCatalogUnavailable(m))?.slug || hint;
+    const model = resolveVideoModel(videoModels.value, preferred);
+    if (!model) {
+      throw new Error(
+        isVi.value ? 'Không có model video trong catalog.' : 'No video models in catalog.',
+      );
+    }
+    videoModelSlug.value = model.slug;
+    syncVideoFieldValues(model);
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Could not load video models';
+    videoGenMode.value = false;
+  } finally {
+    videoModelsLoading.value = false;
+  }
+}
+
 async function handleEnableImageGen() {
   error.value = '';
+  videoGenMode.value = false;
+  jobRefs.value = jobRefs.value.filter((r) => r.jobTarget === 'image');
   imageGenMode.value = true;
-  pendingAttachments.value = [];
   await ensureImageCatalog();
 }
 
 function handleCancelImageGen() {
   imageGenMode.value = false;
+  jobRefs.value = jobRefs.value.filter((r) => r.jobTarget !== 'image');
+}
+
+async function handleEnableVideoGen() {
+  error.value = '';
+  imageGenMode.value = false;
+  jobRefs.value = jobRefs.value.filter((r) => r.jobTarget === 'video');
+  videoGenMode.value = true;
+  await ensureVideoCatalog();
+}
+
+function handleCancelVideoGen() {
+  videoGenMode.value = false;
+  jobRefs.value = jobRefs.value.filter((r) => r.jobTarget !== 'video');
 }
 
 function onImageModelChange() {
   syncImageFieldValues();
 }
 
+function onVideoModelChange() {
+  syncVideoFieldValues();
+}
+
 watch(imageModelSlug, onImageModelChange);
+watch(videoModelSlug, onVideoModelChange);
 
 function readSessionFromLocation(): string {
   if (typeof window === 'undefined') return '';
@@ -460,7 +569,7 @@ function buildUpstreamMessages(history: ChatMessage[]) {
   return sliced.map((m) => ({
     role: m.role === 'assistant' ? ('model' as const) : ('user' as const),
     text: m.text,
-    attachments: (m.attachments ?? []) as unknown[],
+    attachments: (m.attachments ?? []).filter((a) => a.purpose !== 'job') as unknown[],
   }));
 }
 
@@ -530,27 +639,286 @@ async function handleImportFile(e: Event) {
 }
 
 function openImagePicker() {
+  if (uploadingAttachments.value || uploadingJobRefs.value || streaming.value) return;
+  if (imageGenMode.value || videoGenMode.value) {
+    imageGenMode.value = false;
+    videoGenMode.value = false;
+    jobRefs.value = [];
+  }
   fileInput.value?.click();
+}
+
+function openVideoPicker() {
+  if (uploadingAttachments.value || uploadingJobRefs.value || streaming.value) return;
+  if (imageGenMode.value || videoGenMode.value) {
+    imageGenMode.value = false;
+    videoGenMode.value = false;
+    jobRefs.value = [];
+  }
+  videoFileInput.value?.click();
+}
+
+function openJobImageRefPicker() {
+  if (uploadingJobRefs.value || uploadingAttachments.value || streaming.value) return;
+  jobImageFileInput.value?.click();
+}
+
+function openJobVideoRefPicker() {
+  if (uploadingJobRefs.value || uploadingAttachments.value || streaming.value) return;
+  jobVideoFileInput.value?.click();
 }
 
 async function handleImageSelected(e: Event) {
   const inputEl = e.target as HTMLInputElement;
-  const file = inputEl.files?.[0];
+  const picked = [...(inputEl.files ?? [])];
+  const files = picked.filter(isImageUploadFile);
   inputEl.value = '';
-  if (!file || !file.type.startsWith('image/')) return;
+  if (!picked.length) return;
+  if (!files.length) {
+    error.value = isVi.value
+      ? 'Không nhận diện được file ảnh. Thử .jpg, .png hoặc .webp.'
+      : 'Unrecognized image file. Try .jpg, .png, or .webp.';
+    return;
+  }
+
+  const slotsLeft = MAX_PENDING_ATTACHMENTS - pendingAttachments.value.length;
+  if (slotsLeft <= 0) {
+    error.value = isVi.value
+      ? `Tối đa ${MAX_PENDING_ATTACHMENTS} ảnh đính kèm.`
+      : `Maximum ${MAX_PENDING_ATTACHMENTS} attached images.`;
+    return;
+  }
+
+  const batch = files.slice(0, slotsLeft);
+  uploadingAttachments.value = true;
+  error.value = '';
+
   try {
-    const url = await uploadChatImage(file);
-    pendingAttachments.value = [
-      ...pendingAttachments.value,
-      { type: 'image', url, name: file.name },
-    ];
+    const results = await Promise.allSettled(
+      batch.map(async (file) => {
+        const url = await uploadChatImage(file);
+        return { type: 'image' as const, purpose: 'chat' as const, url, name: file.name };
+      }),
+    );
+
+    const added: ChatAttachment[] = [];
+    let failed = 0;
+    let firstError = '';
+    for (const result of results) {
+      if (result.status === 'fulfilled') added.push(result.value);
+      else {
+        failed += 1;
+        if (!firstError && result.reason instanceof Error) firstError = result.reason.message;
+      }
+    }
+
+    if (added.length) {
+      pendingAttachments.value = [...pendingAttachments.value, ...added];
+    }
+
+    const skipped = files.length - batch.length;
+    const parts: string[] = [];
+    if (failed) {
+      parts.push(isVi.value ? `${failed} ảnh upload thất bại` : `${failed} image(s) failed to upload`);
+      if (firstError) parts.push(firstError);
+    }
+    if (skipped) {
+      parts.push(
+        isVi.value
+          ? `chỉ thêm được ${slotsLeft} ảnh (giới hạn ${MAX_PENDING_ATTACHMENTS})`
+          : `only ${slotsLeft} added (limit ${MAX_PENDING_ATTACHMENTS})`,
+      );
+    }
+    if (parts.length) error.value = parts.join(' · ');
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Upload failed';
+  } finally {
+    uploadingAttachments.value = false;
   }
 }
 
 function removePendingAttachment(index: number) {
   pendingAttachments.value = pendingAttachments.value.filter((_, i) => i !== index);
+}
+
+function removeJobRef(index: number) {
+  const target = activeJobTarget();
+  const visible = target
+    ? jobRefs.value.filter((r) => r.jobTarget === target)
+    : jobRefs.value;
+  const ref = visible[index];
+  if (!ref) return;
+  jobRefs.value = jobRefs.value.filter((r) => r.url !== ref.url || r.jobTarget !== ref.jobTarget);
+}
+
+async function uploadJobRefs(
+  files: File[],
+  type: 'image' | 'video',
+  maxCount: number,
+  uploadFn: (file: File) => Promise<string>,
+) {
+  const existing = jobRefs.value.filter((r) => r.type === type).length;
+  const slotsLeft = maxCount - existing;
+  if (slotsLeft <= 0) {
+    error.value = isVi.value
+      ? `Tối đa ${maxCount} ref ${type === 'image' ? 'ảnh' : 'video'} cho job.`
+      : `Maximum ${maxCount} ${type} ref(s) for job.`;
+    return;
+  }
+
+  const batch = files.slice(0, slotsLeft);
+  const jobTarget = activeJobTarget();
+  if (!jobTarget) return;
+
+  uploadingJobRefs.value = true;
+  error.value = '';
+
+  try {
+    const results = await Promise.allSettled(
+      batch.map(async (file) => {
+        const url = await uploadFn(file);
+        return {
+          type,
+          purpose: 'job' as const,
+          jobTarget,
+          url,
+          name: file.name,
+        };
+      }),
+    );
+
+    const added: ChatAttachment[] = [];
+    let failed = 0;
+    let firstError = '';
+    for (const result of results) {
+      if (result.status === 'fulfilled') added.push(result.value);
+      else {
+        failed += 1;
+        if (!firstError && result.reason instanceof Error) firstError = result.reason.message;
+      }
+    }
+
+    if (added.length) jobRefs.value = [...jobRefs.value, ...added];
+
+    const parts: string[] = [];
+    if (failed) {
+      parts.push(isVi.value ? `${failed} ref upload thất bại` : `${failed} ref(s) failed to upload`);
+      if (firstError) parts.push(firstError);
+    }
+    if (parts.length) error.value = parts.join(' · ');
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Upload failed';
+  } finally {
+    uploadingJobRefs.value = false;
+  }
+}
+
+async function handleJobImageRefSelected(e: Event) {
+  const inputEl = e.target as HTMLInputElement;
+  const picked = [...(inputEl.files ?? [])];
+  const files = picked.filter(isImageUploadFile);
+  inputEl.value = '';
+  if (!picked.length) return;
+  if (!files.length) {
+    error.value = isVi.value
+      ? 'Không nhận diện được file ảnh ref.'
+      : 'Unrecognized image ref file.';
+    return;
+  }
+  await uploadJobRefs(files, 'image', MAX_JOB_IMAGE_REFS, uploadChatImage);
+}
+
+async function handleJobVideoRefSelected(e: Event) {
+  const inputEl = e.target as HTMLInputElement;
+  const picked = [...(inputEl.files ?? [])];
+  const files = picked.filter(isVideoUploadFile);
+  inputEl.value = '';
+  if (!picked.length) return;
+  if (!files.length) {
+    error.value = isVi.value
+      ? 'Không nhận diện được file video ref.'
+      : 'Unrecognized video ref file.';
+    return;
+  }
+  await uploadJobRefs(files, 'video', MAX_JOB_VIDEO_REFS, uploadChatVideo);
+}
+
+function attachmentTitle(count: number, type: ChatAttachment['type']): string {
+  if (type === 'video') {
+    return isVi.value
+      ? `${count} video`
+      : `${count} video${count > 1 ? 's' : ''}`;
+  }
+  return isVi.value ? `${count} ảnh` : `${count} image${count > 1 ? 's' : ''}`;
+}
+
+async function handleVideoSelected(e: Event) {
+  const inputEl = e.target as HTMLInputElement;
+  const picked = [...(inputEl.files ?? [])];
+  const files = picked.filter(isVideoUploadFile);
+  inputEl.value = '';
+  if (!picked.length) return;
+  if (!files.length) {
+    error.value = isVi.value
+      ? 'Không nhận diện được file video. Thử .mp4 hoặc .webm.'
+      : 'Unrecognized video file. Try .mp4 or .webm.';
+    return;
+  }
+
+  const slotsLeft = MAX_PENDING_ATTACHMENTS - pendingAttachments.value.length;
+  if (slotsLeft <= 0) {
+    error.value = isVi.value
+      ? `Tối đa ${MAX_PENDING_ATTACHMENTS} video đính kèm.`
+      : `Maximum ${MAX_PENDING_ATTACHMENTS} attached videos.`;
+    return;
+  }
+
+  const batch = files.slice(0, slotsLeft);
+  uploadingAttachments.value = true;
+  error.value = '';
+
+  try {
+    const results = await Promise.allSettled(
+      batch.map(async (file) => {
+        const url = await uploadChatVideo(file);
+        return { type: 'video' as const, purpose: 'chat' as const, url, name: file.name };
+      }),
+    );
+
+    const added: ChatAttachment[] = [];
+    let failed = 0;
+    let firstError = '';
+    for (const result of results) {
+      if (result.status === 'fulfilled') added.push(result.value);
+      else {
+        failed += 1;
+        if (!firstError && result.reason instanceof Error) firstError = result.reason.message;
+      }
+    }
+
+    if (added.length) {
+      pendingAttachments.value = [...pendingAttachments.value, ...added];
+    }
+
+    const skipped = files.length - batch.length;
+    const parts: string[] = [];
+    if (failed) {
+      parts.push(isVi.value ? `${failed} video upload thất bại` : `${failed} video(s) failed to upload`);
+      if (firstError) parts.push(firstError);
+    }
+    if (skipped) {
+      parts.push(
+        isVi.value
+          ? `chỉ thêm được ${slotsLeft} video (giới hạn ${MAX_PENDING_ATTACHMENTS})`
+          : `only ${slotsLeft} added (limit ${MAX_PENDING_ATTACHMENTS})`,
+      );
+    }
+    if (parts.length) error.value = parts.join(' · ');
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Upload failed';
+  } finally {
+    uploadingAttachments.value = false;
+  }
 }
 
 async function runTurn(history: ChatMessage[], userMsg: ChatMessage, assistantId: string) {
@@ -649,6 +1017,9 @@ function handleStop() {
 async function runImageTurn(history: ChatMessage[], userMsg: ChatMessage, assistantId: string) {
   const sessionId = activeSessionId.value;
   const model = activeImageModel.value;
+  const jobRefAttachments = (userMsg.attachments ?? []).filter(
+    (a) => a.purpose === 'job' && a.jobTarget === 'image',
+  );
   if (!sessionId || !model) {
     error.value = isVi.value ? 'Chọn model image.' : 'Pick an image model.';
     return;
@@ -694,7 +1065,13 @@ async function runImageTurn(history: ChatMessage[], userMsg: ChatMessage, assist
   );
 
   try {
-    const result = await createImageJobWait(model, userMsg.text, fieldValues, controller.signal);
+    const result = await createImageJobWait(
+      model,
+      userMsg.text,
+      fieldValues,
+      controller.signal,
+      toMediaJobRefs(jobRefAttachments),
+    );
     const fieldSummary = formatImageJobFieldSummary(result.fields);
     const caption = isVi.value
       ? `Ảnh từ **${result.modelLabel}**${fieldSummary ? ` · ${fieldSummary}` : ''}`
@@ -728,7 +1105,7 @@ async function runImageTurn(history: ChatMessage[], userMsg: ChatMessage, assist
       credits: result.credits ?? null,
       jobId: result.jobId,
       resultUrl: result.resultUrl,
-      source: 'playground',
+      source: 'chat',
     });
 
     await refreshCreditsBalance();
@@ -755,7 +1132,134 @@ async function runImageTurn(history: ChatMessage[], userMsg: ChatMessage, assist
       prompt: userMsg.text,
       status: 'failed',
       credits: model.credits ?? null,
-      source: 'playground',
+      source: 'chat',
+    });
+  } finally {
+    stopProgress();
+    chatAbort.value = null;
+    streaming.value = false;
+  }
+}
+
+async function runVideoTurn(history: ChatMessage[], userMsg: ChatMessage, assistantId: string) {
+  const sessionId = activeSessionId.value;
+  const model = activeVideoModel.value;
+  const jobRefAttachments = (userMsg.attachments ?? []).filter(
+    (a) => a.purpose === 'job' && a.jobTarget === 'video',
+  );
+  if (!sessionId || !model) {
+    error.value = isVi.value ? 'Chọn model video.' : 'Pick a video model.';
+    return;
+  }
+
+  if (modelCatalogUnavailable(model)) {
+    const msg = isVi.value
+      ? 'Model video đang tạm ngưng trên upstream. Chọn model khác.'
+      : 'Video model temporarily unavailable upstream. Pick another model.';
+    error.value = msg;
+    chatErrorHint.value = { message: msg, suggestModel: true, suggestRetry: false };
+    messages.value = messages.value.map((m) =>
+      m.id === assistantId ? { ...m, text: msg, isError: true } : m,
+    );
+    saveChatMessages(sessionId, messages.value);
+    return;
+  }
+
+  const fieldValues = { ...videoFieldValues.value };
+  const validationError = validateCatalogJobFields(model, fieldValues, isVi.value);
+  if (validationError) {
+    error.value = validationError;
+    messages.value = messages.value.map((m) =>
+      m.id === assistantId ? { ...m, text: validationError, isError: true } : m,
+    );
+    saveChatMessages(sessionId, messages.value);
+    return;
+  }
+
+  const controller = new AbortController();
+  chatAbort.value = controller;
+  streaming.value = true;
+  chatErrorHint.value = null;
+
+  let stopProgress = startMediaJobProgressTimer(
+    (label) => {
+      messages.value = messages.value.map((m) =>
+        m.id === assistantId ? { ...m, text: label, isError: false } : m,
+      );
+    },
+    'video',
+    isVi.value,
+  );
+
+  try {
+    const result = await createVideoJobWait(
+      model,
+      userMsg.text,
+      fieldValues,
+      controller.signal,
+      toMediaJobRefs(jobRefAttachments),
+    );
+    const fieldSummary = formatImageJobFieldSummary(result.fields);
+    const caption = isVi.value
+      ? `Video từ **${result.modelLabel}**${fieldSummary ? ` · ${fieldSummary}` : ''}`
+      : `Video from **${result.modelLabel}**${fieldSummary ? ` · ${fieldSummary}` : ''}`;
+    const meta = {
+      latencyMs: result.latencyMs,
+      modelLabel: result.modelLabel,
+      jobType: 'video' as const,
+      videoDuration: result.fields.duration,
+      costCredits: result.credits ?? undefined,
+    };
+
+    messages.value = messages.value.map((m) =>
+      m.id === assistantId
+        ? {
+            ...m,
+            text: caption,
+            attachments: [{ type: 'video' as const, url: result.resultUrl, name: result.modelLabel }],
+            meta,
+            isError: false,
+          }
+        : m,
+    );
+    saveChatMessages(sessionId, messages.value);
+
+    appendUsageRecord({
+      jobType: 'video',
+      model: result.modelSlug,
+      prompt: userMsg.text,
+      status: 'success',
+      credits: result.credits ?? null,
+      jobId: result.jobId,
+      resultUrl: result.resultUrl,
+      source: 'chat',
+    });
+
+    await refreshCreditsBalance();
+    await props.onCreditsRefresh?.();
+    touchChatSession(sessionId);
+    refreshSessions();
+    videoGenMode.value = false;
+  } catch (err) {
+    if (controller.signal.aborted) {
+      saveChatMessages(sessionId, messages.value);
+      return;
+    }
+    const formatted = formatChatError(err, isVi.value);
+    chatErrorHint.value = formatted;
+    error.value = formatted.message;
+    messages.value = messages.value.map((m) =>
+      m.id === assistantId ? { ...m, text: formatted.message, isError: true } : m,
+    );
+    saveChatMessages(sessionId, messages.value);
+
+    appendUsageRecord({
+      jobType: 'video',
+      model: model.slug,
+      prompt: userMsg.text,
+      status: 'failed',
+      credits: model.credits ?? null,
+      source: 'chat',
     });
   } finally {
     stopProgress();
@@ -767,19 +1271,31 @@ async function runImageTurn(history: ChatMessage[], userMsg: ChatMessage, assist
 async function handleSend() {
   const text = input.value.trim();
   const sessionId = activeSessionId.value;
-  if ((!text && pendingAttachments.value.length === 0) || !sessionId || streaming.value) return;
-  if (imageGenMode.value && !text) return;
+  const target = activeJobTarget();
+  const refsForJob = target ? jobRefs.value.filter((r) => r.jobTarget === target) : [];
+  if (!sessionId || streaming.value) return;
+  if (target) {
+    if (!text) return;
+  } else if (!text && pendingAttachments.value.length === 0) {
+    return;
+  }
 
   error.value = '';
   chatErrorHint.value = null;
-  const attachments = imageGenMode.value ? [] : [...pendingAttachments.value];
-  pendingAttachments.value = [];
+  const attachments = target
+    ? refsForJob.map((r) => ({ ...r, purpose: 'job' as const, jobTarget: target }))
+    : pendingAttachments.value.map((r) => ({ ...r, purpose: r.purpose ?? ('chat' as const) }));
+  if (target) {
+    jobRefs.value = jobRefs.value.filter((r) => r.jobTarget !== target);
+  } else {
+    pendingAttachments.value = [];
+  }
   input.value = '';
 
   const userMsg: ChatMessage = {
     id: crypto.randomUUID(),
     role: 'user',
-    text: text || (isVi.value ? '(ảnh đính kèm)' : '(image attached)'),
+    text,
     createdAt: Date.now(),
     attachments: attachments.length ? attachments : undefined,
   };
@@ -788,7 +1304,12 @@ async function handleSend() {
   saveChatMessages(sessionId, history);
   const session = getChatSession(sessionId);
   if (!session || session.title === 'New chat') {
-    touchChatSession(sessionId, { title: titleFromMessage(userMsg.text) });
+    const title = text.trim()
+      ? titleFromMessage(text)
+      : attachments.length
+        ? attachmentTitle(attachments.length, attachments[0]?.type ?? 'image')
+        : 'New chat';
+    touchChatSession(sessionId, { title });
   } else {
     touchChatSession(sessionId);
   }
@@ -803,6 +1324,11 @@ async function handleSend() {
 
   if (imageGenMode.value) {
     await runImageTurn(history, userMsg, assistantId);
+    return;
+  }
+
+  if (videoGenMode.value) {
+    await runVideoTurn(history, userMsg, assistantId);
     return;
   }
 
@@ -1296,13 +1822,33 @@ onUnmounted(() => {
                 :class="{ 'has-attachments': (message.attachments?.length ?? 0) > 0 }"
               >
                 <div v-if="message.attachments?.length" class="or-app-chat-attachments">
-                  <img
+                  <div
                     v-for="(att, i) in message.attachments"
                     :key="`${message.id}-att-${i}`"
-                    :src="att.url"
-                    :alt="att.name || 'attachment'"
-                    class="or-app-chat-attachment-img"
-                  />
+                    class="or-app-chat-attachment-item"
+                  >
+                    <span
+                      v-if="message.role === 'user'"
+                      class="or-attach-badge"
+                      :class="att.purpose === 'job' ? 'is-job' : 'is-chat'"
+                    >
+                      {{ attachmentBadgeLabel(att, isVi) }}
+                    </span>
+                    <img
+                      v-if="att.type === 'image' || !att.type"
+                      :src="att.url"
+                      :alt="att.name || 'attachment'"
+                      class="or-app-chat-attachment-img"
+                    />
+                    <video
+                      v-else
+                      :src="att.url"
+                      class="or-app-chat-attachment-video"
+                      controls
+                      playsinline
+                      preload="metadata"
+                    />
+                  </div>
                 </div>
                 <textarea
                   v-if="editingMessageId === message.id && message.role === 'user'"
@@ -1322,7 +1868,7 @@ onUnmounted(() => {
                 />
               </div>
               <ChatMessageActionBar
-                v-if="message.text && editingMessageId !== message.id"
+                v-if="(message.text || (message.attachments?.length ?? 0) > 0) && editingMessageId !== message.id"
                 :role="message.role"
                 :actions-locked="messageActionsLocked(message.id)"
                 :is-vi="isVi"
@@ -1392,28 +1938,101 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div v-if="pendingAttachments.length" class="or-app-chat-col">
-        <div class="or-app-chat-pending or-app-chat-pending-above">
-        <div v-for="(att, i) in pendingAttachments" :key="`pending-${i}`" class="or-app-chat-pending-item">
-          <img :src="att.url" :alt="att.name" class="or-app-chat-pending-img" />
-          <button type="button" class="or-app-chat-pending-remove" @click="removePendingAttachment(i)">×</button>
-        </div>
+      <div v-if="videoGenMode" class="or-app-chat-col">
+        <div class="or-chat-image-gen-bar">
+        <label class="or-chat-image-gen-field">
+          <span>{{ isVi ? 'Model video' : 'Video model' }}</span>
+          <select v-model="videoModelSlug" :disabled="streaming || videoModelsLoading || !videoModels.length">
+            <option
+              v-for="m in videoModels"
+              :key="m.slug"
+              :value="m.slug"
+              :disabled="modelCatalogUnavailable(m)"
+            >
+              {{ m.name }} · {{ m.creditsLabel }}{{ modelUnavailableSuffix(m, isVi) }}
+            </option>
+          </select>
+        </label>
+        <label
+          v-for="def in videoFieldDefs"
+          :key="def.field"
+          class="or-chat-image-gen-field"
+        >
+          <span>{{ def.field }}</span>
+          <select
+            :value="videoFieldValues[def.field] || ''"
+            :disabled="streaming"
+            @change="setVideoField(def.field, ($event.target as HTMLSelectElement).value)"
+          >
+            <option v-for="opt in def.options" :key="opt.value" :value="opt.value">
+              {{ opt.label !== opt.value ? `${opt.label} (${opt.value})` : opt.value }}
+            </option>
+          </select>
+        </label>
+        <span v-if="videoModelsLoading" class="or-chat-image-gen-loading">
+          {{ isVi ? 'Đang tải catalog…' : 'Loading catalog…' }}
+        </span>
         </div>
       </div>
-      <input ref="fileInput" type="file" accept="image/*" hidden @change="handleImageSelected" />
+
+      <input
+        ref="fileInput"
+        type="file"
+        accept="image/*"
+        multiple
+        hidden
+        @change="handleImageSelected"
+      />
+      <input
+        ref="videoFileInput"
+        type="file"
+        accept="video/*,.mp4,.mov,.webm,.mkv,.avi,.m4v"
+        multiple
+        hidden
+        @change="handleVideoSelected"
+      />
+      <input
+        ref="jobImageFileInput"
+        type="file"
+        accept="image/*,.jpg,.jpeg,.png,.webp"
+        multiple
+        hidden
+        @change="handleJobImageRefSelected"
+      />
+      <input
+        ref="jobVideoFileInput"
+        type="file"
+        accept="video/*,.mp4,.mov,.webm,.mkv,.avi,.m4v"
+        multiple
+        hidden
+        @change="handleJobVideoRefSelected"
+      />
       <input ref="importInput" type="file" accept="application/json,.json" hidden @change="handleImportFile" />
       <ChatComposer
         v-model:input="input"
         :streaming="streaming"
         :is-vi="isVi"
         :active-model="activeModel"
-        :pending-count="pendingAttachments.length"
+        :pending-attachments="pendingAttachments"
+        :job-refs="jobRefs"
+        :uploading-attachments="uploadingAttachments"
+        :uploading-job-refs="uploadingJobRefs"
+        :gen-allows-image-ref="activeGenAllowsImageRef"
+        :gen-allows-video-ref="activeGenAllowsVideoRef"
         :image-gen-mode="imageGenMode"
+        :video-gen-mode="videoGenMode"
         @send="handleSend"
         @stop="handleStop"
+        @remove-pending="removePendingAttachment"
+        @remove-job-ref="removeJobRef"
+        @attach-job-image-ref="openJobImageRefPicker"
+        @attach-job-video-ref="openJobVideoRefPicker"
         @attach-image="openImagePicker"
+        @attach-video="openVideoPicker"
         @enable-image-gen="handleEnableImageGen"
+        @enable-video-gen="handleEnableVideoGen"
         @cancel-image-gen="handleCancelImageGen"
+        @cancel-video-gen="handleCancelVideoGen"
         @export-backup="handleExportBackup"
         @import-backup="handleImportClick"
         @clear-all="handleClearAll"

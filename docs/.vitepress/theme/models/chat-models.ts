@@ -198,6 +198,12 @@ export function buildMessageMetaRows(
       rows.push({ label: isVi ? 'Tỷ lệ' : 'Ratio', value: meta.imageRatio });
     }
   }
+  if (meta.jobType === 'video') {
+    rows.push({ label: isVi ? 'Loại' : 'Type', value: isVi ? 'Tạo video' : 'Video job' });
+    if (meta.videoDuration) {
+      rows.push({ label: isVi ? 'Thời lượng' : 'Duration', value: meta.videoDuration });
+    }
+  }
 
   if (typeof meta.promptTokens === 'number' && meta.promptTokens > 0) {
     rows.push({

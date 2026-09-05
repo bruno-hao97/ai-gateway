@@ -1,12 +1,49 @@
 import { parseGatewayError } from './chat-api';
 import { getStoredToken } from './auth-api';
 import { apiBase } from './gateway-base';
-import { fetchModelsForType, type CatalogModel, type JobTypeId } from './catalog-api';
+import { fetchModelsForType, modelInputModalities, type CatalogModel, type JobTypeId } from './catalog-api';
 import {
   buildImageJobFields,
   type CatalogJobFieldValues,
   writeImageFieldValues,
 } from './catalog-job-fields';
+
+export interface MediaJobRef {
+  type: 'image' | 'video';
+  url: string;
+}
+
+export function buildMediaJobFields(
+  model: CatalogModel,
+  prompt: string,
+  values: CatalogJobFieldValues,
+  refs: MediaJobRef[] = [],
+): Record<string, unknown> {
+  const fields: Record<string, unknown> = { ...buildImageJobFields(model, prompt, values) };
+  const jobType = resolveMediaJobType(model);
+  const imageUrls = refs.filter((r) => r.type === 'image').map((r) => ({ url: r.url }));
+  const videoUrls = refs.filter((r) => r.type === 'video').map((r) => r.url);
+
+  if (jobType === 'image') {
+    if (imageUrls.length) fields.images = imageUrls;
+  } else {
+    if (imageUrls.length) fields.images = imageUrls;
+    if (videoUrls.length === 1) fields.video_url = videoUrls[0];
+    else if (videoUrls.length > 1) fields.video_urls = videoUrls.map((url) => ({ url }));
+  }
+
+  return fields;
+}
+
+export function modelAcceptsJobRefType(model: CatalogModel | null | undefined, type: 'image' | 'video'): boolean {
+  if (!model) return false;
+  const allowed = modelInputModalities(model);
+  if (allowed.includes(type)) return true;
+  const jobType = resolveMediaJobType(model);
+  if (type === 'image' && jobType === 'image') return true;
+  if (type === 'video' && jobType === 'video') return true;
+  return false;
+}
 
 export type PlaygroundMediaType = 'image' | 'video';
 
@@ -152,10 +189,11 @@ export async function createMediaJobWait(
   prompt: string,
   fieldValues: CatalogJobFieldValues,
   signal?: AbortSignal,
+  refs: MediaJobRef[] = [],
 ): Promise<MediaJobResult> {
   const started = Date.now();
   const jobType = resolveMediaJobType(model);
-  const fields = buildImageJobFields(model, prompt, fieldValues);
+  const fields = buildMediaJobFields(model, prompt, fieldValues, refs);
   const res = await fetch(`${apiBase()}/gateway/jobs/${jobType}`, {
     method: 'POST',
     headers: {

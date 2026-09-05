@@ -1,7 +1,14 @@
+export type ChatAttachmentPurpose = 'chat' | 'job';
+export type ChatJobTarget = 'image' | 'video';
+
 export interface ChatAttachment {
-  type: 'image';
+  type: 'image' | 'video';
   url: string;
   name?: string;
+  /** chat = hỏi agent; job = ref cho media job generate */
+  purpose?: ChatAttachmentPurpose;
+  /** job ref thuộc image job hay video job */
+  jobTarget?: ChatJobTarget;
 }
 
 export interface ChatMessageMeta {
@@ -10,8 +17,9 @@ export interface ChatMessageMeta {
   completionTokens?: number;
   totalTokens?: number;
   modelLabel?: string;
-  jobType?: 'image';
+  jobType?: 'image' | 'video';
   imageRatio?: string;
+  videoDuration?: string;
   costCredits?: number;
   balanceAfter?: number;
   reasoning?: string;
@@ -57,10 +65,19 @@ function normalizeAttachment(raw: unknown): ChatAttachment | null {
   const a = raw as Record<string, unknown>;
   const url = typeof a.url === 'string' ? a.url.trim() : '';
   if (!url) return null;
+  const rawType = typeof a.type === 'string' ? a.type : '';
+  const type = rawType === 'video' ? 'video' : 'image';
+  const purposeRaw = typeof a.purpose === 'string' ? a.purpose : '';
+  const purpose = purposeRaw === 'job' ? 'job' : purposeRaw === 'chat' ? 'chat' : undefined;
+  const jobTargetRaw = typeof a.jobTarget === 'string' ? a.jobTarget : '';
+  const jobTarget =
+    jobTargetRaw === 'video' ? 'video' : jobTargetRaw === 'image' ? 'image' : undefined;
   return {
-    type: 'image',
+    type,
     url,
     name: typeof a.name === 'string' ? a.name : undefined,
+    purpose,
+    jobTarget,
   };
 }
 

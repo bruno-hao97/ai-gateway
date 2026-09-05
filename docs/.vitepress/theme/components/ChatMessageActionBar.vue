@@ -2,6 +2,7 @@
 import type { ChatMessageMeta } from '../models/chat-storage';
 import ChatIcon from './ChatIcon.vue';
 import ChatMessageMoreMenu from './ChatMessageMoreMenu.vue';
+import ChatMetaHover from './ChatMetaHover.vue';
 
 defineProps<{
   role: 'user' | 'assistant';
@@ -70,6 +71,13 @@ const emit = defineEmits<{
         :disabled="actionsLocked"
       />
     </div>
-    <span v-if="metaSummary" class="or-chat-msg-toolbar-meta">{{ metaSummary }}</span>
+    <ChatMetaHover
+      v-if="role === 'assistant' && metaSummary && messageMeta"
+      :meta="messageMeta"
+      :is-vi="isVi"
+    >
+      {{ metaSummary }}
+    </ChatMetaHover>
+    <span v-else-if="metaSummary" class="or-chat-msg-toolbar-meta is-static">{{ metaSummary }}</span>
   </div>
 </template>

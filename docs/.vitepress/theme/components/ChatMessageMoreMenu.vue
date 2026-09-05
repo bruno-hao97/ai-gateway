@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import type { ChatMessageMeta } from '../models/chat-storage';
-import { buildMessageMetaRows, hasMessageMetaDetails } from '../models/chat-models';
+import { hasMessageMetaDetails } from '../models/chat-models';
 import ChatIcon from './ChatIcon.vue';
+import ChatMetaPanel from './ChatMetaPanel.vue';
 
 const props = defineProps<{
   meta?: ChatMessageMeta;
@@ -15,7 +16,6 @@ const root = ref<HTMLElement | null>(null);
 const open = ref(false);
 const metaOpen = ref(false);
 
-const rows = computed(() => buildMessageMetaRows(props.meta, !!props.isVi));
 const hasMeta = computed(() => hasMessageMetaDetails(props.meta));
 
 const timeLabel = computed(() => {
@@ -74,19 +74,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
         <span>{{ isVi ? 'Metadata' : 'Metadata' }}</span>
       </button>
 
-      <div v-if="metaOpen" class="or-chat-meta-panel">
-        <div v-for="(row, i) in rows" :key="`${row.label}-${i}`" class="or-chat-meta-row">
-          <span class="or-chat-meta-label">{{ row.label }}</span>
-          <span class="or-chat-meta-value">{{ row.value }}</span>
-        </div>
-        <p class="or-chat-meta-foot">
-          {{
-            isVi
-              ? 'Credits lấy từ số dư ví; tokens từ upstream. Xem Usage trong Profile để đối chiếu.'
-              : 'Credits come from wallet balance; tokens from upstream. See Usage in Profile to reconcile.'
-          }}
-        </p>
-      </div>
+      <ChatMetaPanel v-if="metaOpen" :meta="meta" :is-vi="isVi" />
     </div>
   </div>
 </template>

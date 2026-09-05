@@ -4,6 +4,35 @@ import { gommoClientDeviceFields } from './gommo-device';
 import { sanitizeChatReply, extractUserFacingTail } from './chat-reply-sanitize';
 import type { ChatAttachment } from './chat-storage';
 
+const VIDEO_UPLOAD_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v', 'mpeg', 'mpg']);
+
+export function isVideoUploadFile(file: File): boolean {
+  if (file.type.startsWith('video/')) return true;
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  return VIDEO_UPLOAD_EXTENSIONS.has(ext);
+}
+
+export function isImageUploadFile(file: File): boolean {
+  if (file.type.startsWith('image/')) return true;
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'heif', 'avif'].includes(ext);
+}
+
+function parseUploadResultUrl(raw: unknown): string {
+  const root = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const data =
+    root.data && typeof root.data === 'object'
+      ? (root.data as Record<string, unknown>)
+      : root;
+  return (
+    (typeof data.url === 'string' && data.url) ||
+    (typeof data.result_url === 'string' && data.result_url) ||
+    (typeof data.video_url === 'string' && data.video_url) ||
+    (typeof data.image_url === 'string' && data.image_url) ||
+    ''
+  );
+}
+
 export interface ChatTurnMessage {
   role: 'user' | 'model';
   text: string;
@@ -368,14 +397,23 @@ export async function uploadChatImage(file: File): Promise<string> {
   });
   const raw = await parseJsonResponse(res);
   if (!res.ok) throw new Error(parseGatewayError(raw, res.status));
-  const data =
-    raw && typeof raw === 'object' && (raw as Record<string, unknown>).data
-      ? ((raw as Record<string, unknown>).data as Record<string, unknown>)
-      : (raw as Record<string, unknown>);
-  const url =
-    (typeof data.url === 'string' && data.url) ||
-    (typeof data.result_url === 'string' && data.result_url) ||
-    '';
+  const url = parseUploadResultUrl(raw);
+  if (!url) throw new Error('Upload succeeded but no URL returned');
+  return url;
+}
+
+export async function uploadChatVideo(file: File): Promise<string> {
+  const base = apiBase();
+  const form = new FormData();
+  form.append('video_file', file, file.name);
+  const res = await fetch(`${base}/gateway/upload/video`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getStoredToken()}` },
+    body: form,
+  });
+  const raw = await parseJsonResponse(res);
+  if (!res.ok) throw new Error(parseGatewayError(raw, res.status));
+  const url = parseUploadResultUrl(raw);
   if (!url) throw new Error('Upload succeeded but no URL returned');
   return url;
 }
