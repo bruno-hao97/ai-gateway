@@ -38,6 +38,7 @@ import {
   resolveImageModel,
 } from '../models/chat-image-job';
 import type { CatalogModel } from '../models/catalog-api';
+import { modelCatalogUnavailable, modelUnavailableSuffix } from '../models/catalog-api';
 import {
   catalogJobFieldDefs,
   formatImageJobFieldSummary,
@@ -60,6 +61,7 @@ import {
   type ChatModelOption,
 } from '../models/chat-models';
 import { formatChatError } from '../models/chat-errors';
+import { startMediaJobProgressTimer } from '../models/media-job-progress';
 import { sliceHistoryForUpstream } from '../models/chat-memory';
 import { readChatSettings, type ChatSettings } from '../models/chat-settings';
 import {
@@ -228,7 +230,12 @@ async function ensureImageCatalog() {
   imageModelsLoading.value = true;
   try {
     imageModels.value = await fetchImageCatalogModels();
-    const model = resolveImageModel(imageModels.value, readLastImageModelSlug());
+    const hint = readLastImageModelSlug();
+    const preferred =
+      hint && imageModels.value.some((m) => m.slug === hint && !modelCatalogUnavailable(m))
+        ? hint
+        : imageModels.value.find((m) => !modelCatalogUnavailable(m))?.slug || hint;
+    const model = resolveImageModel(imageModels.value, preferred);
     if (!model) {
       throw new Error(
         isVi.value ? 'Không có model image trong catalog.' : 'No image models in catalog.',
@@ -647,6 +654,19 @@ async function runImageTurn(history: ChatMessage[], userMsg: ChatMessage, assist
     return;
   }
 
+  if (modelCatalogUnavailable(model)) {
+    const msg = isVi.value
+      ? 'Model ảnh đang tạm ngưng trên upstream. Chọn model khác.'
+      : 'Image model temporarily unavailable upstream. Pick another model.';
+    error.value = msg;
+    chatErrorHint.value = { message: msg, suggestModel: true, suggestRetry: false };
+    messages.value = messages.value.map((m) =>
+      m.id === assistantId ? { ...m, text: msg, isError: true } : m,
+    );
+    saveChatMessages(sessionId, messages.value);
+    return;
+  }
+
   const fieldValues = { ...imageFieldValues.value };
   const validationError = validateCatalogJobFields(model, fieldValues, isVi.value);
   if (validationError) {
@@ -663,9 +683,14 @@ async function runImageTurn(history: ChatMessage[], userMsg: ChatMessage, assist
   streaming.value = true;
   chatErrorHint.value = null;
 
-  const progressText = isVi.value ? 'Đang tạo ảnh…' : 'Generating image…';
-  messages.value = messages.value.map((m) =>
-    m.id === assistantId ? { ...m, text: progressText, isError: false } : m,
+  let stopProgress = startMediaJobProgressTimer(
+    (label) => {
+      messages.value = messages.value.map((m) =>
+        m.id === assistantId ? { ...m, text: label, isError: false } : m,
+      );
+    },
+    'image',
+    isVi.value,
   );
 
   try {
@@ -733,6 +758,7 @@ async function runImageTurn(history: ChatMessage[], userMsg: ChatMessage, assist
       source: 'playground',
     });
   } finally {
+    stopProgress();
     chatAbort.value = null;
     streaming.value = false;
   }
@@ -982,6 +1008,17 @@ function switchToDefaultModel() {
   error.value = '';
 }
 
+function switchToNextImageModel() {
+  const list = imageModels.value.filter((m) => !modelCatalogUnavailable(m));
+  if (!list.length) return;
+  const idx = list.findIndex((m) => m.slug === imageModelSlug.value);
+  const next = list[(idx + 1) % list.length]!;
+  imageModelSlug.value = next.slug;
+  syncImageFieldValues(next);
+  chatErrorHint.value = null;
+  error.value = '';
+}
+
 function onPopState() {
   const id = readSessionFromLocation();
   if (id && getChatSession(id)) {
@@ -1210,7 +1247,15 @@ onUnmounted(() => {
           <p>{{ error }}</p>
           <div v-if="chatErrorHint" class="or-app-chat-error-actions">
             <button
-              v-if="chatErrorHint.suggestModel"
+              v-if="chatErrorHint.suggestModel && imageGenMode"
+              type="button"
+              class="or-app-btn or-app-btn-ghost or-app-chat-error-btn"
+              @click="switchToNextImageModel"
+            >
+              {{ isVi ? 'Thử model ảnh khác' : 'Try another image model' }}
+            </button>
+            <button
+              v-else-if="chatErrorHint.suggestModel"
               type="button"
               class="or-app-btn or-app-btn-ghost or-app-chat-error-btn"
               @click="switchToDefaultModel"
@@ -1315,8 +1360,13 @@ onUnmounted(() => {
         <label class="or-chat-image-gen-field">
           <span>{{ isVi ? 'Model ảnh' : 'Image model' }}</span>
           <select v-model="imageModelSlug" :disabled="streaming || imageModelsLoading || !imageModels.length">
-            <option v-for="m in imageModels" :key="m.slug" :value="m.slug">
-              {{ m.name }} · {{ m.creditsLabel }}
+            <option
+              v-for="m in imageModels"
+              :key="m.slug"
+              :value="m.slug"
+              :disabled="modelCatalogUnavailable(m)"
+            >
+              {{ m.name }} · {{ m.creditsLabel }}{{ modelUnavailableSuffix(m, isVi) }}
             </option>
           </select>
         </label>

@@ -22,6 +22,31 @@ export function formatChatError(err: unknown, isVi: boolean): FormattedChatError
     };
   }
 
+  if (
+    lower.includes('not_available') ||
+    lower.includes('not available') ||
+    lower.includes('không khả dụng') ||
+    lower.includes('dịch vụ hiện không')
+  ) {
+    return {
+      message: isVi
+        ? 'Model tạm ngưng trên upstream. Thử model khác hoặc quay lại sau.'
+        : 'Model temporarily unavailable upstream. Try another model or retry later.',
+      suggestModel: true,
+      suggestRetry: true,
+    };
+  }
+
+  if (lower.includes('không hợp lệ') || lower.includes('invalid model')) {
+    return {
+      message: isVi
+        ? 'Model không hợp lệ cho loại job này. Kiểm tra tab ảnh/video hoặc đổi model.'
+        : 'Invalid model for this job type. Check image/video tab or pick another model.',
+      suggestModel: true,
+      suggestRetry: false,
+    };
+  }
+
   if (lower.includes('model') && (lower.includes('invalid') || lower.includes('not found') || lower.includes('unsupported'))) {
     return {
       message: isVi
@@ -50,7 +75,14 @@ export function formatChatError(err: unknown, isVi: boolean): FormattedChatError
 
   return {
     message: raw,
-    suggestModel: lower.includes('upstream') || lower.includes('http 5'),
+    suggestModel:
+      lower.includes('upstream') ||
+      lower.includes('http 5') ||
+      lower.includes('job failed') ||
+      lower.includes('model'),
     suggestRetry: true,
   };
 }
+
+/** Shared formatter for chat + playground media jobs. */
+export const formatMediaJobError = formatChatError;

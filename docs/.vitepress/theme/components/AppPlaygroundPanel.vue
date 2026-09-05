@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 import { useData } from 'vitepress';
-import type { CatalogModel } from '../models/catalog-api';
+import { modelCatalogUnavailable, modelUnavailableSuffix, type CatalogModel } from '../models/catalog-api';
 import {
   catalogJobFieldDefs,
   formatImageJobFieldSummary,
@@ -10,6 +10,7 @@ import {
   type CatalogJobField,
   type CatalogJobFieldValues,
 } from '../models/catalog-job-fields';
+import { formatMediaJobError, type FormattedChatError } from '../models/chat-errors';
 import {
   createMediaJobWait,
   fetchMediaCatalogModels,
@@ -20,6 +21,7 @@ import {
   type MediaJobResult,
   type PlaygroundMediaType,
 } from '../models/media-job';
+import { startMediaJobProgressTimer } from '../models/media-job-progress';
 import { appendUsageRecord } from '../models/usage-history';
 import { formatCredits, resolveChatCostCredits } from '../models/user-api';
 import { playgroundUrl } from '../models/gateway-base';
@@ -48,10 +50,17 @@ const fieldValues = ref<CatalogJobFieldValues>({});
 const prompt = ref('');
 const running = ref(false);
 const error = ref('');
+const jobErrorHint = ref<FormattedChatError | null>(null);
+const progressLabel = ref('');
 const result = ref<MediaJobResult | null>(null);
 const abortRef = ref<AbortController | null>(null);
+let progressStop: (() => void) | null = null;
+let generateLock = false;
 
 const activeModel = computed(() => resolveMediaModel(models.value, modelSlug.value));
+const activeModelUnavailable = computed(() =>
+  activeModel.value ? modelCatalogUnavailable(activeModel.value) : false,
+);
 const fieldDefs = computed(() => catalogJobFieldDefs(activeModel.value));
 const resultMediaType = computed(() => result.value?.jobType ?? mediaType.value);
 
@@ -77,9 +86,50 @@ function setField(field: CatalogJobField, value: string) {
   fieldValues.value = { ...fieldValues.value, [field]: value };
 }
 
+function stopProgressTimer() {
+  progressStop?.();
+  progressStop = null;
+  progressLabel.value = '';
+}
+
+function startProgressTimer(jobType: PlaygroundMediaType) {
+  stopProgressTimer();
+  progressStop = startMediaJobProgressTimer(
+    (label) => {
+      progressLabel.value = label;
+    },
+    jobType,
+    isVi.value,
+  );
+}
+
+function pickFirstAvailableSlug(
+  list: CatalogModel[],
+  tab: PlaygroundMediaType,
+  preferred?: string,
+): string {
+  const hint = preferred?.trim();
+  if (hint && list.some((m) => m.slug === hint && !modelCatalogUnavailable(m))) return hint;
+  const saved = readLastMediaModelSlug(tab);
+  if (saved && list.some((m) => m.slug === saved && !modelCatalogUnavailable(m))) return saved;
+  const available = list.find((m) => !modelCatalogUnavailable(m));
+  return available?.slug || list[0]?.slug || '';
+}
+
+function switchToNextModel() {
+  const list = models.value.filter((m) => !modelCatalogUnavailable(m));
+  if (!list.length) return;
+  const idx = list.findIndex((m) => m.slug === modelSlug.value);
+  const next = list[(idx + 1) % list.length]!;
+  modelSlug.value = next.slug;
+  jobErrorHint.value = null;
+  error.value = '';
+}
+
 async function loadCatalog(type: PlaygroundMediaType, preferredSlug?: string) {
   modelsLoading.value = true;
   error.value = '';
+  jobErrorHint.value = null;
   try {
     const slugHint = preferredSlug?.trim() || '';
     let tab = type;
@@ -96,13 +146,8 @@ async function loadCatalog(type: PlaygroundMediaType, preferredSlug?: string) {
     }
 
     models.value = list;
-    const slug =
-      slugHint && list.some((m) => m.slug === slugHint)
-        ? slugHint
-        : readLastMediaModelSlug(tab);
-    const model = resolveMediaModel(list, slug);
-    modelSlug.value = model?.slug || '';
-    syncFieldValues(model);
+    modelSlug.value = pickFirstAvailableSlug(list, tab, slugHint);
+    syncFieldValues(resolveMediaModel(list, modelSlug.value));
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load catalog';
     models.value = [];
@@ -115,19 +160,31 @@ async function loadCatalog(type: PlaygroundMediaType, preferredSlug?: string) {
 async function handleGenerate() {
   const model = activeModel.value;
   const text = prompt.value.trim();
-  if (!model || !text || running.value) return;
+  if (!model || !text || running.value || generateLock) return;
+
+  if (modelCatalogUnavailable(model)) {
+    error.value = isVi.value
+      ? 'Model đang tạm ngưng trên upstream. Chọn model khác.'
+      : 'Model is temporarily unavailable upstream. Pick another model.';
+    jobErrorHint.value = { message: error.value, suggestModel: true, suggestRetry: false };
+    return;
+  }
 
   const validation = validateCatalogJobFields(model, fieldValues.value, isVi.value);
   if (validation) {
     error.value = validation;
+    jobErrorHint.value = null;
     return;
   }
 
+  generateLock = true;
   error.value = '';
+  jobErrorHint.value = null;
   result.value = null;
   const controller = new AbortController();
   abortRef.value = controller;
   running.value = true;
+  startProgressTimer(resolveMediaJobType(model));
   const balanceBefore = props.credits ?? null;
 
   try {
@@ -152,8 +209,9 @@ async function handleGenerate() {
     });
   } catch (err) {
     if (controller.signal.aborted) return;
-    const message = err instanceof Error ? err.message : 'Job failed';
-    error.value = message;
+    const formatted = formatMediaJobError(err, isVi.value);
+    jobErrorHint.value = formatted;
+    error.value = formatted.message;
     appendUsageRecord({
       jobType: resolveMediaJobType(model),
       model: model.name,
@@ -163,14 +221,19 @@ async function handleGenerate() {
       source: 'playground',
     });
   } finally {
+    stopProgressTimer();
     abortRef.value = null;
     running.value = false;
+    generateLock = false;
   }
 }
 
 function handleStop() {
   abortRef.value?.abort();
+  stopProgressTimer();
 }
+
+onUnmounted(() => stopProgressTimer());
 
 function copyResultUrl() {
   if (!result.value?.resultUrl) return;
@@ -245,11 +308,24 @@ watch(
         <label class="or-pg-field">
           <span class="or-pg-label">{{ isVi ? 'Model' : 'Model' }}</span>
           <select v-model="modelSlug" class="or-pg-select" :disabled="running || modelsLoading || !models.length">
-            <option v-for="m in models" :key="m.slug" :value="m.slug">
-              {{ m.name }} · {{ m.creditsLabel }}
+            <option
+              v-for="m in models"
+              :key="m.slug"
+              :value="m.slug"
+              :disabled="modelCatalogUnavailable(m)"
+            >
+              {{ m.name }} · {{ m.creditsLabel }}{{ modelUnavailableSuffix(m, isVi) }}
             </option>
           </select>
         </label>
+
+        <p v-if="activeModelUnavailable" class="or-pg-hint or-pg-warn">
+          {{
+            isVi
+              ? 'Model này đang tạm ngưng trên upstream — chọn model khác trước khi Generate.'
+              : 'This model is temporarily unavailable upstream — pick another before Generate.'
+          }}
+        </p>
 
         <label v-for="def in fieldDefs" :key="def.field" class="or-pg-field">
           <span class="or-pg-label">{{ def.field }}</span>
@@ -283,19 +359,34 @@ watch(
             v-else
             type="button"
             class="or-app-btn or-app-btn-primary or-pg-btn-run"
-            :disabled="!prompt.trim() || !activeModel || modelsLoading"
+            :disabled="!prompt.trim() || !activeModel || modelsLoading || activeModelUnavailable"
             @click="handleGenerate"
           >
             {{ isVi ? 'Tạo' : 'Generate' }}
           </button>
         </div>
 
-        <p v-if="error" class="or-app-alert or-pg-error">{{ error }}</p>
+        <div v-if="error" class="or-app-alert or-pg-error">
+          <p>{{ error }}</p>
+          <div v-if="jobErrorHint" class="or-pg-error-actions">
+            <button
+              v-if="jobErrorHint.suggestModel"
+              type="button"
+              class="or-app-btn or-app-btn-ghost or-pg-error-btn"
+              @click="switchToNextModel"
+            >
+              {{ isVi ? 'Thử model khác' : 'Try another model' }}
+            </button>
+          </div>
+        </div>
       </section>
 
       <section class="or-pg-result">
         <div v-if="running" class="or-pg-result-empty">
-          <p class="or-pg-result-status">{{ isVi ? 'Đang tạo… (1–5 phút)' : 'Generating… (1–5 min)' }}</p>
+          <div class="or-pg-progress">
+            <span class="or-pg-progress-spinner" aria-hidden="true" />
+            <p class="or-pg-result-status">{{ progressLabel || (isVi ? 'Đang tạo…' : 'Generating…') }}</p>
+          </div>
         </div>
         <div v-else-if="result" class="or-pg-result-media">
           <img

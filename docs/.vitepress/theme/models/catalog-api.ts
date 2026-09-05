@@ -228,6 +228,21 @@ function pickDescriptionFields(m: Record<string, unknown>): { vi: string; en: st
   return { vi, en: '' };
 }
 
+export function modelCatalogUnavailable(m: CatalogModel): boolean {
+  const raw = m.raw;
+  const err = String(raw.error ?? raw.status_error ?? '')
+    .trim()
+    .toUpperCase();
+  if (err === 'NOT_AVAILABLE' || err === 'UNAVAILABLE' || err === 'DISABLED') return true;
+  const msg = String(raw.message ?? raw.status_message ?? '').toLowerCase();
+  return msg.includes('không khả dụng') || msg.includes('not available');
+}
+
+export function modelUnavailableSuffix(m: CatalogModel, isVi: boolean): string {
+  if (!modelCatalogUnavailable(m)) return '';
+  return isVi ? ' · tạm ngưng' : ' · unavailable';
+}
+
 /** Locale-aware catalog description (EN from gateway cache / translate). */
 export function modelDescription(m: CatalogModel, isVi: boolean): string {
   if (isVi) return m.descriptionVi || m.descriptionEn;
