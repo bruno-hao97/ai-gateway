@@ -6,11 +6,13 @@ import ModelsCompare from './components/ModelsCompare.vue';
 import LandingPage from './components/LandingPage.vue';
 import AuthPage from './components/AuthPage.vue';
 import LegalPage from './components/LegalPage.vue';
+import AboutPage from './components/AboutPage.vue';
 import AppDashboard from './components/AppDashboard.vue';
 import './models-catalog.css';
 import './landing.css';
 import './auth.css';
 import './legal.css';
+import './about.css';
 import './app-dashboard.css';
 import './site-footer.css';
 
@@ -23,6 +25,7 @@ export default {
     app.component('LandingPage', LandingPage);
     app.component('AuthPage', AuthPage);
     app.component('LegalPage', LegalPage);
+    app.component('AboutPage', AboutPage);
     app.component('AppDashboard', AppDashboard);
   },
 } satisfies Theme;

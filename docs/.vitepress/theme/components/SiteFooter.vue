@@ -49,6 +49,7 @@ const linkColumns = computed((): FooterColumn[] => {
       id: 'company',
       title: t('Company', 'Công ty'),
       links: [
+        { label: t('About', 'Về chúng tôi'), href: `${p}/about/` },
         { label: t('Privacy Policy', 'Chính sách quyền riêng tư'), href: `${p}/privacy-policy/` },
         { label: t('Terms of Service', 'Điều khoản dịch vụ'), href: `${p}/terms/` },
         { label: t('Principles', 'Nguyên tắc'), href: `${p}/principles` },

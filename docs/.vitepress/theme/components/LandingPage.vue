@@ -6,13 +6,11 @@ import {
   JOB_TYPES,
   catalogProviders,
   fetchAllModels,
-  modelDescription,
   playgroundUrl,
   providerInitials,
   sortModels,
   type CatalogLang,
   type CatalogModel,
-  type JobTypeId,
 } from '../models/catalog-api';
 
 const { lang } = useData();
@@ -32,9 +30,12 @@ const playgroundLink = computed(() => `${prefix.value}/app/playground/`);
 const creditsLink = computed(() => `${prefix.value}/app/credits/`);
 const mcpLink = computed(() => `${prefix.value}/mcp/`);
 const apiLink = computed(() => `${prefix.value}/reference/openapi`);
-const sdkLink = computed(() => `${prefix.value}/sdk/`);
 const privacyPolicyLink = computed(() => `${prefix.value}/privacy-policy/`);
-const termsLink = computed(() => `${prefix.value}/terms/`);
+const aboutLink = computed(() => `${prefix.value}/about/`);
+
+function t(en: string, vi: string): string {
+  return isVi.value ? vi : en;
+}
 
 const loading = ref(true);
 const allModels = ref<CatalogModel[]>([]);
@@ -45,218 +46,88 @@ const stats = computed(() => ({
   providers: catalogProviders(allModels.value).length || '—',
 }));
 
-const featured = computed(() => {
-  const models = allModels.value;
-  if (!models.length) return [];
-  const picks: CatalogModel[] = [];
-  const seen = new Set<string>();
-  for (const type of ['image', 'video', 'tts', 'music'] as JobTypeId[]) {
-    const m = sortModels(
-      models.filter((x) => x.jobType === type),
-      'newest',
-    )[0];
-    if (m && !seen.has(m.slug)) {
-      picks.push(m);
-      seen.add(m.slug);
-    }
-  }
-  for (const m of sortModels(models, 'newest')) {
-    if (picks.length >= 8) break;
-    if (!seen.has(m.slug)) {
-      picks.push(m);
-      seen.add(m.slug);
-    }
-  }
-  return picks;
-});
+const tableModels = computed(() => sortModels(allModels.value, 'newest').slice(0, 10));
 
-const platformCards = computed(() =>
+const toolChips = computed(() =>
+  JOB_TYPES.map((jt) => ({
+    id: jt.id,
+    label: jt.label,
+    href: `${playgroundLink.value}?type=${jt.id}`,
+  })),
+);
+
+const pillars = computed(() =>
   isVi.value
     ? [
         {
-          title: 'Chat',
-          desc: 'Trò chuyện với Auto Router — stream SSE, tạo ảnh/video trong chat.',
-          icon: '💬',
-          href: chatLink.value,
-          cta: 'Mở chat',
+          n: '01',
+          title: 'Một cổng, một contract',
+          desc: 'Ẩn v2.api.gommo.net và api.gommo.net — deploy gateway, client chỉ nhớ một base URL.',
         },
         {
-          title: 'Playground',
-          desc: 'Thử image, video, music và tool jobs — không cần viết code.',
-          icon: '▶',
-          href: playgroundLink.value,
-          cta: 'Mở playground',
+          n: '02',
+          title: 'Catalog là nguồn sự thật',
+          desc: 'Không đoán ratio, mode hay resolution — đọc từ GET /gateway/models trước mỗi job.',
         },
         {
-          title: 'Models',
-          desc: 'Duyệt catalog, so sánh credits và tham số từ Gommo.',
-          icon: '◈',
-          href: modelsLink.value,
-          cta: 'Xem catalog',
+          n: '03',
+          title: 'Portal + API + MCP',
+          desc: 'Chat và Playground cho người dùng; REST, OpenAPI và 10 MCP tools cho agent.',
         },
         {
-          title: 'Credits',
-          desc: 'Nạp credit, xem số dư và lịch sử usage trong portal.',
-          icon: '◎',
-          href: creditsLink.value,
-          cta: 'Mở wallet',
+          n: '04',
+          title: 'Secret ở server',
+          desc: 'Merchant token và billing keys không bao giờ xuất hiện trong browser hay SDK public.',
         },
       ]
     : [
         {
-          title: 'Chat',
-          desc: 'Talk to Auto Router — SSE streaming, image and video generation in chat.',
-          icon: '💬',
-          href: chatLink.value,
-          cta: 'Open chat',
+          n: '01',
+          title: 'One gate, one contract',
+          desc: 'Hide v2.api.gommo.net and api.gommo.net — deploy the gateway, clients keep one base URL.',
         },
         {
-          title: 'Playground',
-          desc: 'Try image, video, music, and tool jobs — no code required.',
-          icon: '▶',
-          href: playgroundLink.value,
-          cta: 'Open playground',
+          n: '02',
+          title: 'Catalog is source of truth',
+          desc: 'Never guess ratio, mode, or resolution — read GET /gateway/models before every job.',
         },
         {
-          title: 'Models',
-          desc: 'Browse the catalog, compare credits and parameters from Gommo.',
-          icon: '◈',
-          href: modelsLink.value,
-          cta: 'Browse catalog',
+          n: '03',
+          title: 'Portal + API + MCP',
+          desc: 'Chat and Playground for humans; REST, OpenAPI, and 10 MCP tools for agents.',
         },
         {
-          title: 'Credits',
-          desc: 'Top up credits, check balance, and view usage history in the portal.',
-          icon: '◎',
-          href: creditsLink.value,
-          cta: 'Open wallet',
+          n: '04',
+          title: 'Secrets stay server-side',
+          desc: 'Merchant token and billing keys never appear in the browser or public SDK.',
         },
       ],
 );
 
-const devFeatures = computed(() =>
+const routeNodes = computed(() =>
   isVi.value
     ? [
-        {
-          title: 'REST + proxy',
-          desc: 'Mode B JSON hoặc Mode C — một base URL cho toàn bộ Gommo.',
-          icon: '⇄',
-        },
-        {
-          title: 'OpenAPI & SDK',
-          desc: 'Tài liệu song ngữ, cookbook và TypeScript client.',
-          icon: '📦',
-        },
-        {
-          title: 'MCP',
-          desc: '10 tools cho Cursor và agent — models, jobs, chat.',
-          icon: '⬡',
-        },
-        {
-          title: 'Bảo mật',
-          desc: 'Merchant token và billing secret chỉ ở server.',
-          icon: '🔒',
-        },
+        { label: 'Client', sub: 'Browser · mobile · script' },
+        { label: 'AI Gateway', sub: 'REST · proxy · portal', core: true },
+        { label: 'Gommo', sub: 'Models · jobs · billing' },
       ]
     : [
-        {
-          title: 'REST + proxy',
-          desc: 'Mode B JSON or Mode C — one base URL for all Gommo APIs.',
-          icon: '⇄',
-        },
-        {
-          title: 'OpenAPI & SDK',
-          desc: 'Bilingual docs, cookbook, and TypeScript client.',
-          icon: '📦',
-        },
-        {
-          title: 'MCP',
-          desc: '10 tools for Cursor and agents — models, jobs, chat.',
-          icon: '⬡',
-        },
-        {
-          title: 'Security',
-          desc: 'Merchant token and billing secrets stay server-side.',
-          icon: '🔒',
-        },
-      ],
-);
-
-const userSteps = computed(() =>
-  isVi.value
-    ? [
-        {
-          n: '1',
-          title: 'Tạo tài khoản',
-          desc: 'Đăng ký miễn phí — email và mật khẩu Gommo qua gateway.',
-          href: signupLink.value,
-        },
-        {
-          n: '2',
-          title: 'Tạo nội dung',
-          desc: 'Chat, Playground hoặc chọn model từ catalog.',
-          href: chatLink.value,
-        },
-        {
-          n: '3',
-          title: 'Tích hợp API',
-          desc: 'Bearer token + Quickstart — image, video, audio jobs.',
-          href: quickstartLink.value,
-        },
-      ]
-    : [
-        {
-          n: '1',
-          title: 'Create account',
-          desc: 'Sign up free — Gommo email and password via the gateway.',
-          href: signupLink.value,
-        },
-        {
-          n: '2',
-          title: 'Create content',
-          desc: 'Use Chat, Playground, or pick a model from the catalog.',
-          href: chatLink.value,
-        },
-        {
-          n: '3',
-          title: 'Integrate API',
-          desc: 'Bearer token + Quickstart — image, video, and audio jobs.',
-          href: quickstartLink.value,
-        },
+        { label: 'Client', sub: 'Browser · mobile · script' },
+        { label: 'AI Gateway', sub: 'REST · proxy · portal', core: true },
+        { label: 'Gommo', sub: 'Models · jobs · billing' },
       ],
 );
 
 const codeSample = computed(() => {
   const base = apiBase() || 'https://api.yourdomain.com';
-  return `curl "${base}/gateway/models?type=image&lang=en"
-# Bearer optional for catalog browse
-
-curl -X POST "${base}/gateway/jobs" \\
-  -H "Authorization: Bearer $TOKEN" \\
-  -H "Content-Type: application/json" \\
-  -d '{"type":"image","model":"YOUR_SLUG","ratio":"FROM_CATALOG"}'`;
+  return `$ curl ${base}/gateway/models?type=image
+$ curl -X POST ${base}/gateway/jobs \\
+    -H "Authorization: Bearer $TOKEN" \\
+    -d '{"type":"image","model":"SLUG","ratio":"FROM_CATALOG"}'`;
 });
 
-const docLinks = computed(() =>
-  isVi.value
-    ? [
-        { label: 'Quickstart', href: quickstartLink.value },
-        { label: 'API Reference', href: apiLink.value },
-        { label: 'SDK', href: sdkLink.value },
-        { label: 'MCP', href: mcpLink.value },
-        { label: 'Models', href: modelsLink.value },
-      ]
-    : [
-        { label: 'Quickstart', href: quickstartLink.value },
-        { label: 'API Reference', href: apiLink.value },
-        { label: 'SDK', href: sdkLink.value },
-        { label: 'MCP', href: mcpLink.value },
-        { label: 'Models', href: modelsLink.value },
-      ],
-);
-
 function jobTypeLabel(id: string): string {
-  return JOB_TYPES.find((t) => t.id === id)?.label ?? id;
+  return JOB_TYPES.find((jt) => jt.id === id)?.label ?? id;
 }
 
 onMounted(async () => {
@@ -273,241 +144,238 @@ onMounted(async () => {
 <template>
   <div class="gw-landing">
     <section class="gw-hero">
-      <div class="gw-hero-glow" aria-hidden="true" />
-      <div class="gw-hero-inner">
-        <a :href="prefix || '/'" class="gw-hero-brand">
-          <span class="gw-hero-brand-mark" aria-hidden="true">⬡</span>
-          <span>AI Gateway</span>
-        </a>
-        <p class="gw-hero-eyebrow">
-          {{ isVi ? 'Nền tảng AI tất cả trong một' : 'All-in-one AI platform' }}
-        </p>
-        <h1 class="gw-hero-title">
-          {{
-            isVi
-              ? 'Tạo ảnh, video, audio và chat — một nơi cho creator và developer'
-              : 'Generate images, videos, audio, and chat — one place for creators and developers'
-          }}
-        </h1>
-        <p class="gw-hero-sub">
-          {{
-            isVi
-              ? 'Powered by Gommo — catalog models, portal Chat & Playground, REST API và MCP cho agent.'
-              : 'Powered by Gommo — model catalog, Chat & Playground portal, REST API, and MCP for agents.'
-          }}
-        </p>
-        <div class="gw-hero-actions">
-          <a :href="signupLink" class="gw-btn gw-btn-primary">{{
-            isVi ? 'Bắt đầu miễn phí' : 'Get started free'
-          }}</a>
-          <a :href="chatLink" class="gw-btn gw-btn-secondary">{{
-            isVi ? 'Mở Chat' : 'Open Chat'
-          }}</a>
-          <a :href="playgroundLink" class="gw-btn gw-btn-secondary">Playground</a>
-          <a :href="modelsLink" class="gw-btn gw-btn-ghost">{{
-            isVi ? 'Khám phá models' : 'Browse models'
-          }}</a>
+      <div class="gw-hero-grid" aria-hidden="true" />
+      <div class="gw-hero-layout">
+        <div class="gw-hero-copy">
+          <p class="gw-hero-index">{{ t('GATEWAY · GOMMO', 'GATEWAY · GOMMO') }}</p>
+          <h1 class="gw-hero-title">
+            {{
+              t(
+                'One URL between you and every Gommo model.',
+                'Một URL giữa bạn và mọi model Gommo.',
+              )
+            }}
+          </h1>
+          <p class="gw-hero-sub">
+            {{
+              t(
+                'AI Gateway is not another studio — it is the routing layer: catalog, jobs, chat, credits, and docs behind a single deployable API.',
+                'AI Gateway không phải studio khác — là tầng routing: catalog, jobs, chat, credits và docs sau một API deploy được.',
+              )
+            }}
+          </p>
+          <div class="gw-hero-actions">
+            <a :href="signupLink" class="gw-btn gw-btn-primary">{{
+              t('Create account', 'Tạo tài khoản')
+            }}</a>
+            <a :href="quickstartLink" class="gw-btn gw-btn-outline">{{
+              t('Read Quickstart', 'Đọc Quickstart')
+            }}</a>
+          </div>
+          <nav class="gw-hero-shortcuts" :aria-label="t('Shortcuts', 'Lối tắt')">
+            <a :href="chatLink">{{ t('Chat', 'Chat') }}</a>
+            <a :href="playgroundLink">Playground</a>
+            <a :href="modelsLink">{{ t('Models', 'Models') }}</a>
+            <a :href="mcpLink">MCP</a>
+          </nav>
+          <p class="gw-hero-trust">
+            <a :href="loginLink">{{ t('Sign in', 'Đăng nhập') }}</a>
+            <span aria-hidden="true">/</span>
+            <a :href="aboutLink">{{ t('About', 'Về chúng tôi') }}</a>
+            <span aria-hidden="true">/</span>
+            <a :href="privacyPolicyLink">{{ t('Privacy', 'Privacy') }}</a>
+          </p>
         </div>
-        <p class="gw-hero-trust">
-          <template v-if="isVi">
-            Đã có tài khoản?
-            <a :href="loginLink">Đăng nhập</a>
-            ·
-            <a :href="privacyPolicyLink">Chính sách quyền riêng tư</a>
-            ·
-            <a :href="termsLink">Điều khoản</a>
-          </template>
-          <template v-else>
-            Already have an account?
-            <a :href="loginLink">Sign in</a>
-            ·
-            <a :href="privacyPolicyLink">Privacy Policy</a>
-            ·
-            <a :href="termsLink">Terms of Service</a>
-          </template>
-        </p>
+
+        <aside class="gw-route-panel" :aria-label="t('Request flow', 'Luồng request')">
+          <p class="gw-route-label">{{ t('REQUEST FLOW', 'LUỒNG REQUEST') }}</p>
+          <div class="gw-route-stack">
+            <template v-for="(node, i) in routeNodes" :key="node.label">
+              <div class="gw-route-node" :class="{ 'gw-route-node--core': node.core }">
+                <span class="gw-route-node-name">{{ node.label }}</span>
+                <span class="gw-route-node-sub">{{ node.sub }}</span>
+              </div>
+              <div v-if="i < routeNodes.length - 1" class="gw-route-connector">
+                <span class="gw-route-connector-line" />
+                <span class="gw-route-connector-tag">
+                  {{ i === 0 ? 'Bearer / JSON' : 'upstream' }}
+                </span>
+              </div>
+            </template>
+          </div>
+          <pre class="gw-route-terminal"><code>{{ codeSample }}</code></pre>
+        </aside>
       </div>
     </section>
 
-    <section class="gw-stats" :aria-label="isVi ? 'Thống kê' : 'Platform stats'">
+    <section class="gw-stats" :aria-label="t('Live catalog', 'Catalog live')">
       <div class="gw-stats-inner">
         <div class="gw-stat">
           <strong>{{ stats.models }}</strong>
-          <span>{{ isVi ? 'Models' : 'Models' }}</span>
+          <span>{{ t('models indexed', 'models') }}</span>
         </div>
-        <div class="gw-stat">
-          <strong>{{ stats.jobTypes }}</strong>
-          <span>{{ isVi ? 'Loại job' : 'Job types' }}</span>
-        </div>
+        <div class="gw-stat-divider" aria-hidden="true" />
         <div class="gw-stat">
           <strong>{{ stats.providers }}</strong>
-          <span>{{ isVi ? 'Providers' : 'Providers' }}</span>
+          <span>{{ t('providers', 'providers') }}</span>
         </div>
-        <div class="gw-stat gw-stat-muted">
-          <strong>API</strong>
-          <span>{{ isVi ? 'REST + MCP' : 'REST + MCP' }}</span>
+        <div class="gw-stat-divider" aria-hidden="true" />
+        <div class="gw-stat">
+          <strong>{{ stats.jobTypes }}</strong>
+          <span>{{ t('job types', 'loại job') }}</span>
+        </div>
+        <div class="gw-stat-divider" aria-hidden="true" />
+        <div class="gw-stat">
+          <strong>10</strong>
+          <span>{{ t('MCP tools', 'MCP tools') }}</span>
         </div>
       </div>
     </section>
 
     <section class="gw-section">
-      <div class="gw-section-inner">
-        <h2 class="gw-section-title">{{ isVi ? 'Nền tảng' : 'Platform' }}</h2>
-        <p class="gw-section-sub gw-section-sub-below">
-          {{
-            isVi
-              ? 'Dùng trực tiếp trên web hoặc tích hợp qua API — cùng tài khoản Gommo.'
-              : 'Use the web portal or integrate via API — same Gommo account.'
-          }}
-        </p>
-        <div class="gw-features">
-          <a
-            v-for="card in platformCards"
-            :key="card.title"
-            :href="card.href"
-            class="gw-feature gw-feature-link"
-          >
-            <span class="gw-feature-icon" aria-hidden="true">{{ card.icon }}</span>
-            <h3>{{ card.title }}</h3>
-            <p>{{ card.desc }}</p>
-            <span class="gw-feature-cta">{{ card.cta }} →</span>
-          </a>
-        </div>
-      </div>
-    </section>
-
-    <section class="gw-section gw-section-elevated">
       <div class="gw-section-inner">
         <div class="gw-section-head">
           <div>
-            <h2 class="gw-section-title">
-              {{ isVi ? 'Model nổi bật' : 'Featured models' }}
-            </h2>
+            <p class="gw-section-index">01</p>
+            <h2 class="gw-section-title">{{ t('Catalog snapshot', 'Snapshot catalog') }}</h2>
             <p class="gw-section-sub">
               {{
-                isVi
-                  ? 'Credits và tham số từ catalog Gommo — cập nhật live.'
-                  : 'Credits and parameters from the live Gommo catalog.'
+                t(
+                  'Newest models from live Gommo — open Playground or compare side by side.',
+                  'Models mới nhất từ Gommo live — mở Playground hoặc so sánh.',
+                )
               }}
             </p>
           </div>
-          <a :href="compareLink" class="gw-link-arrow">{{
-            isVi ? 'So sánh →' : 'Compare →'
-          }}</a>
+          <a :href="compareLink" class="gw-link-arrow">{{ t('Compare', 'So sánh') }} →</a>
         </div>
 
-        <p v-if="loading" class="gw-muted">{{ isVi ? 'Đang tải catalog…' : 'Loading catalog…' }}</p>
-        <div v-else-if="featured.length" class="gw-model-grid">
-          <a
-            v-for="m in featured"
-            :key="m.slug"
-            :href="playgroundUrl(m, localePrefix)"
-            class="gw-model-card"
-          >
-            <div class="gw-model-card-head">
-              <span class="or-provider-avatar or-provider-avatar--sm">{{
-                providerInitials(m.provider || m.slug)
-              }}</span>
-              <span class="gw-model-type">{{ jobTypeLabel(m.jobType) }}</span>
-            </div>
-            <strong class="gw-model-name">{{ m.name }}</strong>
-            <code class="gw-model-slug">{{ m.slug }}</code>
-            <p v-if="modelDescription(m, isVi)" class="gw-model-desc">
-              {{ modelDescription(m, isVi) }}
-            </p>
-            <span class="gw-model-credits">{{ m.creditsLabel }}</span>
+        <p v-if="loading" class="gw-muted">{{ t('Loading…', 'Đang tải…') }}</p>
+        <div v-else-if="tableModels.length" class="gw-model-table-wrap">
+          <table class="gw-model-table">
+            <thead>
+              <tr>
+                <th>{{ t('Model', 'Model') }}</th>
+                <th>{{ t('Type', 'Loại') }}</th>
+                <th>{{ t('Provider', 'Provider') }}</th>
+                <th>{{ t('Credits', 'Credits') }}</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="m in tableModels" :key="m.slug">
+                <td class="gw-model-table-name">
+                  <span class="or-provider-avatar or-provider-avatar--sm">{{
+                    providerInitials(m.provider || m.slug)
+                  }}</span>
+                  <span>
+                    <strong>{{ m.name }}</strong>
+                    <code>{{ m.slug }}</code>
+                  </span>
+                </td>
+                <td><span class="gw-type-tag">{{ jobTypeLabel(m.jobType) }}</span></td>
+                <td class="gw-model-table-provider">{{ m.provider || '—' }}</td>
+                <td class="gw-model-table-credits">{{ m.creditsLabel }}</td>
+                <td class="gw-model-table-action">
+                  <a :href="playgroundUrl(m, localePrefix)">→</a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-else class="gw-muted">{{ t('Catalog offline.', 'Catalog offline.') }}</p>
+        <a :href="modelsLink" class="gw-text-link">{{ t('Full catalog', 'Toàn bộ catalog') }} →</a>
+      </div>
+    </section>
+
+    <section class="gw-section gw-section-muted">
+      <div class="gw-section-inner">
+        <p class="gw-section-index">02</p>
+        <h2 class="gw-section-title">{{ t('Job surfaces', 'Job surfaces') }}</h2>
+        <p class="gw-section-sub gw-section-sub-below">
+          {{ t('Each chip opens Playground on the matching job type.', 'Mỗi chip mở Playground với job type tương ứng.') }}
+        </p>
+        <div class="gw-tool-chips">
+          <a v-for="chip in toolChips" :key="chip.id" :href="chip.href" class="gw-tool-chip">
+            <span class="gw-tool-chip-prefix">//</span>{{ chip.label }}
           </a>
         </div>
-        <p v-else class="gw-muted">
-          {{
-            isVi
-              ? 'Catalog tạm không tải được — thử lại sau hoặc xem Models.'
-              : 'Catalog unavailable — try again later or browse Models.'
-          }}
-        </p>
-        <a :href="modelsLink" class="gw-btn gw-btn-secondary gw-model-all">{{
-          isVi ? 'Xem toàn bộ catalog' : 'Browse full catalog'
-        }}</a>
       </div>
     </section>
 
     <section class="gw-section">
-      <div class="gw-section-inner">
-        <h2 class="gw-section-title">{{ isVi ? 'Bắt đầu trong 3 bước' : 'Get started in 3 steps' }}</h2>
-        <div class="gw-steps">
-          <a v-for="s in userSteps" :key="s.n" :href="s.href" class="gw-step gw-step-link">
-            <span class="gw-step-n">{{ s.n }}</span>
-            <h3>{{ s.title }}</h3>
-            <p>{{ s.desc }}</p>
-          </a>
-        </div>
-      </div>
-    </section>
-
-    <section class="gw-section gw-section-elevated">
-      <div class="gw-section-inner">
-        <h2 class="gw-section-title">{{ isVi ? 'Cho developer' : 'For developers' }}</h2>
-        <p class="gw-section-sub gw-section-sub-below">
-          {{
-            isVi
-              ? 'Gateway TypeScript — proxy Gommo + REST wrap, OpenAPI và MCP.'
-              : 'TypeScript gateway — Gommo proxy + REST wrap, OpenAPI, and MCP.'
-          }}
-        </p>
-        <div class="gw-features gw-features-dev">
-          <article v-for="f in devFeatures" :key="f.title" class="gw-feature">
-            <span class="gw-feature-icon" aria-hidden="true">{{ f.icon }}</span>
-            <h3>{{ f.title }}</h3>
-            <p>{{ f.desc }}</p>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="gw-section gw-section-code">
-      <div class="gw-section-inner gw-code-wrap">
-        <div class="gw-code-copy">
-          <h2 class="gw-section-title">{{ isVi ? 'Tích hợp nhanh' : 'Integrate in minutes' }}</h2>
-          <p class="gw-section-sub">
+      <div class="gw-section-inner gw-split">
+        <div class="gw-split-panel">
+          <p class="gw-section-index">03</p>
+          <h2 class="gw-split-title">{{ t('Use the portal', 'Dùng portal') }}</h2>
+          <p class="gw-split-desc">
             {{
-              isVi
-                ? 'Catalog public, job cần Bearer. Xem Quickstart đầy đủ.'
-                : 'Public catalog browse, Bearer required for jobs. Read the full Quickstart.'
+              t(
+                'Chat streams SSE. Playground runs real jobs. Credits wallet syncs with Gommo — same token as the API.',
+                'Chat stream SSE. Playground chạy job thật. Wallet credits sync Gommo — cùng token với API.',
+              )
             }}
           </p>
-          <a :href="quickstartLink" class="gw-btn gw-btn-primary">{{
-            isVi ? 'Đọc Quickstart' : 'Read Quickstart'
-          }}</a>
+          <div class="gw-split-links">
+            <a :href="chatLink" class="gw-btn gw-btn-primary">{{ t('Chat', 'Chat') }}</a>
+            <a :href="playgroundLink" class="gw-btn gw-btn-outline">Playground</a>
+            <a :href="creditsLink" class="gw-btn gw-btn-outline">{{ t('Credits', 'Credits') }}</a>
+          </div>
         </div>
-        <pre class="gw-code"><code>{{ codeSample }}</code></pre>
+        <div class="gw-split-panel">
+          <p class="gw-section-index">04</p>
+          <h2 class="gw-split-title">{{ t('Ship with the API', 'Ship với API') }}</h2>
+          <p class="gw-split-desc">
+            {{
+              t(
+                'OpenAPI reference, TypeScript SDK, cookbook recipes, and MCP for Cursor agents.',
+                'OpenAPI, TypeScript SDK, cookbook và MCP cho Cursor agent.',
+              )
+            }}
+          </p>
+          <div class="gw-split-links">
+            <a :href="apiLink" class="gw-btn gw-btn-primary">{{ t('API Reference', 'API Reference') }}</a>
+            <a :href="quickstartLink" class="gw-btn gw-btn-outline">Quickstart</a>
+            <a :href="mcpLink" class="gw-btn gw-btn-outline">MCP</a>
+          </div>
+        </div>
       </div>
     </section>
 
-    <section class="gw-section gw-section-cta">
-      <div class="gw-section-inner gw-cta-inner">
-        <h2 class="gw-cta-title">
-          {{ isVi ? 'Sẵn sàng tạo?' : 'Ready to create?' }}
+    <section class="gw-section gw-section-muted">
+      <div class="gw-section-inner">
+        <p class="gw-section-index gw-section-index-center">§</p>
+        <h2 class="gw-section-title gw-section-title-center">
+          {{ t('How the gateway thinks', 'Gateway hoạt động thế nào') }}
         </h2>
-        <p class="gw-cta-sub">
-          {{
-            isVi
-              ? 'Đăng ký miễn phí hoặc mở docs để tích hợp API.'
-              : 'Sign up free or open the docs to integrate the API.'
-          }}
-        </p>
-        <div class="gw-cta-actions">
-          <a :href="signupLink" class="gw-btn gw-btn-primary">{{
-            isVi ? 'Đăng ký' : 'Sign up'
-          }}</a>
-          <a :href="quickstartLink" class="gw-btn gw-btn-secondary">{{
-            isVi ? 'Xem docs' : 'View docs'
-          }}</a>
+        <ol class="gw-pillars">
+          <li v-for="p in pillars" :key="p.n" class="gw-pillar">
+            <span class="gw-pillar-n">{{ p.n }}</span>
+            <div>
+              <h3>{{ p.title }}</h3>
+              <p>{{ p.desc }}</p>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="gw-cta-band">
+      <div class="gw-cta-band-inner">
+        <div>
+          <h2>{{ t('Deploy once. Route everything.', 'Deploy một lần. Route mọi thứ.') }}</h2>
+          <p>
+            {{
+              t(
+                'Start with a free account or skim the docs — no separate studio signup.',
+                'Bắt đầu với tài khoản miễn phí hoặc đọc docs — không cần đăng ký studio riêng.',
+              )
+            }}
+          </p>
         </div>
-        <div class="gw-doc-links">
-          <a v-for="link in docLinks" :key="link.href" :href="link.href" class="gw-doc-link">{{
-            link.label
-          }}</a>
-        </div>
+        <a :href="signupLink" class="gw-btn gw-btn-primary gw-btn-lg">{{
+          t('Get started', 'Bắt đầu')
+        }}</a>
       </div>
     </section>
   </div>
