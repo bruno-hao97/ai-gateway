@@ -331,6 +331,15 @@ body.gw-has-docs-subnav .VPContent.has-sidebar {
   flex-shrink: 0;
 }
 
+.gw-auth-check a {
+  color: var(--vp-c-brand-1);
+  text-decoration: none;
+}
+
+.gw-auth-check a:hover {
+  text-decoration: underline;
+}
+
 .gw-auth-error {
   margin: 0;
   font-size: 0.8125rem;

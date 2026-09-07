@@ -4,6 +4,7 @@ import DefaultTheme from 'vitepress/theme';
 import { useData, useRoute } from 'vitepress';
 import { clearAuth, getStoredToken } from './models/auth-api';
 import { getDocsZone, isChatImmersivePath, showDocsSubNav } from './models/docs-nav';
+import SiteFooter from './components/SiteFooter.vue';
 
 const { Layout } = DefaultTheme;
 const { lang } = useData();
@@ -36,7 +37,21 @@ function patchNavTitleLink() {
   if (typeof document === 'undefined') return;
   const el = document.querySelector('.VPNavBarTitle a.title');
   if (!(el instanceof HTMLAnchorElement)) return;
-  el.href = signedIn.value ? `${prefix.value}/app/` : `${prefix.value}/` || '/';
+  el.href = `${prefix.value}/` || '/';
+}
+
+function patchNavHomeLink() {
+  if (typeof document === 'undefined') return;
+  const homeLabels = isVi.value ? ['Trang chủ'] : ['Home'];
+  for (const link of document.querySelectorAll('.VPNavBarMenu a')) {
+    const label = link.textContent?.trim();
+    if (!label || !homeLabels.includes(label)) continue;
+    const item = link.parentElement;
+    if (item instanceof HTMLElement) {
+      item.style.display = signedIn.value ? '' : 'none';
+    }
+    break;
+  }
 }
 
 function patchDocsNavActive() {
@@ -68,6 +83,7 @@ function placeSubNavAfterNav() {
 
 function syncLayoutChrome() {
   patchNavTitleLink();
+  patchNavHomeLink();
   patchDocsNavActive();
   syncSubNavBodyClass();
   if (showSubNav.value) placeSubNavAfterNav();
@@ -118,6 +134,10 @@ function signOut() {
           </a>
         </div>
       </nav>
+    </template>
+
+    <template #layout-bottom>
+      <SiteFooter v-if="!chatImmersive" />
     </template>
 
     <template #nav-bar-content-after>

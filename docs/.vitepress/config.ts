@@ -204,6 +204,7 @@ const docsSidebarVi = [
 ];
 
 const navEn = [
+  { text: 'Home', link: '/app/' },
   { text: 'Models', link: '/models/' },
   { text: 'Playground', link: '/app/playground/' },
   { text: 'Chat', link: '/app/chat/' },
@@ -211,6 +212,7 @@ const navEn = [
 ];
 
 const navVi = [
+  { text: 'Trang chủ', link: '/vi/app/' },
   { text: 'Models', link: '/vi/models/' },
   { text: 'Playground', link: '/vi/app/playground/' },
   { text: 'Chat', link: '/vi/app/chat/' },

@@ -1,4 +1,4 @@
-/* ── Landing page (OpenRouter-style, uses VitePress theme tokens) ── */
+/* ── Landing page (79ai-style product + developer hybrid) ── */
 
 .gw-landing {
   --gw-max: 1120px;
@@ -56,7 +56,23 @@
   position: relative;
   max-width: var(--gw-max);
   margin: 0 auto;
-  padding: 4rem var(--gw-pad) 3.5rem;
+  padding: 3.5rem var(--gw-pad) 3rem;
+}
+
+.gw-hero-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--gw-text);
+  text-decoration: none;
+}
+
+.gw-hero-brand-mark {
+  color: var(--gw-accent);
+  font-size: 1.1rem;
 }
 
 .gw-hero-eyebrow {
@@ -70,8 +86,8 @@
 
 .gw-hero-title {
   margin: 0 0 1rem;
-  max-width: 16ch;
-  font-size: clamp(2.25rem, 5vw, 3.25rem);
+  max-width: 22ch;
+  font-size: clamp(2rem, 4.5vw, 3rem);
   font-weight: 700;
   line-height: 1.08;
   letter-spacing: -0.03em;
@@ -81,7 +97,7 @@
 
 .gw-hero-sub {
   margin: 0 0 1.75rem;
-  max-width: 38rem;
+  max-width: 40rem;
   font-size: 1.0625rem;
   line-height: 1.6;
   color: var(--gw-muted);
@@ -91,6 +107,22 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.gw-hero-trust {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--gw-dim);
+}
+
+.gw-hero-trust a {
+  color: var(--gw-muted);
+  text-decoration: none;
+}
+
+.gw-hero-trust a:hover {
+  color: var(--gw-accent);
 }
 
 .gw-btn {
@@ -215,6 +247,10 @@
   max-width: 36rem;
 }
 
+.gw-section-sub-below {
+  margin-bottom: 1.5rem;
+}
+
 .gw-muted {
   color: var(--gw-dim);
   font-size: 0.875rem;
@@ -246,6 +282,31 @@
   border: 1px solid var(--gw-border);
   border-radius: 12px;
   background: var(--gw-elevated);
+}
+
+.gw-feature-link {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.12s, transform 0.12s;
+}
+
+.gw-feature-link:hover {
+  border-color: var(--gw-dim);
+  transform: translateY(-1px);
+}
+
+.gw-feature-cta {
+  margin-top: auto;
+  padding-top: 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gw-accent);
+}
+
+.gw-features-dev .gw-feature {
+  background: var(--gw-bg);
 }
 
 .gw-feature-icon {
@@ -465,10 +526,18 @@
 }
 
 .gw-cta-sub {
-  margin: 0 auto 1.5rem;
+  margin: 0 auto 1.25rem;
   max-width: 28rem;
   font-size: 0.9375rem;
   color: var(--gw-muted);
+}
+
+.gw-cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-bottom: 1.25rem;
 }
 
 .gw-doc-links {
@@ -492,38 +561,6 @@
 .gw-doc-link:hover {
   border-color: var(--gw-dim);
   color: var(--gw-text);
-}
-
-/* Rules footer */
-
-.gw-rules {
-  border-top: 1px solid var(--gw-border);
-  background: var(--gw-bg);
-  padding: 2rem 0 3rem;
-}
-
-.gw-rules-inner {
-  max-width: var(--gw-max);
-  margin: 0 auto;
-  padding: 0 var(--gw-pad);
-}
-
-.gw-rules strong {
-  display: block;
-  margin-bottom: 0.65rem;
-  font-size: 0.875rem;
-}
-
-.gw-rules ul {
-  margin: 0 0 0.85rem;
-  padding-left: 1.15rem;
-  font-size: 0.8125rem;
-  line-height: 1.6;
-  color: var(--gw-muted);
-}
-
-.gw-rules li + li {
-  margin-top: 0.25rem;
 }
 
 @media (max-width: 960px) {

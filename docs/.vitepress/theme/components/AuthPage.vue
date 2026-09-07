@@ -24,6 +24,8 @@ const homeLink = computed(() => `${prefix.value}/`);
 const loginLink = computed(() => `${prefix.value}/login/`);
 const signupLink = computed(() => `${prefix.value}/signup/`);
 const appLink = computed(() => `${prefix.value}/app/`);
+const termsLink = computed(() => `${prefix.value}/terms/`);
+const privacyPolicyLink = computed(() => `${prefix.value}/privacy-policy/`);
 
 function afterAuthRedirect() {
   return readRedirectFromLocation(appLink.value);
@@ -205,11 +207,20 @@ async function onSubmit() {
           <label v-if="isSignup" class="gw-auth-check">
             <input v-model="agreeTerms" type="checkbox" required />
             <span>
-              {{
-                isVi
-                  ? 'Tôi đồng ý Terms of Service và Privacy Policy.'
-                  : 'I agree to the Terms of Service and Privacy Policy.'
-              }}
+              <template v-if="isVi">
+                Tôi đồng ý
+                <a :href="termsLink" target="_blank" rel="noopener">Điều khoản dịch vụ</a>
+                và
+                <a :href="privacyPolicyLink" target="_blank" rel="noopener"
+                  >Chính sách quyền riêng tư</a
+                >.
+              </template>
+              <template v-else>
+                I agree to the
+                <a :href="termsLink" target="_blank" rel="noopener">Terms of Service</a>
+                and
+                <a :href="privacyPolicyLink" target="_blank" rel="noopener">Privacy Policy</a>.
+              </template>
             </span>
           </label>
         </template>
