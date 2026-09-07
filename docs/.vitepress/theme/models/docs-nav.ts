@@ -80,3 +80,9 @@ export function isChatImmersivePath(path: string): boolean {
   const { path: p } = stripLocale(path);
   return p === '/app/chat' || p.startsWith('/app/chat/');
 }
+
+/** API Playground embed — full-height below nav + docs subnav, no footer. */
+export function isApiPlaygroundImmersivePath(path: string): boolean {
+  const { path: p } = stripLocale(path);
+  return p === '/reference/playground' || p.startsWith('/reference/playground/');
+}

@@ -9,7 +9,7 @@
 </head>
 <body class="pg-body">
   <header class="pg-topbar">
-    <a class="logo" href="index.html">AI <span>Gateway</span></a>
+    <a class="logo" href="#" id="logo-link">AI <span>Gateway</span></a>
     <nav class="pg-topnav">
       <a href="models.html">Models</a>
       <a href="playground.html" class="active" aria-current="page">Playground</a>
@@ -19,7 +19,7 @@
   </header>
 
   <div class="pg-shell">
-    <aside class="pg-sidebar" aria-label="Endpoints">
+    <aside class="pg-sidebar gw-scroll" aria-label="Endpoints">
       <div class="pg-sidebar-search">
         <input id="sidebarSearch" type="search" placeholder="Search endpoints…" autocomplete="off" aria-label="Search endpoints" />
       </div>
@@ -109,11 +109,12 @@
       </nav>
     </aside>
 
-    <main class="pg-main">
+    <main class="pg-main gw-scroll">
       <div class="pg-panel active" id="panel-connection" data-panel="connection">
         <header class="pg-panel-head">
+          <p class="pg-panel-kicker">Gateway REST</p>
           <h1>Connection</h1>
-          <p class="pg-endpoint"><code>POST /api/apps/go-mmo/auth/login</code></p>
+          <p class="pg-endpoint"><code>POST /gateway/auth/login</code></p>
         </header>
 
         <div class="banner-warn" role="alert">
@@ -121,12 +122,7 @@
           User token in <code>sessionStorage</code>. Never paste merchant or admin keys.
         </div>
 
-        <div class="field">
-          <label for="baseUrl">Gateway base URL</label>
-          <input id="baseUrl" type="url" placeholder="http://localhost:3001" autocomplete="off" />
-          <p class="hint">Open via <code>http://localhost:3001/portal/playground.html</code> (requires <code>npm run dev</code>).</p>
-        </div>
-
+        <div class="gw-job-panel">
         <p class="pg-token-badge" id="tokenBadge">No token</p>
         <p class="pg-token-badge pg-credits-badge" id="creditsBadge" hidden></p>
         <button type="button" class="btn btn-secondary btn-sm pg-fetch-me" id="btnFetchMe">Fetch credits (/ai/me)</button>
@@ -154,23 +150,26 @@
 
         <div id="auth-token" class="pg-tab-panel">
           <div class="field">
-            <label for="token">access_token</label>
+            <label for="token">Access token</label>
             <input id="token" type="password" placeholder="Paste Bearer token" autocomplete="off" />
           </div>
           <button type="button" class="btn btn-secondary" id="btnSaveToken">Save token</button>
         </div>
+        </div>
 
-        <p class="status-line" id="authStatus"></p>
+        <div class="pg-status-slot" id="authStatus" role="status" aria-live="polite"></div>
       </div>
 
       <div class="pg-panel" id="panel-models" data-panel="models">
         <header class="pg-panel-head">
+          <p class="pg-panel-kicker">Gateway REST</p>
           <h1>List models</h1>
           <p class="pg-endpoint"><code>GET /gateway/models?type=</code></p>
         </header>
 
+        <div class="gw-job-panel">
         <div class="field">
-          <label for="modelType">type</label>
+          <label for="modelType">Job type</label>
           <select id="modelType">
             <optgroup label="Core">
               <option value="image" selected>image</option>
@@ -190,18 +189,21 @@
           </select>
         </div>
         <button type="button" class="btn btn-primary" id="btnModels">Fetch models</button>
-        <p class="status-line" id="modelsStatus"></p>
+        </div>
+        <div class="pg-status-slot" id="modelsStatus" role="status" aria-live="polite"></div>
         <p class="hint">Pick <strong>music</strong> (or video/tts) above, then Fetch. Opens matching job panel in sidebar.</p>
       </div>
 
       <div class="pg-panel" id="panel-media-job" data-panel="media-job">
         <header class="pg-panel-head">
+          <p class="pg-panel-kicker">Media jobs</p>
           <h1 id="mediaJobTitle">Image job</h1>
           <p class="pg-endpoint"><code id="mediaJobEndpoint">POST /gateway/jobs/image</code></p>
         </header>
 
+        <div class="gw-job-panel">
         <div class="field">
-          <label for="jobType">type</label>
+          <label for="jobType">Job type</label>
           <select id="jobType">
             <optgroup label="Core">
               <option value="image" selected>image</option>
@@ -221,7 +223,7 @@
           </select>
         </div>
         <div class="field">
-          <label for="mediaModelSelect">modelSlug (from catalog)</label>
+          <label for="mediaModelSelect">Model</label>
           <select id="mediaModelSelect">
             <option value="">— Fetch models first —</option>
           </select>
@@ -229,33 +231,36 @@
         <div id="catalogFields" class="pg-catalog-fields"></div>
         <div class="field-row">
           <div class="field pg-field-grow">
-            <label for="mediaPrompt">prompt</label>
+            <label for="mediaPrompt">Prompt</label>
             <textarea id="mediaPrompt" rows="4">A cute cat, studio photo</textarea>
           </div>
           <div class="field">
             <label for="mediaWait" class="pg-check-label">
               <input id="mediaWait" type="checkbox" checked />
-              wait (server poll)
+              Wait (server poll)
             </label>
           </div>
         </div>
+        </div>
         <button type="button" class="btn btn-primary pg-run" id="btnMediaJob">Run request</button>
-        <p class="status-line" id="mediaJobStatus"></p>
+        <div class="pg-status-slot" id="mediaJobStatus" role="status" aria-live="polite"></div>
         <p class="hint">Fetch models for the same <code>type</code> on List models first. Uncheck wait → use Poll job with returned job id.</p>
       </div>
 
       <div class="pg-panel" id="panel-poll-job" data-panel="poll-job">
         <header class="pg-panel-head">
+          <p class="pg-panel-kicker">Media jobs</p>
           <h1>Poll job</h1>
           <p class="pg-endpoint"><code>GET /gateway/jobs/:id?media=</code></p>
         </header>
 
+        <div class="gw-job-panel">
         <div class="field">
-          <label for="pollJobId">job id (id_base)</label>
+          <label for="pollJobId">Job ID</label>
           <input id="pollJobId" type="text" placeholder="from create job response" autocomplete="off" />
         </div>
         <div class="field">
-          <label for="pollMedia">media</label>
+          <label for="pollMedia">Media type</label>
           <select id="pollMedia">
             <option value="image" selected>image</option>
             <option value="video">video</option>
@@ -267,42 +272,48 @@
           <button type="button" class="btn btn-primary" id="btnPollLoop">Auto poll (3.5s)</button>
           <button type="button" class="btn btn-secondary" id="btnPollStop" hidden>Stop</button>
         </div>
-        <p class="status-line" id="pollStatus"></p>
+        </div>
+        <div class="pg-status-slot" id="pollStatus" role="status" aria-live="polite"></div>
         <p class="hint">Use after create job with <code>wait: false</code>. Auto loop stops on result URL, failed status, or max attempts.</p>
       </div>
 
       <div class="pg-panel" id="panel-chat" data-panel="chat">
         <header class="pg-panel-head">
+          <p class="pg-panel-kicker">Platform</p>
           <h1>Chat</h1>
           <p class="pg-endpoint"><code>POST /gateway/chat</code></p>
         </header>
 
+        <div class="gw-job-panel">
         <div class="field">
-          <label for="chatAction">action</label>
+          <label for="chatAction">Action</label>
           <select id="chatAction">
             <option value="chat" selected>chat</option>
             <option value="stream">stream (SSE)</option>
           </select>
         </div>
         <div class="field">
-          <label for="chatSessionId">sessionId <span class="pg-optional">optional</span></label>
+          <label for="chatSessionId">Session ID <span class="pg-optional">optional</span></label>
           <input id="chatSessionId" type="text" placeholder="UUID — auto-saved after first reply" autocomplete="off" />
         </div>
         <div class="field">
-          <label for="chatQuery">query</label>
+          <label for="chatQuery">Query</label>
           <textarea id="chatQuery" rows="4">Xin chào, trả lời một câu ngắn bằng tiếng Việt.</textarea>
+        </div>
         </div>
         <p class="hint"><code>messages</code> auto-built from query — upstream requires at least one user message.</p>
         <button type="button" class="btn btn-primary pg-run" id="btnChat">Run request</button>
-        <p class="status-line" id="chatStatus"></p>
+        <div class="pg-status-slot" id="chatStatus" role="status" aria-live="polite"></div>
       </div>
 
       <div class="pg-panel" id="panel-upload" data-panel="upload">
         <header class="pg-panel-head">
+          <p class="pg-panel-kicker">Platform</p>
           <h1>Upload</h1>
           <p class="pg-endpoint"><code>POST /gateway/upload/image</code> · <code>/upload/video</code></p>
         </header>
 
+        <div class="gw-job-panel">
         <div class="pg-tabs" role="tablist">
           <button type="button" class="pg-tab active" data-upload-tab="image">Image</button>
           <button type="button" class="pg-tab" data-upload-tab="video">Video</button>
@@ -310,35 +321,38 @@
 
         <div id="upload-image" class="pg-tab-panel active">
           <div class="field">
-            <label for="uploadImageFile">file</label>
+            <label for="uploadImageFile">Image file</label>
             <input id="uploadImageFile" type="file" accept="image/*" />
           </div>
         </div>
         <div id="upload-video" class="pg-tab-panel">
           <div class="field">
-            <label for="uploadVideoFile">video_file</label>
+            <label for="uploadVideoFile">Video file</label>
             <input id="uploadVideoFile" type="file" accept="video/*" />
           </div>
         </div>
 
         <div class="field">
-          <label for="uploadFileName">fileName <span class="pg-optional">optional</span></label>
+          <label for="uploadFileName">File name <span class="pg-optional">optional</span></label>
           <input id="uploadFileName" type="text" placeholder="defaults to original filename" autocomplete="off" />
         </div>
+        </div>
         <button type="button" class="btn btn-primary pg-run" id="btnUpload">Upload</button>
-        <p class="status-line" id="uploadStatus"></p>
+        <div class="pg-status-slot" id="uploadStatus" role="status" aria-live="polite"></div>
       </div>
 
       <div class="pg-panel" id="panel-audio" data-panel="audio">
         <header class="pg-panel-head">
+          <p class="pg-panel-kicker">Platform</p>
           <h1>Audio</h1>
           <p class="pg-endpoint"><code>POST /gateway/audio/voices</code> · <code>/audio/tts</code></p>
         </header>
 
-        <p class="pg-sidebar-label pg-inline-label">1 — Search voices</p>
+        <div class="gw-job-panel">
+        <p class="gw-job-params-head">1 — Search voices</p>
         <div class="field-row">
           <div class="field">
-            <label for="audioServer">server</label>
+            <label for="audioServer">Server</label>
             <select id="audioServer">
               <option value="elevenlabs_cheap" selected>elevenlabs_cheap</option>
               <option value="minimaxai_cheap">minimaxai_cheap</option>
@@ -346,43 +360,47 @@
             </select>
           </div>
           <div class="field">
-            <label for="audioVoiceQuery">query <span class="pg-optional">optional</span></label>
+            <label for="audioVoiceQuery">Query <span class="pg-optional">optional</span></label>
             <input id="audioVoiceQuery" type="text" placeholder="search" autocomplete="off" />
           </div>
         </div>
         <button type="button" class="btn btn-secondary" id="btnVoices">Fetch voices</button>
         <div class="field">
-          <label for="audioVoiceSelect">voice</label>
+          <label for="audioVoiceSelect">Voice</label>
           <select id="audioVoiceSelect" disabled>
             <option value="">— Fetch voices first —</option>
           </select>
         </div>
 
-        <p class="pg-sidebar-label pg-inline-label">2 — Text-to-speech</p>
+        <p class="gw-job-params-head gw-job-params-head--section">2 — Text-to-speech</p>
         <div class="field">
-          <label for="audioModel">model</label>
+          <label for="audioModel">Model</label>
           <input id="audioModel" type="text" value="eleven_multilingual_v2" autocomplete="off" />
         </div>
         <div class="field">
-          <label for="audioText">text</label>
+          <label for="audioText">Text</label>
           <textarea id="audioText" rows="3">Xin chào, đây là thử nghiệm TTS qua AI Gateway.</textarea>
         </div>
+        </div>
         <button type="button" class="btn btn-primary pg-run" id="btnTts">Run TTS</button>
-        <p class="status-line" id="audioStatus"></p>
+        <div class="pg-status-slot" id="audioStatus" role="status" aria-live="polite"></div>
       </div>
 
       <div class="pg-panel" id="panel-audio-lists" data-panel="audio-lists">
         <header class="pg-panel-head">
+          <p class="pg-panel-kicker">Platform</p>
           <h1>Audio lists</h1>
           <p class="pg-endpoint"><code>GET /gateway/audio/lists</code></p>
         </header>
 
+        <div class="gw-job-panel">
         <div class="field">
-          <label for="audioListsProjectId">projectId <span class="pg-optional">optional</span></label>
+          <label for="audioListsProjectId">Project ID <span class="pg-optional">optional</span></label>
           <input id="audioListsProjectId" type="text" value="default" autocomplete="off" />
         </div>
         <button type="button" class="btn btn-primary pg-run" id="btnAudioLists">Fetch lists</button>
-        <p class="status-line" id="audioListsStatus"></p>
+        </div>
+        <div class="pg-status-slot" id="audioListsStatus" role="status" aria-live="polite"></div>
         <p class="hint">TTS generation history — pick <code>file_url</code> from RESPONSE to preview in browser.</p>
       </div>
     </main>
@@ -395,13 +413,15 @@
           <button type="button" class="btn btn-ghost btn-sm" id="btnCopyResponse" title="Copy JSON">Copy</button>
         </div>
       </div>
-      <pre class="pg-response-body" id="responseOutput">Run a request to see JSON here.</pre>
-      <div class="pg-preview" id="resultPreview" hidden>
-        <p class="pg-preview-label">resultUrl</p>
-        <a id="resultLink" href="#" target="_blank" rel="noopener noreferrer"></a>
-        <img id="resultImage" alt="Generated image" hidden />
-        <video id="resultVideo" controls hidden></video>
-        <audio id="resultAudio" controls hidden></audio>
+      <div class="pg-response-scroll gw-scroll">
+        <div class="pg-preview" id="resultPreview" hidden>
+          <p class="pg-preview-label">Preview</p>
+          <a id="resultLink" class="pg-preview-open" href="#" target="_blank" rel="noopener noreferrer">Open in new tab ↗</a>
+          <img id="resultImage" alt="Generated image" hidden />
+          <video id="resultVideo" controls hidden></video>
+          <audio id="resultAudio" controls hidden></audio>
+        </div>
+        <pre class="pg-response-body" id="responseOutput">Run a request to see JSON here.</pre>
       </div>
     </aside>
   </div>

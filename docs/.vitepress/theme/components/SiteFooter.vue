@@ -2,8 +2,6 @@
 import { computed } from 'vue';
 import { useData } from 'vitepress';
 
-const GITHUB_URL = 'https://github.com/bruno-hao97/ai-gateway';
-
 interface FooterLink {
   label: string;
   href: string;
@@ -39,7 +37,7 @@ const linkColumns = computed((): FooterColumn[] => {
       links: [
         { label: t('Models', 'Models'), href: `${p}/models/` },
         { label: t('Compare models', 'So sánh models'), href: `${p}/models/compare/` },
-        { label: t('Playground', 'Playground'), href: `${p}/app/playground/` },
+        { label: t('Media Playground', 'Media Playground'), href: `${p}/app/playground/` },
         { label: t('Chat', 'Chat'), href: `${p}/app/chat/` },
         { label: t('MCP', 'MCP'), href: `${p}/mcp/` },
         { label: t('Credits', 'Credits'), href: `${p}/app/credits/` },
@@ -70,11 +68,6 @@ const linkColumns = computed((): FooterColumn[] => {
         { label: t('SDK', 'SDK'), href: `${p}/sdk/` },
         { label: t('FAQ', 'FAQ'), href: `${p}/faq` },
       ],
-    },
-    {
-      id: 'connect',
-      title: t('Connect', 'Kết nối'),
-      links: [{ label: t('GitHub', 'GitHub'), href: GITHUB_URL, external: true }],
     },
   ];
 });

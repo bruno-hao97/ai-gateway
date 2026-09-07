@@ -98,6 +98,14 @@
   margin-bottom: 1.25rem;
 }
 
+.gw-hero-note {
+  margin: -0.5rem 0 1rem;
+  max-width: 32rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--gw-dim);
+}
+
 .gw-hero-shortcuts {
   display: flex;
   flex-wrap: wrap;

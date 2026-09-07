@@ -7,8 +7,10 @@
 - Dev UI: `/portal` (docs-portal), developer docs VitePress `:5173`
 
 ## Dev
-- `npm run dev` — API :3001 (+ `/portal/` khi dev)
-- `npm run docs:dev` — VitePress :5173
+- `npm run docs:dev` — **một port** `:5173` (docs + `/portal/` static + proxy `/gateway/*`)
+- Set `GATEWAY_PROXY_TARGET` (hoặc `VITE_GATEWAY_URL`) trong `.env` → API remote; không cần `npm run dev`
+- `npm run docs:stack` — docs + local API `:3001` khi sửa backend
+- `npm run dev` — chỉ gateway API `:3001` (portal tại `/portal` khi chạy riêng)
 - `GATEWAY_CORS_ORIGIN` — chỉ khi browser client khác origin (optional cho API-only)
 
 ## Proxy (implement trước)

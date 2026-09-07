@@ -854,13 +854,6 @@
   transition: border-color 0.12s, background 0.12s;
 }
 
-.or-compare-preset-icons {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  min-height: 28px;
-}
-
 .or-compare-preset strong {
   color: var(--or-text);
   font-size: 0.875rem;
@@ -964,22 +957,6 @@
   font-size: 1.25rem;
   line-height: 1;
   padding: 0 0.15rem;
-}
-
-.or-compare-icon-skeleton {
-  background: var(--or-bg-hover);
-  color: transparent;
-  animation: or-compare-pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes or-compare-pulse {
-  0%,
-  100% {
-    opacity: 0.45;
-  }
-  50% {
-    opacity: 0.85;
-  }
 }
 
 /* ── Compare results (2-column cards) ── */

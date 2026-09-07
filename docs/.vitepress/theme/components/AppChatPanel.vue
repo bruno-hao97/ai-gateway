@@ -47,6 +47,7 @@ import type { CatalogModel } from '../models/catalog-api';
 import { modelCatalogUnavailable, modelUnavailableSuffix } from '../models/catalog-api';
 import {
   catalogJobFieldDefs,
+  catalogJobFieldLabel,
   formatImageJobFieldSummary,
   resolveImageFieldValues,
   validateCatalogJobFields,
@@ -1072,7 +1073,7 @@ async function runImageTurn(history: ChatMessage[], userMsg: ChatMessage, assist
       controller.signal,
       toMediaJobRefs(jobRefAttachments),
     );
-    const fieldSummary = formatImageJobFieldSummary(result.fields);
+    const fieldSummary = formatImageJobFieldSummary(result.fields, isVi.value);
     const caption = isVi.value
       ? `Ảnh từ **${result.modelLabel}**${fieldSummary ? ` · ${fieldSummary}` : ''}`
       : `Image from **${result.modelLabel}**${fieldSummary ? ` · ${fieldSummary}` : ''}`;
@@ -1199,7 +1200,7 @@ async function runVideoTurn(history: ChatMessage[], userMsg: ChatMessage, assist
       controller.signal,
       toMediaJobRefs(jobRefAttachments),
     );
-    const fieldSummary = formatImageJobFieldSummary(result.fields);
+    const fieldSummary = formatImageJobFieldSummary(result.fields, isVi.value);
     const caption = isVi.value
       ? `Video từ **${result.modelLabel}**${fieldSummary ? ` · ${fieldSummary}` : ''}`
       : `Video from **${result.modelLabel}**${fieldSummary ? ` · ${fieldSummary}` : ''}`;
@@ -1902,76 +1903,92 @@ onUnmounted(() => {
       </button>
 
       <div v-if="imageGenMode" class="or-app-chat-col">
-        <div class="or-chat-image-gen-bar">
-        <label class="or-chat-image-gen-field">
-          <span>{{ isVi ? 'Model ảnh' : 'Image model' }}</span>
-          <select v-model="imageModelSlug" :disabled="streaming || imageModelsLoading || !imageModels.length">
-            <option
-              v-for="m in imageModels"
-              :key="m.slug"
-              :value="m.slug"
-              :disabled="modelCatalogUnavailable(m)"
-            >
-              {{ m.name }} · {{ m.creditsLabel }}{{ modelUnavailableSuffix(m, isVi) }}
-            </option>
-          </select>
-        </label>
-        <label
-          v-for="def in imageFieldDefs"
-          :key="def.field"
-          class="or-chat-image-gen-field"
-        >
-          <span>{{ def.field }}</span>
-          <select
-            :value="imageFieldValues[def.field] || ''"
-            :disabled="streaming"
-            @change="setImageField(def.field, ($event.target as HTMLSelectElement).value)"
+        <div class="or-chat-image-gen-bar gw-job-panel gw-job-panel--compact">
+          <p class="gw-job-panel-kicker">{{ isVi ? 'Ảnh' : 'Image' }}</p>
+          <label class="gw-job-field">
+            <span class="gw-job-label">
+              <span class="gw-job-label-prefix" aria-hidden="true">//</span>
+              {{ isVi ? 'Model' : 'Model' }}
+            </span>
+            <select v-model="imageModelSlug" class="gw-job-input" :disabled="streaming || imageModelsLoading || !imageModels.length">
+              <option
+                v-for="m in imageModels"
+                :key="m.slug"
+                :value="m.slug"
+                :disabled="modelCatalogUnavailable(m)"
+              >
+                {{ m.name }} · {{ m.creditsLabel }}{{ modelUnavailableSuffix(m, isVi) }}
+              </option>
+            </select>
+          </label>
+          <label
+            v-for="def in imageFieldDefs"
+            :key="def.field"
+            class="gw-job-field"
           >
-            <option v-for="opt in def.options" :key="opt.value" :value="opt.value">
-              {{ opt.label !== opt.value ? `${opt.label} (${opt.value})` : opt.value }}
-            </option>
-          </select>
-        </label>
-        <span v-if="imageModelsLoading" class="or-chat-image-gen-loading">
-          {{ isVi ? 'Đang tải catalog…' : 'Loading catalog…' }}
-        </span>
+            <span class="gw-job-label">
+              <span class="gw-job-label-prefix" aria-hidden="true">//</span>
+              {{ catalogJobFieldLabel(def.field, isVi) }}
+            </span>
+            <select
+              class="gw-job-input"
+              :value="imageFieldValues[def.field] || ''"
+              :disabled="streaming"
+              @change="setImageField(def.field, ($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="opt in def.options" :key="opt.value" :value="opt.value">
+                {{ opt.label !== opt.value ? `${opt.label} (${opt.value})` : opt.value }}
+              </option>
+            </select>
+          </label>
+          <span v-if="imageModelsLoading" class="or-chat-image-gen-loading">
+            {{ isVi ? 'Đang tải catalog…' : 'Loading catalog…' }}
+          </span>
         </div>
       </div>
 
       <div v-if="videoGenMode" class="or-app-chat-col">
-        <div class="or-chat-image-gen-bar">
-        <label class="or-chat-image-gen-field">
-          <span>{{ isVi ? 'Model video' : 'Video model' }}</span>
-          <select v-model="videoModelSlug" :disabled="streaming || videoModelsLoading || !videoModels.length">
-            <option
-              v-for="m in videoModels"
-              :key="m.slug"
-              :value="m.slug"
-              :disabled="modelCatalogUnavailable(m)"
-            >
-              {{ m.name }} · {{ m.creditsLabel }}{{ modelUnavailableSuffix(m, isVi) }}
-            </option>
-          </select>
-        </label>
-        <label
-          v-for="def in videoFieldDefs"
-          :key="def.field"
-          class="or-chat-image-gen-field"
-        >
-          <span>{{ def.field }}</span>
-          <select
-            :value="videoFieldValues[def.field] || ''"
-            :disabled="streaming"
-            @change="setVideoField(def.field, ($event.target as HTMLSelectElement).value)"
+        <div class="or-chat-image-gen-bar gw-job-panel gw-job-panel--compact">
+          <p class="gw-job-panel-kicker">{{ isVi ? 'Video' : 'Video' }}</p>
+          <label class="gw-job-field">
+            <span class="gw-job-label">
+              <span class="gw-job-label-prefix" aria-hidden="true">//</span>
+              {{ isVi ? 'Model' : 'Model' }}
+            </span>
+            <select v-model="videoModelSlug" class="gw-job-input" :disabled="streaming || videoModelsLoading || !videoModels.length">
+              <option
+                v-for="m in videoModels"
+                :key="m.slug"
+                :value="m.slug"
+                :disabled="modelCatalogUnavailable(m)"
+              >
+                {{ m.name }} · {{ m.creditsLabel }}{{ modelUnavailableSuffix(m, isVi) }}
+              </option>
+            </select>
+          </label>
+          <label
+            v-for="def in videoFieldDefs"
+            :key="def.field"
+            class="gw-job-field"
           >
-            <option v-for="opt in def.options" :key="opt.value" :value="opt.value">
-              {{ opt.label !== opt.value ? `${opt.label} (${opt.value})` : opt.value }}
-            </option>
-          </select>
-        </label>
-        <span v-if="videoModelsLoading" class="or-chat-image-gen-loading">
-          {{ isVi ? 'Đang tải catalog…' : 'Loading catalog…' }}
-        </span>
+            <span class="gw-job-label">
+              <span class="gw-job-label-prefix" aria-hidden="true">//</span>
+              {{ catalogJobFieldLabel(def.field, isVi) }}
+            </span>
+            <select
+              class="gw-job-input"
+              :value="videoFieldValues[def.field] || ''"
+              :disabled="streaming"
+              @change="setVideoField(def.field, ($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="opt in def.options" :key="opt.value" :value="opt.value">
+                {{ opt.label !== opt.value ? `${opt.label} (${opt.value})` : opt.value }}
+              </option>
+            </select>
+          </label>
+          <span v-if="videoModelsLoading" class="or-chat-image-gen-loading">
+            {{ isVi ? 'Đang tải catalog…' : 'Loading catalog…' }}
+          </span>
         </div>
       </div>
 

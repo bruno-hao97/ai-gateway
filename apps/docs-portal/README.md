@@ -1,22 +1,22 @@
 # Docs Portal
 
-Landing + API playground, served từ Express tại **`/portal`** (dev).
+API playground dev UI, served từ Express tại **`/portal`** (dev).
 
 ## Chạy local
 
 ```bash
 # API + portal (1 port)
 npm run dev
-# → http://localhost:3001/portal/
-# → http://localhost:3001/portal/models.html
+# → http://localhost:3001/portal/          (→ playground)
 # → http://localhost:3001/portal/playground.html
+# → http://localhost:3001/portal/models.html
 
-# Chỉ khi viết/sửa markdown docs
+# Docs site (VitePress)
 npm run docs:dev
 # → http://localhost:5173
 ```
 
-Playground mặc định gọi API **cùng origin** — không cần `GATEWAY_CORS_ORIGIN`.
+Logo **AI Gateway** trên playground trỏ về docs (`5173` dev). Playground mặc định gọi API **cùng origin** — không cần `GATEWAY_CORS_ORIGIN`.
 
 ## Production
 

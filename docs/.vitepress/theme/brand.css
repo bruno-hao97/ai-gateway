@@ -1,0 +1,24 @@
+/* Gateway brand — single source for VitePress docs theme.
+   Portal mirrors --gw-brand-* in apps/docs-portal/css/style.css */
+
+:root {
+  --gw-brand-1: #646cff;
+  --gw-brand-2: #7c84ff;
+  --gw-brand-3: #5258d9;
+  --vp-c-brand-1: var(--gw-brand-1);
+  --vp-c-brand-2: var(--gw-brand-2);
+  --vp-c-brand-3: var(--gw-brand-3);
+  --vp-c-brand-soft: color-mix(in srgb, var(--gw-brand-1) 14%, transparent);
+  --gw-scroll-size: 6px;
+  --gw-scroll-thumb: rgba(255, 255, 255, 0.14);
+  --gw-scroll-thumb-hover: rgba(255, 255, 255, 0.22);
+}
+
+.dark {
+  --gw-brand-1: #8b93ff;
+  --gw-brand-2: #646cff;
+  --gw-brand-3: #a8adff;
+  --vp-c-brand-1: var(--gw-brand-1);
+  --vp-c-brand-2: var(--gw-brand-2);
+  --vp-c-brand-3: var(--gw-brand-3);
+}

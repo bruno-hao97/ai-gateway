@@ -493,7 +493,7 @@ export function normalizeCatalogModel(
   };
 }
 
-/** Dev: VitePress proxy `/gateway` → :3001. Prod: set VITE_GATEWAY_URL at build. */
+/** Dev: VitePress proxy `/gateway` (GATEWAY_PROXY_TARGET). Prod: VITE_GATEWAY_URL at build. */
 export function gatewayBaseUrl(): string {
   const env = import.meta.env.VITE_GATEWAY_URL as string | undefined;
   if (env) return env.replace(/\/$/, '');

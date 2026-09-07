@@ -3,7 +3,13 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import DefaultTheme from 'vitepress/theme';
 import { useData, useRoute } from 'vitepress';
 import { clearAuth, getStoredToken } from './models/auth-api';
-import { getDocsZone, isChatImmersivePath, showDocsSubNav } from './models/docs-nav';
+import {
+  getDocsZone,
+  isApiPlaygroundImmersivePath,
+  isAppShellPath,
+  isChatImmersivePath,
+  showDocsSubNav,
+} from './models/docs-nav';
 import SiteFooter from './components/SiteFooter.vue';
 
 const { Layout } = DefaultTheme;
@@ -16,7 +22,10 @@ const signedIn = ref(false);
 const subNavEl = ref<HTMLElement | null>(null);
 
 const showSubNav = computed(() => showDocsSubNav(route.path));
+const appShell = computed(() => isAppShellPath(route.path));
 const chatImmersive = computed(() => isChatImmersivePath(route.path));
+const apiPlaygroundImmersive = computed(() => isApiPlaygroundImmersivePath(route.path));
+const hideSiteFooter = computed(() => chatImmersive.value || apiPlaygroundImmersive.value);
 
 const docsSubNav = computed(() => {
   const p = prefix.value;
@@ -67,7 +76,9 @@ function patchDocsNavActive() {
 function syncSubNavBodyClass() {
   if (typeof document === 'undefined') return;
   document.body.classList.toggle('gw-has-docs-subnav', showSubNav.value);
+  document.body.classList.toggle('gw-app-shell', appShell.value);
   document.body.classList.toggle('gw-chat-immersive', chatImmersive.value);
+  document.body.classList.toggle('gw-api-playground-immersive', apiPlaygroundImmersive.value);
 }
 
 function placeSubNavAfterNav() {
@@ -137,7 +148,7 @@ function signOut() {
     </template>
 
     <template #layout-bottom>
-      <SiteFooter v-if="!chatImmersive" />
+      <SiteFooter v-if="!hideSiteFooter" />
     </template>
 
     <template #nav-bar-content-after>

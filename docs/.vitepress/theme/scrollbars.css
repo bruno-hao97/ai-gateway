@@ -1,0 +1,64 @@
+/* Unified thin scrollbars — docs + .gw-scroll utility (portal mirrors tokens in style.css) */
+
+.gw-scroll,
+.VPSidebar .items,
+.VPSidebar .curtain,
+.VPContent .content,
+.vp-doc,
+.VPDocAside .content,
+.or-sidebar,
+.or-checkout-modal,
+.or-checkout-invoice-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--gw-scroll-thumb) transparent;
+}
+
+.gw-scroll::-webkit-scrollbar,
+.VPSidebar .items::-webkit-scrollbar,
+.VPSidebar .curtain::-webkit-scrollbar,
+.VPContent .content::-webkit-scrollbar,
+.vp-doc::-webkit-scrollbar,
+.VPDocAside .content::-webkit-scrollbar,
+.or-sidebar::-webkit-scrollbar,
+.or-checkout-modal::-webkit-scrollbar,
+.or-checkout-invoice-scroll::-webkit-scrollbar {
+  width: var(--gw-scroll-size);
+  height: var(--gw-scroll-size);
+}
+
+.gw-scroll::-webkit-scrollbar-track,
+.VPSidebar .items::-webkit-scrollbar-track,
+.VPSidebar .curtain::-webkit-scrollbar-track,
+.VPContent .content::-webkit-scrollbar-track,
+.vp-doc::-webkit-scrollbar-track,
+.VPDocAside .content::-webkit-scrollbar-track,
+.or-sidebar::-webkit-scrollbar-track,
+.or-checkout-modal::-webkit-scrollbar-track,
+.or-checkout-invoice-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.gw-scroll::-webkit-scrollbar-thumb,
+.VPSidebar .items::-webkit-scrollbar-thumb,
+.VPSidebar .curtain::-webkit-scrollbar-thumb,
+.VPContent .content::-webkit-scrollbar-thumb,
+.vp-doc::-webkit-scrollbar-thumb,
+.VPDocAside .content::-webkit-scrollbar-thumb,
+.or-sidebar::-webkit-scrollbar-thumb,
+.or-checkout-modal::-webkit-scrollbar-thumb,
+.or-checkout-invoice-scroll::-webkit-scrollbar-thumb {
+  background: var(--gw-scroll-thumb);
+  border-radius: 3px;
+}
+
+.gw-scroll::-webkit-scrollbar-thumb:hover,
+.VPSidebar .items::-webkit-scrollbar-thumb:hover,
+.VPSidebar .curtain::-webkit-scrollbar-thumb:hover,
+.VPContent .content::-webkit-scrollbar-thumb:hover,
+.vp-doc::-webkit-scrollbar-thumb:hover,
+.VPDocAside .content::-webkit-scrollbar-thumb:hover,
+.or-sidebar::-webkit-scrollbar-thumb:hover,
+.or-checkout-modal::-webkit-scrollbar-thumb:hover,
+.or-checkout-invoice-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--gw-scroll-thumb-hover);
+}

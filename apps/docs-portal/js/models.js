@@ -28,6 +28,8 @@ let models = [];
 let lastFetchAt = null;
 
 document.getElementById('docs-nav').href = docsUrl();
+const logoLink = document.getElementById('logo-link');
+if (logoLink) logoLink.href = docsUrl();
 
 baseUrlEl.value = defaultBaseUrl();
 tokenEl.value = getStoredToken();

@@ -2,7 +2,6 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useData, useRoute } from 'vitepress';
 import { getStoredToken, getStoredDomain, importSessionFromUrl, loginUrlWithRedirect } from '../models/auth-api';
-import { playgroundUrl } from '../models/gateway-base';
 import {
   fetchBillingPackages,
   fetchBillingStatus,
@@ -99,7 +98,7 @@ let checkoutToastTimer: ReturnType<typeof setTimeout> | null = null;
 const usagePanelRef = ref<InstanceType<typeof ProfileUsagePanel> | null>(null);
 const logsPanelRef = ref<InstanceType<typeof ProfileUsagePanel> | null>(null);
 
-const playgroundExternalUrl = computed(() => playgroundUrl());
+const apiExplorerLink = computed(() => `${prefix.value}/reference/playground/`);
 
 const credits = computed(() => getCredits(me.value));
 const displayName = computed(() => getDisplayName(me.value));
@@ -370,13 +369,6 @@ watch(
 <template>
   <div class="or-catalog or-app" :class="{ 'or-app-has-playground': isImmersiveView(), 'or-app-chat-layout': view === 'chat' }">
     <aside v-if="view !== 'chat'" class="or-sidebar">
-      <div class="or-app-brand">
-        <a :href="`${prefix}/app/`" class="or-app-brand-link">
-          <span class="or-app-logo">⬡</span>
-          <span class="or-app-brand-title">AI Gateway</span>
-        </a>
-      </div>
-
       <div class="or-app-workspace" aria-label="Workspace">
         <button type="button" class="or-app-workspace-btn" disabled>
           <span>{{ isVi ? 'Workspace mặc định' : 'Default workspace' }}</span>
@@ -490,12 +482,10 @@ watch(
         <div class="or-app-header-actions">
           <a
             v-if="view === 'playground'"
-            :href="playgroundExternalUrl"
-            target="_blank"
-            rel="noreferrer"
+            :href="apiExplorerLink"
             class="or-app-btn or-app-btn-ghost"
           >
-            {{ isVi ? 'API explorer ↗' : 'API explorer ↗' }}
+            {{ isVi ? 'API explorer' : 'API explorer' }}
           </a>
           <button
             v-if="view === 'profile'"

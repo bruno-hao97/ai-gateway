@@ -5,6 +5,18 @@ export type { CatalogJobField, CatalogOption };
 
 export const CATALOG_JOB_FIELD_ORDER: CatalogJobField[] = ['ratio', 'mode', 'resolution', 'duration'];
 
+const CATALOG_JOB_FIELD_LABELS: Record<CatalogJobField, { en: string; vi: string }> = {
+  ratio: { en: 'Aspect ratio', vi: 'Tỉ lệ ảnh' },
+  mode: { en: 'Mode', vi: 'Chế độ' },
+  resolution: { en: 'Resolution', vi: 'Độ phân giải' },
+  duration: { en: 'Duration', vi: 'Thời lượng' },
+};
+
+export function catalogJobFieldLabel(field: CatalogJobField, isVi = false): string {
+  const labels = CATALOG_JOB_FIELD_LABELS[field];
+  return isVi ? labels.vi : labels.en;
+}
+
 const STORAGE_KEY = 'gw_portal_chat_image_fields_v2';
 
 export type CatalogJobFieldValues = Partial<Record<CatalogJobField, string>>;
@@ -114,9 +126,10 @@ export function validateCatalogJobFields(
         : `Select ${def.field} from catalog — never guess values.`;
     }
     if (!def.options.some((o) => o.value === val)) {
+      const label = catalogJobFieldLabel(def.field, isVi);
       return isVi
-        ? `${def.field} không hợp lệ cho model này.`
-        : `Invalid ${def.field} for this model.`;
+        ? `${label} không hợp lệ cho model này.`
+        : `Invalid ${label.toLowerCase()} for this model.`;
     }
   }
   return null;
@@ -135,8 +148,8 @@ export function buildImageJobFields(
   return fields;
 }
 
-export function formatImageJobFieldSummary(values: CatalogJobFieldValues): string {
+export function formatImageJobFieldSummary(values: CatalogJobFieldValues, isVi = false): string {
   return CATALOG_JOB_FIELD_ORDER.filter((f) => values[f])
-    .map((f) => `${f} ${values[f]}`)
+    .map((f) => `${catalogJobFieldLabel(f, isVi)} ${values[f]}`)
     .join(' · ');
 }

@@ -16,7 +16,6 @@ import {
   modelTags,
   monthGroupLabel,
   playgroundUrl,
-  presetPreviewModels,
   presetExampleNames,
   providerInitials,
   type CatalogLang,
@@ -101,7 +100,6 @@ const showSlotPicker = computed(() => !(slotA.value && slotB.value));
 const presetCards = computed(() =>
   COMPARE_PRESETS.map((preset) => ({
     preset,
-    preview: presetPreviewModels(allModels.value, preset),
     examples: presetExampleNames(allModels.value, preset),
   })),
 );
@@ -237,25 +235,12 @@ onMounted(() => {
 
       <div class="or-compare-presets">
         <button
-          v-for="{ preset, preview, examples } in presetCards"
+          v-for="{ preset, examples } in presetCards"
           :key="preset.id"
           type="button"
           class="or-compare-preset"
           @click="onPresetClick(preset)"
         >
-          <div v-if="preview.length" class="or-compare-preset-icons">
-            <span
-              v-for="m in preview"
-              :key="m.slug"
-              class="or-provider-avatar or-provider-avatar--sm"
-              :title="m.name"
-            >{{ providerInitials(m.provider || m.slug) }}</span>
-          </div>
-          <div v-else-if="loading" class="or-compare-preset-icons or-compare-preset-icons--placeholder" aria-hidden="true">
-            <span class="or-provider-avatar or-provider-avatar--sm or-compare-icon-skeleton" />
-            <span class="or-provider-avatar or-provider-avatar--sm or-compare-icon-skeleton" />
-            <span class="or-provider-avatar or-provider-avatar--sm or-compare-icon-skeleton" />
-          </div>
           <strong>{{ isVi ? preset.titleVi : preset.titleEn }}</strong>
           <span class="or-compare-preset-desc">{{
             isVi ? preset.descVi : preset.descEn

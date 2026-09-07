@@ -1,19 +1,27 @@
+/* Brand — keep --gw-brand-* in sync with docs/.vitepress/theme/brand.css */
 :root {
+  --gw-brand-1: #646cff;
+  --gw-brand-2: #7c84ff;
+  --gw-brand-3: #5258d9;
   --bg: #0f1117;
   --surface: #1a1d27;
   --border: #2a2f3d;
   --text: #e8eaef;
   --muted: #9aa3b5;
-  --accent: #6c8cff;
-  --accent-hover: #8aa4ff;
+  --dim: #6b7280;
+  --accent: var(--gw-brand-1);
+  --accent-hover: var(--gw-brand-2);
   --warn-bg: #3d2e12;
   --warn-border: #b8860b;
   --warn-text: #f0d78c;
   --ok: #3dd68c;
   --err: #ff6b6b;
-  --radius: 10px;
+  --radius: 2px;
   --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
   --mono: 'Cascadia Code', 'Consolas', monospace;
+  --gw-scroll-size: 6px;
+  --gw-scroll-thumb: rgba(255, 255, 255, 0.14);
+  --gw-scroll-thumb-hover: rgba(255, 255, 255, 0.22);
 }
 
 *,
@@ -125,13 +133,13 @@ nav a {
 .btn {
   display: inline-block;
   padding: 0.55rem 1.1rem;
-  border-radius: 8px;
-  font-size: 0.9rem;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
   font-weight: 600;
   border: none;
   cursor: pointer;
   text-decoration: none;
-  transition: background 0.15s, transform 0.1s;
+  transition: background 0.12s, border-color 0.12s, opacity 0.12s;
 }
 
 .btn-primary {
@@ -192,27 +200,36 @@ nav a {
 }
 
 .field {
-  margin-bottom: 1rem;
+  margin-bottom: 0.85rem;
 }
 
-.field label {
+.field label:not(.pg-check-label) {
   display: block;
-  font-size: 0.82rem;
-  color: var(--muted);
-  margin-bottom: 0.35rem;
+  font-family: var(--mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 0.3rem;
+}
+
+.field label:not(.pg-check-label)::before {
+  content: '// ';
+  color: var(--accent);
 }
 
 .field input,
 .field select,
 .field textarea {
   width: 100%;
-  padding: 0.55rem 0.75rem;
-  border-radius: 8px;
+  padding: 0.48rem 0.55rem;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);
   font-family: inherit;
-  font-size: 0.92rem;
+  font-size: 0.8125rem;
 }
 
 .field input:focus,
@@ -220,6 +237,17 @@ nav a {
 .field textarea:focus {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+.field input:-webkit-autofill,
+.field input:-webkit-autofill:hover,
+.field input:-webkit-autofill:focus,
+.field input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px var(--bg) inset !important;
+  box-shadow: 0 0 0 1000px var(--bg) inset !important;
+  -webkit-text-fill-color: var(--text) !important;
+  caret-color: var(--text);
+  transition: background-color 99999s ease-out;
 }
 
 .field-row {
@@ -246,7 +274,7 @@ pre.output {
   padding: 1rem;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   font-family: var(--mono);
   font-size: 0.78rem;
   overflow: auto;
@@ -269,8 +297,47 @@ pre.output {
   color: var(--err);
 }
 
+/* Shared job-parameter UI (portal playground + forms) */
+
+.gw-job-panel {
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  padding: 1rem 1rem 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.gw-job-params {
+  margin-top: 0.15rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+.gw-job-params-head {
+  margin: 0 0 0.65rem;
+  font-family: var(--mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.gw-job-panel .field:last-child {
+  margin-bottom: 0;
+}
+
+.gw-job-panel .pg-tabs {
+  margin-top: 0;
+}
+
+.gw-job-params-head--section {
+  margin-top: 1rem;
+}
+
 .hint {
-  font-size: 0.82rem;
+  font-size: 0.75rem;
   color: var(--muted);
   margin-top: 0.35rem;
 }
@@ -282,4 +349,28 @@ footer.site-footer {
   font-size: 0.85rem;
   border-top: 1px solid var(--border);
   margin-top: 2rem;
+}
+
+/* Thin scrollbars — keep in sync with docs/.vitepress/theme/scrollbars.css */
+.gw-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--gw-scroll-thumb) transparent;
+}
+
+.gw-scroll::-webkit-scrollbar {
+  width: var(--gw-scroll-size);
+  height: var(--gw-scroll-size);
+}
+
+.gw-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.gw-scroll::-webkit-scrollbar-thumb {
+  background: var(--gw-scroll-thumb);
+  border-radius: 3px;
+}
+
+.gw-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--gw-scroll-thumb-hover);
 }

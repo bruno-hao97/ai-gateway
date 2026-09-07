@@ -6,7 +6,6 @@ import {
   JOB_TYPES,
   catalogProviders,
   fetchAllModels,
-  playgroundUrl,
   providerInitials,
   sortModels,
   type CatalogLang,
@@ -18,7 +17,6 @@ const isVi = computed(() => lang.value === 'vi-VN');
 const catalogLang = computed((): CatalogLang | undefined => (isVi.value ? 'vi' : 'en'));
 
 const prefix = computed(() => (isVi.value ? '/vi' : ''));
-const localePrefix = computed((): '' | '/vi' => (isVi.value ? '/vi' : ''));
 
 const quickstartLink = computed(() => `${prefix.value}/quickstart`);
 const loginLink = computed(() => `${prefix.value}/login/`);
@@ -27,6 +25,7 @@ const modelsLink = computed(() => `${prefix.value}/models/`);
 const compareLink = computed(() => `${prefix.value}/models/compare/`);
 const chatLink = computed(() => `${prefix.value}/app/chat/`);
 const playgroundLink = computed(() => `${prefix.value}/app/playground/`);
+const apiPlaygroundLink = computed(() => `${prefix.value}/reference/playground/`);
 const creditsLink = computed(() => `${prefix.value}/app/credits/`);
 const mcpLink = computed(() => `${prefix.value}/mcp/`);
 const apiLink = computed(() => `${prefix.value}/reference/openapi`);
@@ -35,6 +34,16 @@ const aboutLink = computed(() => `${prefix.value}/about/`);
 
 function t(en: string, vi: string): string {
   return isVi.value ? vi : en;
+}
+
+function apiPlaygroundHref(opts?: { type?: string; model?: string }): string {
+  const base = apiPlaygroundLink.value;
+  if (!opts?.type && !opts?.model) return base;
+  const params = new URLSearchParams();
+  if (opts.type) params.set('type', opts.type);
+  if (opts.model) params.set('model', opts.model);
+  const q = params.toString();
+  return q ? `${base}?${q}` : base;
 }
 
 const loading = ref(true);
@@ -52,7 +61,7 @@ const toolChips = computed(() =>
   JOB_TYPES.map((jt) => ({
     id: jt.id,
     label: jt.label,
-    href: `${playgroundLink.value}?type=${jt.id}`,
+    href: apiPlaygroundHref({ type: jt.id }),
   })),
 );
 
@@ -165,20 +174,24 @@ onMounted(async () => {
             }}
           </p>
           <div class="gw-hero-actions">
-            <a :href="signupLink" class="gw-btn gw-btn-primary">{{
-              t('Create account', 'Tạo tài khoản')
+            <a :href="apiPlaygroundLink" class="gw-btn gw-btn-primary">{{
+              t('Try API Playground', 'Thử API Playground')
             }}</a>
             <a :href="quickstartLink" class="gw-btn gw-btn-outline">{{
               t('Read Quickstart', 'Đọc Quickstart')
             }}</a>
           </div>
-          <nav class="gw-hero-shortcuts" :aria-label="t('Shortcuts', 'Lối tắt')">
-            <a :href="chatLink">{{ t('Chat', 'Chat') }}</a>
-            <a :href="playgroundLink">Playground</a>
-            <a :href="modelsLink">{{ t('Models', 'Models') }}</a>
-            <a :href="mcpLink">MCP</a>
-          </nav>
+          <p class="gw-hero-note">
+            {{
+              t(
+                'No account needed — sign in inside the playground Connection panel.',
+                'Không cần tài khoản docs — đăng nhập trong panel Connection của playground.',
+              )
+            }}
+          </p>
           <p class="gw-hero-trust">
+            <a :href="signupLink">{{ t('Create account', 'Tạo tài khoản') }}</a>
+            <span aria-hidden="true">/</span>
             <a :href="loginLink">{{ t('Sign in', 'Đăng nhập') }}</a>
             <span aria-hidden="true">/</span>
             <a :href="aboutLink">{{ t('About', 'Về chúng tôi') }}</a>
@@ -241,8 +254,8 @@ onMounted(async () => {
             <p class="gw-section-sub">
               {{
                 t(
-                  'Newest models from live Gommo — open Playground or compare side by side.',
-                  'Models mới nhất từ Gommo live — mở Playground hoặc so sánh.',
+                  'Newest models from live Gommo — try endpoints in API Playground or compare side by side.',
+                  'Models mới nhất từ Gommo live — thử endpoint trong API Playground hoặc so sánh.',
                 )
               }}
             </p>
@@ -277,7 +290,7 @@ onMounted(async () => {
                 <td class="gw-model-table-provider">{{ m.provider || '—' }}</td>
                 <td class="gw-model-table-credits">{{ m.creditsLabel }}</td>
                 <td class="gw-model-table-action">
-                  <a :href="playgroundUrl(m, localePrefix)">→</a>
+                  <a :href="apiPlaygroundHref({ type: m.jobType, model: m.slug })">→</a>
                 </td>
               </tr>
             </tbody>
@@ -293,7 +306,12 @@ onMounted(async () => {
         <p class="gw-section-index">02</p>
         <h2 class="gw-section-title">{{ t('Job surfaces', 'Job surfaces') }}</h2>
         <p class="gw-section-sub gw-section-sub-below">
-          {{ t('Each chip opens Playground on the matching job type.', 'Mỗi chip mở Playground với job type tương ứng.') }}
+          {{
+            t(
+              'Each chip opens API Playground on the matching job type — login in the Connection panel.',
+              'Mỗi chip mở API Playground với job type tương ứng — đăng nhập trong panel Connection.',
+            )
+          }}
         </p>
         <div class="gw-tool-chips">
           <a v-for="chip in toolChips" :key="chip.id" :href="chip.href" class="gw-tool-chip">
@@ -311,14 +329,16 @@ onMounted(async () => {
           <p class="gw-split-desc">
             {{
               t(
-                'Chat streams SSE. Playground runs real jobs. Credits wallet syncs with Gommo — same token as the API.',
-                'Chat stream SSE. Playground chạy job thật. Wallet credits sync Gommo — cùng token với API.',
+                'Chat streams SSE. Media Playground runs real jobs (sign in required). Credits wallet syncs with Gommo.',
+                'Chat stream SSE. Media Playground chạy job thật (cần đăng nhập). Wallet credits sync Gommo.',
               )
             }}
           </p>
           <div class="gw-split-links">
             <a :href="chatLink" class="gw-btn gw-btn-primary">{{ t('Chat', 'Chat') }}</a>
-            <a :href="playgroundLink" class="gw-btn gw-btn-outline">Playground</a>
+            <a :href="playgroundLink" class="gw-btn gw-btn-outline">{{
+              t('Media Playground', 'Media Playground')
+            }}</a>
             <a :href="creditsLink" class="gw-btn gw-btn-outline">{{ t('Credits', 'Credits') }}</a>
           </div>
         </div>
@@ -328,13 +348,13 @@ onMounted(async () => {
           <p class="gw-split-desc">
             {{
               t(
-                'OpenAPI reference, TypeScript SDK, cookbook recipes, and MCP for Cursor agents.',
-                'OpenAPI, TypeScript SDK, cookbook và MCP cho Cursor agent.',
+                'Try live endpoints in API Playground, browse OpenAPI, SDK, cookbook, and MCP for Cursor agents.',
+                'Thử endpoint live trong API Playground, OpenAPI, SDK, cookbook và MCP cho Cursor agent.',
               )
             }}
           </p>
           <div class="gw-split-links">
-            <a :href="apiLink" class="gw-btn gw-btn-primary">{{ t('API Reference', 'API Reference') }}</a>
+            <a :href="apiLink" class="gw-btn gw-btn-outline">{{ t('OpenAPI', 'OpenAPI') }}</a>
             <a :href="quickstartLink" class="gw-btn gw-btn-outline">Quickstart</a>
             <a :href="mcpLink" class="gw-btn gw-btn-outline">MCP</a>
           </div>
@@ -367,14 +387,14 @@ onMounted(async () => {
           <p>
             {{
               t(
-                'Start with a free account or skim the docs — no separate studio signup.',
-                'Bắt đầu với tài khoản miễn phí hoặc đọc docs — không cần đăng ký studio riêng.',
+                'Try endpoints live in API Playground, or create an account for Chat and Media Playground.',
+                'Thử endpoint live trong API Playground, hoặc tạo tài khoản cho Chat và Media Playground.',
               )
             }}
           </p>
         </div>
-        <a :href="signupLink" class="gw-btn gw-btn-primary gw-btn-lg">{{
-          t('Get started', 'Bắt đầu')
+        <a :href="apiPlaygroundLink" class="gw-btn gw-btn-primary gw-btn-lg">{{
+          t('Try API Playground', 'Thử API Playground')
         }}</a>
       </div>
     </section>

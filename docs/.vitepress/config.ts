@@ -1,4 +1,23 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitepress';
+import { loadEnv } from 'vite';
+import { portalStaticPlugin } from './portal-plugin';
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const env = loadEnv('', repoRoot, '');
+const gatewayProxyTarget = (
+  env.GATEWAY_PROXY_TARGET ||
+  env.VITE_GATEWAY_URL ||
+  env.GATEWAY_URL ||
+  'http://localhost:3001'
+).replace(/\/$/, '');
+
+const apiProxy = { target: gatewayProxyTarget, changeOrigin: true };
+
+if (process.env.NODE_ENV !== 'production') {
+  console.log(`[docs] API proxy → ${gatewayProxyTarget}`);
+}
 
 const overviewSidebarEn = [
   { text: 'Quickstart', link: '/quickstart' },
@@ -80,6 +99,7 @@ const opsSidebarVi = [
 
 const referenceSidebarEn = [
   { text: 'OpenAPI', link: '/reference/openapi' },
+  { text: 'API Playground', link: '/reference/playground' },
   { text: 'Media & jobs', link: '/reference/media' },
   { text: 'Upload', link: '/reference/upload' },
   { text: 'Chat', link: '/reference/chat' },
@@ -91,6 +111,7 @@ const referenceSidebarEn = [
 
 const referenceSidebarVi = [
   { text: 'OpenAPI', link: '/vi/reference/openapi' },
+  { text: 'API Playground', link: '/vi/reference/playground' },
   { text: 'Media & jobs', link: '/vi/reference/media' },
   { text: 'Upload', link: '/vi/reference/upload' },
   { text: 'Chat', link: '/vi/reference/chat' },
@@ -282,20 +303,15 @@ export default defineConfig({
   lastUpdated: true,
   ignoreDeadLinks: [/^https?:\/\/localhost/, /README/],
   vite: {
+    plugins: [portalStaticPlugin()],
     server: {
+      // Quick tunnel: cloudflared tunnel --url http://localhost:5173
+      allowedHosts: ['.trycloudflare.com'],
       proxy: {
-        '/gateway': {
-          target: 'http://localhost:3001',
-          changeOrigin: true,
-        },
-        '/ai': {
-          target: 'http://localhost:3001',
-          changeOrigin: true,
-        },
-        '/billing': {
-          target: 'http://localhost:3001',
-          changeOrigin: true,
-        },
+        '/gateway': apiProxy,
+        '/ai': apiProxy,
+        '/billing': apiProxy,
+        '/api/apps/go-mmo': apiProxy,
       },
     },
   },
@@ -306,6 +322,8 @@ export default defineConfig({
       title: 'AI Gateway',
       description: 'Developer docs — Gommo proxy + REST gateway',
       themeConfig: {
+        logo: '/logo.svg',
+        logoLink: '/',
         nav: navEn,
         sidebar: {
           ...pathSidebarEn,
@@ -326,6 +344,8 @@ export default defineConfig({
       title: 'AI Gateway',
       description: 'Tài liệu developer — proxy + REST gateway Gommo',
       themeConfig: {
+        logo: '/logo.svg',
+        logoLink: '/vi/',
         nav: navVi,
         sidebar: {
           ...pathSidebarVi,

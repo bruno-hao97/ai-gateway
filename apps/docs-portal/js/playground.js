@@ -5,11 +5,11 @@ const STORAGE_MODELS_LEGACY = 'portal_last_models';
 const STORAGE_DOMAIN = 'portal_login_domain';
 const STORAGE_CHAT_SESSION = 'portal_chat_session';
 const STORAGE_VOICES = 'portal_last_voices';
+const STORAGE_DEVICE_ID = 'gw_device_id';
 const DEFAULT_API = 'http://localhost:3001';
 
 const $ = (id) => document.getElementById(id);
 
-const baseUrlEl = $('baseUrl');
 const tokenEl = $('token');
 const docsNav = $('docs-nav');
 const openapiNav = $('openapi-nav');
@@ -28,19 +28,20 @@ const docsUrl =
 
 docsNav.href = docsUrl;
 openapiNav.href = `${docsUrl.replace(/\/$/, '')}/reference/openapi`;
+const logoLink = $('logo-link');
+if (logoLink) logoLink.href = docsUrl;
 
 function defaultBaseUrl() {
   const saved = localStorage.getItem(STORAGE_BASE);
   if (saved) return saved.replace(/\/$/, '');
   const origin = window.location.origin.replace(/\/$/, '');
   const port = window.location.port;
-  if (port === '3001') return origin;
+  if (port === '3001' || port === '5173') return origin;
   return DEFAULT_API;
 }
 
 migrateLegacyModelsStorage();
 
-baseUrlEl.value = defaultBaseUrl();
 tokenEl.value = sessionStorage.getItem(STORAGE_TOKEN) || '';
 $('loginDomain').value = localStorage.getItem(STORAGE_DOMAIN) || '79ai.net';
 if ($('chatSessionId')) {
@@ -48,10 +49,6 @@ if ($('chatSessionId')) {
 }
 
 updateTokenBadge();
-
-baseUrlEl.addEventListener('change', () => {
-  localStorage.setItem(STORAGE_BASE, baseUrlEl.value.replace(/\/$/, ''));
-});
 
 function saveToken(value) {
   const t = (value ?? tokenEl.value).trim();
@@ -90,6 +87,20 @@ const EMBED_PARENT_ORIGINS = new Set([
   'http://127.0.0.1:3001',
 ]);
 
+const embedParentParam = urlParams.get('parentOrigin')?.trim();
+if (isEmbed && embedParentParam) {
+  try {
+    const u = new URL(embedParentParam);
+    const ok =
+      u.protocol === 'https:' ||
+      u.hostname === 'localhost' ||
+      u.hostname === '127.0.0.1';
+    if (ok) EMBED_PARENT_ORIGINS.add(u.origin);
+  } catch {
+    /* ignore */
+  }
+}
+
 function isAllowedEmbedParent(origin) {
   if (!origin) return false;
   if (EMBED_PARENT_ORIGINS.has(origin)) return true;
@@ -121,7 +132,7 @@ function handleEmbedTokenMessage(event) {
     if ($('loginDomain')) $('loginDomain').value = domain;
     localStorage.setItem(STORAGE_DOMAIN, domain);
   }
-  runPendingDeepLink();
+  void runPendingDeepLink();
 }
 
 if (isEmbed) {
@@ -129,9 +140,78 @@ if (isEmbed) {
   window.addEventListener('message', handleEmbedTokenMessage);
 }
 
+function getOrCreateDeviceId() {
+  const existing = localStorage.getItem(STORAGE_DEVICE_ID)?.trim();
+  if (existing) return existing;
+  const id =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+  localStorage.setItem(STORAGE_DEVICE_ID, id);
+  return id;
+}
+
+function loginDevicePayload() {
+  const device_id = getOrCreateDeviceId();
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  const browserName = /Edg\//.test(ua)
+    ? 'Edge'
+    : /Chrome\//.test(ua)
+      ? 'Chrome'
+      : /Firefox\//.test(ua)
+        ? 'Firefox'
+        : 'Browser';
+  const device_name = `${browserName} 1`;
+  const device_info = JSON.stringify({
+    device_id,
+    device_name,
+    device_type: 'desktop',
+    language: 'vi',
+  });
+  return { device_id, device_name, device_info };
+}
+
+function appendDeviceToForm(form) {
+  const device = loginDevicePayload();
+  form.set('device_id', device.device_id);
+  form.set('device_name', device.device_name);
+  form.set('device_info', device.device_info);
+}
+
+function pickHttpUrl(...candidates) {
+  for (const c of candidates) {
+    if (typeof c === 'string' && /^https?:\/\//i.test(c.trim())) return c.trim();
+  }
+  return null;
+}
+
+function pickUrlFromMediaInfo(info) {
+  if (!info || typeof info !== 'object') return null;
+  return pickHttpUrl(
+    info.result_url,
+    info.file_url,
+    info.url,
+    info.download_url,
+    info.thumbnail_url,
+    info.music_url,
+    info.audio_url,
+  );
+}
+
+function pickUrlFromRaw(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  return pickUrlFromMediaInfo(
+    raw.imageInfo ||
+      raw.videoInfo ||
+      raw.musicInfo ||
+      raw.audioInfo ||
+      raw.ttsInfo,
+  );
+}
+
 function baseUrl() {
-  const v = baseUrlEl.value.trim().replace(/\/$/, '');
-  if (!v) throw new Error('Set Gateway base URL (e.g. http://localhost:3001)');
+  const v = defaultBaseUrl();
+  if (!v) throw new Error('Gateway base URL unavailable');
   return v;
 }
 
@@ -147,10 +227,59 @@ function authHeaders(json = true) {
   return headers;
 }
 
-function setStatus(el, text, ok) {
+/** @param {HTMLElement | null} el
+ *  @param {string} text
+ *  @param {'neutral' | 'running' | 'ok' | 'err' | 'preview' | boolean} state */
+function setStatus(el, text, state = 'neutral') {
   if (!el) return;
-  el.textContent = text;
-  el.className = 'status-line' + (ok === true ? ' ok' : ok === false ? ' err' : '');
+  if (typeof state === 'boolean') {
+    state = state === true ? 'ok' : state === false ? 'err' : 'neutral';
+  }
+  if (!text && state === 'neutral') {
+    el.className = 'pg-status-slot';
+    el.replaceChildren();
+    return;
+  }
+
+  const labels = {
+    preview: '// COMPLETE',
+    running: '// RUNNING',
+    ok: '// OK',
+    err: '// FAILED',
+    neutral: '// INFO',
+  };
+
+  el.className = 'pg-status-slot';
+  el.replaceChildren();
+
+  const wrap = document.createElement('div');
+  wrap.className = `pg-status pg-status--${state}`;
+
+  const dot = document.createElement('span');
+  dot.className = 'pg-status-dot';
+  dot.setAttribute('aria-hidden', 'true');
+  wrap.appendChild(dot);
+
+  const label = document.createElement('span');
+  label.className = 'pg-status-label';
+  label.textContent = labels[state] || labels.neutral;
+  wrap.appendChild(label);
+
+  if (state === 'preview') {
+    if (text) {
+      const detail = document.createElement('span');
+      detail.className = 'pg-status-detail';
+      detail.textContent = text;
+      wrap.appendChild(detail);
+    }
+  } else if (text) {
+    const msg = document.createElement('span');
+    msg.className = 'pg-status-text';
+    msg.textContent = text;
+    wrap.appendChild(msg);
+  }
+
+  el.appendChild(wrap);
 }
 
 function prettyJson(data) {
@@ -165,34 +294,62 @@ function showResponse(body, meta = {}) {
   if (meta.ms != null) parts.push(`${meta.ms}ms`);
   if (meta.label) parts.unshift(meta.label);
   responseMeta.textContent = parts.length ? parts.join(' · ') : '—';
-  hidePreviewMedia();
+}
+
+function clearPreviewPlayers() {
+  if (resultImage) {
+    resultImage.removeAttribute('src');
+    resultImage.hidden = true;
+  }
+  if (resultVideo) {
+    resultVideo.pause?.();
+    resultVideo.removeAttribute('src');
+    resultVideo.hidden = true;
+  }
+  if (resultAudio) {
+    resultAudio.pause?.();
+    resultAudio.removeAttribute('src');
+    resultAudio.hidden = true;
+  }
 }
 
 function hidePreviewMedia() {
   resultPreview.hidden = true;
-  resultImage.hidden = true;
-  if (resultVideo) resultVideo.hidden = true;
-  if (resultAudio) resultAudio.hidden = true;
+  clearPreviewPlayers();
 }
 
-function showResultUrl(url) {
+function showResultUrl(url, mediaHint = '') {
   if (!url) return;
   resultPreview.hidden = false;
   resultLink.href = url;
-  resultLink.textContent = url;
-  resultImage.hidden = true;
-  if (resultVideo) resultVideo.hidden = true;
-  if (resultAudio) resultAudio.hidden = true;
+  resultLink.title = url;
+  resultLink.textContent = 'Open in new tab ↗';
+  clearPreviewPlayers();
 
-  if (/\.(png|jpe?g|webp|gif)(\?|$)/i.test(url)) {
+  const hint = String(mediaHint || '').toLowerCase();
+  const looksImage = /\.(png|jpe?g|webp|gif|bmp|svg)(\?|$)/i.test(url);
+  const looksVideo = /\.(mp4|webm|mov)(\?|$)/i.test(url);
+  const looksAudio =
+    /\.(mp3|wav|ogg|m4a|aac|flac)(\?|$)/i.test(url) || /\/audio/i.test(url);
+
+  if (hint === 'image' || looksImage) {
     resultImage.src = url;
     resultImage.hidden = false;
-  } else if (resultVideo && /\.(mp4|webm|mov)(\?|$)/i.test(url)) {
+    return;
+  }
+  if ((hint === 'video' || looksVideo) && resultVideo) {
     resultVideo.src = url;
     resultVideo.hidden = false;
-  } else if (resultAudio && (/\.(mp3|wav|ogg|m4a|aac|flac)(\?|$)/i.test(url) || /\/audio/i.test(url))) {
+    return;
+  }
+  if ((hint === 'music' || hint === 'audio' || looksAudio) && resultAudio) {
     resultAudio.src = url;
     resultAudio.hidden = false;
+    return;
+  }
+  if (hint === 'image' || !looksVideo && !looksAudio) {
+    resultImage.src = url;
+    resultImage.hidden = false;
   }
 }
 
@@ -240,10 +397,10 @@ function pickCatalogList(model, ...keys) {
 }
 
 const CATALOG_FIELD_DEFS = [
-  { field: 'ratio', label: 'ratio', keys: ['ratios', 'ratio'] },
-  { field: 'mode', label: 'mode', keys: ['modes', 'mode'] },
-  { field: 'resolution', label: 'resolution', keys: ['resolutions', 'resolution'] },
-  { field: 'duration', label: 'duration', keys: ['durations', 'duration'] },
+  { field: 'ratio', label: 'Aspect ratio', keys: ['ratios', 'ratio'] },
+  { field: 'mode', label: 'Mode', keys: ['modes', 'mode'] },
+  { field: 'resolution', label: 'Resolution', keys: ['resolutions', 'resolution'] },
+  { field: 'duration', label: 'Duration', keys: ['durations', 'duration'] },
 ];
 
 const MEDIA_JOB_LABELS = {
@@ -464,12 +621,27 @@ function parseVoicesList(data) {
   return [];
 }
 
+const modelsFetchInflight = new Map();
+
+function setMediaModelSelectLoading(loading) {
+  const sel = $('mediaModelSelect');
+  if (!sel) return;
+  if (loading) {
+    sel.innerHTML = '<option value="">Loading models…</option>';
+    sel.disabled = true;
+    renderCatalogFields(null);
+    return;
+  }
+  sel.disabled = false;
+}
+
 function populateMediaModelSelect(models) {
   const sel = $('mediaModelSelect');
   if (!sel) return;
+  sel.disabled = false;
   sel.innerHTML = '';
   if (!models.length) {
-    sel.innerHTML = '<option value="">— No models — fetch List models first —</option>';
+    sel.innerHTML = '<option value="">— No models — login or List models —</option>';
     renderCatalogFields(null);
     return;
   }
@@ -479,15 +651,70 @@ function populateMediaModelSelect(models) {
   }
 }
 
+/** @returns {Promise<{ data: unknown, models: ReturnType<typeof normalizeModels> } | null>} */
+async function fetchModelsForType(type, { statusEl, force = false } = {}) {
+  if (!type) return null;
+
+  if (!force) {
+    const cached = normalizeModels(getStoredModelsEnvelope(type));
+    if (cached.length) {
+      return { data: getStoredModelsEnvelope(type), models: cached };
+    }
+  }
+
+  if (modelsFetchInflight.has(type)) {
+    return modelsFetchInflight.get(type);
+  }
+
+  const task = (async () => {
+    try {
+      getToken();
+    } catch (err) {
+      if (statusEl) setStatus(statusEl, err.message, 'err');
+      return null;
+    }
+
+    if (statusEl) setStatus(statusEl, 'Fetching catalog…', 'running');
+
+    try {
+      const data = await apiFetch(
+        `/gateway/models?type=${encodeURIComponent(type)}`,
+        { headers: authHeaders() },
+        `GET /gateway/models?type=${type}`,
+      );
+      const models = normalizeModels(data);
+      setStoredModels(type, data);
+      if (statusEl) {
+        setStatus(
+          statusEl,
+          models.length
+            ? `${models.length} model${models.length === 1 ? '' : 's'} loaded`
+            : '0 models parsed — check RESPONSE',
+          models.length > 0 ? 'ok' : 'err',
+        );
+      }
+      return { data, models };
+    } catch (err) {
+      if (statusEl) setStatus(statusEl, err.message, 'err');
+      return null;
+    } finally {
+      modelsFetchInflight.delete(type);
+    }
+  })();
+
+  modelsFetchInflight.set(type, task);
+  return task;
+}
+
 function renderCatalogFields(model) {
   const container = $('catalogFields');
   if (!container) return;
   container.innerHTML = '';
+  container.className = 'pg-catalog-fields';
   if (!model) return;
 
+  const defs = [];
   for (const def of CATALOG_FIELD_DEFS) {
-    const options = def.keys.flatMap((k) => model[k === 'ratios' ? 'ratios' : k === 'modes' ? 'modes' : k === 'resolutions' ? 'resolutions' : 'durations'] || []);
-    // Use the normalized arrays on model object
     const list =
       def.field === 'ratio'
         ? model.ratios
@@ -497,7 +724,17 @@ function renderCatalogFields(model) {
             ? model.resolutions
             : model.durations;
     if (!list?.length) continue;
+    defs.push({ def, list });
+  }
+  if (!defs.length) return;
 
+  container.className = 'pg-catalog-fields gw-job-params';
+  const head = document.createElement('p');
+  head.className = 'gw-job-params-head';
+  head.textContent = 'Catalog parameters';
+  container.appendChild(head);
+
+  for (const { def, list } of defs) {
     const wrap = document.createElement('div');
     wrap.className = 'field';
     const label = document.createElement('label');
@@ -542,11 +779,9 @@ function activateNavForPanel(panel, jobType) {
   });
 }
 
-function openMediaJobPanel(type) {
+async function openMediaJobPanel(type, { autoFetch = true } = {}) {
   if ($('jobType')) $('jobType').value = type;
   if ($('modelType')) $('modelType').value = type;
-  loadMediaJobForType(type);
-  updateMediaJobChrome(type);
   const promptEl = $('mediaPrompt');
   if (promptEl && DEFAULT_PROMPTS[type] && !promptEl.dataset.userEdited) {
     promptEl.value = DEFAULT_PROMPTS[type];
@@ -555,17 +790,30 @@ function openMediaJobPanel(type) {
     p.classList.toggle('active', p.dataset.panel === 'media-job');
   });
   activateNavForPanel('media-job', type);
+  await loadMediaJobForType(type, { autoFetch });
 }
 
-function loadMediaJobForType(type) {
+async function loadMediaJobForType(type, { autoFetch = false } = {}) {
   if ($('jobType')) $('jobType').value = type;
-  const models = normalizeModels(getStoredModelsEnvelope(type));
+  if ($('modelType')) $('modelType').value = type;
+  updateMediaJobChrome(type);
+
+  let models = normalizeModels(getStoredModelsEnvelope(type));
+
+  if (!models.length && autoFetch) {
+    setMediaModelSelectLoading(true);
+    const result = await fetchModelsForType(type, { statusEl: $('mediaJobStatus') });
+    models = result?.models ?? normalizeModels(getStoredModelsEnvelope(type));
+    setMediaModelSelectLoading(false);
+  }
+
   populateMediaModelSelect(models);
   if (models.length) {
     $('mediaModelSelect').value = models[0].slug;
     onMediaModelChange();
+  } else {
+    renderCatalogFields(null);
   }
-  updateMediaJobChrome(type);
 }
 
 function readCatalogFieldValues() {
@@ -599,36 +847,44 @@ function validateCatalogFields(model) {
 
 function extractJobResultUrl(data, jobType) {
   const d = data?.data;
-  if (d?.resultUrl) return d.resultUrl;
-  if (d?.pollResult?.resultUrl) return d.pollResult.resultUrl;
-  const raw = data?.raw ?? d?.raw ?? d?.pollResult?.raw;
-  if (raw && typeof raw === 'object') {
-    const info =
-      raw.imageInfo || raw.videoInfo || raw.musicInfo || raw.audioInfo || raw.ttsInfo;
-    if (info && typeof info === 'object') {
-      return info.result_url || info.file_url || info.url || null;
-    }
+  const top = pickHttpUrl(
+    d?.resultUrl,
+    d?.pollResult?.resultUrl,
+    d?.result_url,
+    d?.file_url,
+    d?.coverUrl,
+    d?.pollResult?.coverUrl,
+  );
+  if (top) return top;
+
+  const rawSources = [
+    data?.raw,
+    d?.raw,
+    d?.pollResult?.raw,
+    d?.createEnvelope?.raw,
+    d?.createEnvelope?.data?.raw,
+    d?.pollResult?.envelope?.raw,
+  ];
+  for (const raw of rawSources) {
+    const url = pickUrlFromRaw(raw);
+    if (url) return url;
   }
+
   if (jobType === 'music' && d?.pollResult?.coverUrl) return d.pollResult.coverUrl;
   return null;
 }
 
 function extractPollResultUrl(data) {
   const d = data?.data ?? data;
-  if (typeof d === 'object' && d) {
-    if (d.resultUrl) return d.resultUrl;
-    if (d.result_url) return d.result_url;
-    if (d.file_url) return d.file_url;
-    const raw = d.raw ?? data?.raw;
-    if (raw && typeof raw === 'object') {
-      for (const key of ['imageInfo', 'videoInfo', 'musicInfo', 'audioInfo']) {
-        const info = raw[key];
-        if (info && typeof info === 'object') {
-          const url = info.result_url || info.file_url || info.url;
-          if (url) return url;
-        }
-      }
-    }
+  if (typeof d !== 'object' || !d) return null;
+
+  const top = pickHttpUrl(d.resultUrl, d.result_url, d.file_url, d.coverUrl);
+  if (top) return top;
+
+  const rawSources = [d.raw, data?.raw, d.envelope?.raw];
+  for (const raw of rawSources) {
+    const url = pickUrlFromRaw(raw);
+    if (url) return url;
   }
   return null;
 }
@@ -758,7 +1014,7 @@ function stopPollLoop() {
 
 async function runPollOnce() {
   const status = $('pollStatus');
-  setStatus(status, 'Polling…');
+  setStatus(status, 'Polling…', 'running');
   const jobId = $('pollJobId').value.trim();
   const media = $('pollMedia').value;
   if (!jobId) {
@@ -775,13 +1031,14 @@ async function runPollOnce() {
     const label = `GET /gateway/jobs/${jobId}?media=${media}`;
     const data = await requestPoll(jobId, media, label);
     const resultUrl = extractPollResultUrl(data);
-    if (resultUrl) showResultUrl(resultUrl);
+    if (resultUrl) showResultUrl(resultUrl, media);
     if (isPollSuccess(data)) {
       logPollUsage(jobId, media, data, resultUrl);
     } else if (isPollFailed(data)) {
       logPollUsage(jobId, media, data, resultUrl);
     }
-    setStatus(status, resultUrl ? 'Done — see preview →' : 'Polled — check RESPONSE status', !!resultUrl);
+    if (resultUrl) setStatus(status, '', 'preview');
+    else setStatus(status, 'Polled — check RESPONSE status', 'ok');
   } catch (err) {
     setStatus(status, err.message, false);
   }
@@ -816,14 +1073,15 @@ async function runPollLoop() {
 
   for (let attempt = 1; attempt <= POLL_MAX_ATTEMPTS; attempt++) {
     if (pollLoopGeneration !== gen) break;
-    setStatus(status, `Polling… ${attempt}/${POLL_MAX_ATTEMPTS}`);
+    setStatus(status, `Polling… ${attempt}/${POLL_MAX_ATTEMPTS}`, 'running');
     try {
       const data = await requestPoll(jobId, media, label, attempt);
       const resultUrl = extractPollResultUrl(data);
-      if (resultUrl) showResultUrl(resultUrl);
+      if (resultUrl) showResultUrl(resultUrl, media);
       if (isPollSuccess(data)) {
         logPollUsage(jobId, media, data, resultUrl);
-        setStatus(status, resultUrl ? `Done #${attempt} — preview →` : `Done #${attempt}`, true);
+        if (resultUrl) setStatus(status, `Attempt ${attempt}`, 'preview');
+        else setStatus(status, `Done #${attempt}`, 'ok');
         break;
       }
       if (isPollFailed(data)) {
@@ -899,8 +1157,9 @@ function showCredits(credits) {
 async function fetchUserMe(statusEl) {
   const domain = $('loginDomain').value.trim() || '79ai.net';
   const body = new URLSearchParams({ access_token: getToken(), domain });
+  appendDeviceToForm(body);
   const data = await apiFetch(
-    '/api/apps/go-mmo/ai/me',
+    '/ai/me',
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -955,11 +1214,10 @@ async function apiFetch(path, init = {}, label = '') {
 
 $('mediaModelSelect')?.addEventListener('change', onMediaModelChange);
 
-$('jobType')?.addEventListener('change', () => {
+$('jobType')?.addEventListener('change', async () => {
   const type = $('jobType').value;
-  if ($('modelType')) $('modelType').value = type;
-  loadMediaJobForType(type);
   activateNavForPanel('media-job', type);
+  await loadMediaJobForType(type, { autoFetch: true });
 });
 
 $('mediaPrompt')?.addEventListener('input', () => {
@@ -975,7 +1233,7 @@ document.querySelectorAll('.pg-nav-item:not([disabled])').forEach((btn) => {
     const panel = btn.dataset.panel;
     const jobType = btn.dataset.jobType;
     if (panel === 'media-job' && jobType) {
-      openMediaJobPanel(jobType);
+      void openMediaJobPanel(jobType);
       return;
     }
     document.querySelectorAll('.pg-nav-item').forEach((b) => b.classList.toggle('active', b === btn));
@@ -1024,7 +1282,7 @@ $('btnSaveToken').addEventListener('click', () => {
 
 $('btnLogin').addEventListener('click', async () => {
   const status = $('authStatus');
-  setStatus(status, 'Logging in…');
+  setStatus(status, 'Logging in…', 'running');
   const email = $('loginEmail').value.trim();
   const password = $('loginPassword').value;
   const domain = $('loginDomain').value.trim() || '79ai.net';
@@ -1033,15 +1291,19 @@ $('btnLogin').addEventListener('click', async () => {
     return;
   }
   try {
-    const body = new URLSearchParams({ email, password, domain });
     const data = await apiFetch(
-      '/api/apps/go-mmo/auth/login',
+      '/gateway/auth/login',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString(),
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          domain,
+          ...loginDevicePayload(),
+        }),
       },
-      'POST /auth/login',
+      'POST /gateway/auth/login',
     );
     const token = extractAccessToken(data);
     if (!token) {
@@ -1063,7 +1325,7 @@ $('btnLogin').addEventListener('click', async () => {
 
 $('btnFetchMe')?.addEventListener('click', async () => {
   const status = $('authStatus');
-  setStatus(status, 'Fetching /ai/me…');
+  setStatus(status, 'Fetching /ai/me…', 'running');
   try {
     getToken();
   } catch (err) {
@@ -1078,31 +1340,17 @@ $('btnFetchMe')?.addEventListener('click', async () => {
 });
 
 $('btnModels').addEventListener('click', async () => {
+  const type = $('modelType').value;
   const status = $('modelsStatus');
-  setStatus(status, 'Fetching…');
-  try {
-    const type = $('modelType').value;
-    const data = await apiFetch(
-      `/gateway/models?type=${encodeURIComponent(type)}`,
-      { headers: authHeaders() },
-      `GET /gateway/models?type=${type}`,
-    );
-    const models = normalizeModels(data);
-    setStoredModels(type, data);
-    openMediaJobPanel(type);
-    setStatus(
-      status,
-      models.length ? `OK — ${models.length} models (${type})` : 'OK but 0 models parsed — check RESPONSE shape',
-      models.length > 0,
-    );
-  } catch (err) {
-    setStatus(status, err.message, false);
+  const result = await fetchModelsForType(type, { statusEl: status, force: true });
+  if (result) {
+    await openMediaJobPanel(type, { autoFetch: false });
   }
 });
 
 $('btnMediaJob')?.addEventListener('click', async () => {
   const status = $('mediaJobStatus');
-  setStatus(status, 'Running… (wait may take 1–5 min)');
+  setStatus(status, 'Running… (wait may take 1–5 min)', 'running');
 
   const jobType = $('jobType').value;
   const modelSlugVal = $('mediaModelSelect').value;
@@ -1147,7 +1395,7 @@ $('btnMediaJob')?.addEventListener('click', async () => {
       `POST /gateway/jobs/${jobType}`,
     );
     const url = extractJobResultUrl(data, jobType);
-    showResultUrl(url);
+    showResultUrl(url, pollMediaForJobType(jobType));
 
     const jobId = extractJobId(data);
     if (jobId && !wait) {
@@ -1168,9 +1416,13 @@ $('btnMediaJob')?.addEventListener('click', async () => {
       });
     }
 
-    let msg = url ? 'Done — see preview →' : 'OK';
-    if (jobId && !wait) msg += ` — job id copied to Poll (${jobId.slice(0, 8)}…)`;
-    setStatus(status, msg, true);
+    if (url) {
+      setStatus(status, '', 'preview');
+    } else if (jobId && !wait) {
+      setStatus(status, `Job id ${jobId.slice(0, 8)}… — use Poll panel`, 'ok');
+    } else {
+      setStatus(status, 'Finished — check RESPONSE', 'ok');
+    }
   } catch (err) {
     setStatus(status, err.message, false);
   }
@@ -1190,7 +1442,7 @@ $('btnPollStop')?.addEventListener('click', () => {
 
 $('btnAudioLists')?.addEventListener('click', async () => {
   const status = $('audioListsStatus');
-  setStatus(status, 'Fetching…');
+  setStatus(status, 'Fetching…', 'running');
   try {
     getToken();
   } catch (err) {
@@ -1210,7 +1462,7 @@ $('btnAudioLists')?.addEventListener('click', async () => {
     } else if (items && Array.isArray(items.items)) {
       firstUrl = items.items.find((i) => i?.file_url)?.file_url;
     }
-    if (firstUrl) showResultUrl(firstUrl);
+    if (firstUrl) showResultUrl(firstUrl, 'audio');
     setStatus(status, 'OK — see RESPONSE', true);
   } catch (err) {
     setStatus(status, err.message, false);
@@ -1219,7 +1471,7 @@ $('btnAudioLists')?.addEventListener('click', async () => {
 
 $('btnChat')?.addEventListener('click', async () => {
   const status = $('chatStatus');
-  setStatus(status, 'Running…');
+  setStatus(status, 'Running…', 'running');
 
   const action = $('chatAction').value;
   const query = $('chatQuery').value.trim();
@@ -1292,7 +1544,7 @@ $('btnChat')?.addEventListener('click', async () => {
 
 $('btnUpload')?.addEventListener('click', async () => {
   const status = $('uploadStatus');
-  setStatus(status, 'Uploading…');
+  setStatus(status, 'Uploading…', 'running');
 
   const isVideo = $('upload-video').classList.contains('active');
   const fileInput = isVideo ? $('uploadVideoFile') : $('uploadImageFile');
@@ -1344,8 +1596,8 @@ $('btnUpload')?.addEventListener('click', async () => {
     }
 
     const url = extractUploadUrl(body);
-    showResultUrl(url);
-    setStatus(status, url ? 'Done — see preview →' : 'OK', true);
+    showResultUrl(url, isVideo ? 'video' : 'image');
+    setStatus(status, url ? '' : 'Upload finished — check RESPONSE', url ? 'preview' : 'ok');
   } catch (err) {
     setStatus(status, err.message, false);
   }
@@ -1353,7 +1605,7 @@ $('btnUpload')?.addEventListener('click', async () => {
 
 $('btnVoices')?.addEventListener('click', async () => {
   const status = $('audioStatus');
-  setStatus(status, 'Fetching voices…');
+  setStatus(status, 'Fetching voices…', 'running');
 
   try {
     getToken();
@@ -1393,7 +1645,7 @@ $('btnVoices')?.addEventListener('click', async () => {
 
 $('btnTts')?.addEventListener('click', async () => {
   const status = $('audioStatus');
-  setStatus(status, 'Running TTS…');
+  setStatus(status, 'Running TTS…', 'running');
 
   const voice_id = $('audioVoiceSelect').value;
   const server = $('audioServer').value;
@@ -1431,7 +1683,7 @@ $('btnTts')?.addEventListener('click', async () => {
       'POST /gateway/audio/tts',
     );
     const url = extractTtsUrl(data);
-    showResultUrl(url);
+    showResultUrl(url, 'audio');
     logUsageEvent({
       jobType: 'audio',
       model: model || 'TTS',
@@ -1439,18 +1691,20 @@ $('btnTts')?.addEventListener('click', async () => {
       status: url ? 'success' : 'success',
       resultUrl: url || undefined,
     });
-    setStatus(status, url ? 'Done — see preview →' : 'OK', true);
+    setStatus(status, url ? '' : 'TTS finished — check RESPONSE', url ? 'preview' : 'ok');
   } catch (err) {
     setStatus(status, err.message, false);
   }
 });
 
-if (sessionStorage.getItem(STORAGE_MODELS_LEGACY) || sessionStorage.getItem(modelsStorageKey('image'))) {
-  migrateLegacyModelsStorage();
+void (async () => {
+  if (sessionStorage.getItem(STORAGE_MODELS_LEGACY) || sessionStorage.getItem(modelsStorageKey('image'))) {
+    migrateLegacyModelsStorage();
+  }
   const initialType = $('jobType')?.value || 'image';
-  loadMediaJobForType(initialType);
-  updateMediaJobChrome(initialType);
-}
+  const hasToken = Boolean(tokenEl?.value?.trim());
+  await loadMediaJobForType(initialType, { autoFetch: hasToken });
+})();
 
 if (sessionStorage.getItem(STORAGE_VOICES)) {
   try {
@@ -1474,7 +1728,7 @@ function openPanelById(panelId) {
   });
 }
 
-function runPendingDeepLink() {
+async function runPendingDeepLink() {
   if (!pendingDeepLink) return;
   const { type, model, panel } = pendingDeepLink;
   pendingDeepLink = null;
@@ -1486,7 +1740,7 @@ function runPendingDeepLink() {
 
   if (!type) return;
 
-  openMediaJobPanel(type);
+  await openMediaJobPanel(type);
   if (model && $('mediaModelSelect')) {
     const sel = $('mediaModelSelect');
     const has = [...sel.options].some((o) => o.value === model);
@@ -1505,7 +1759,7 @@ function captureDeepLinkFromUrl() {
   const panel = urlParams.get('panel');
   if (!type && !model && !panel) return;
   pendingDeepLink = { type, model, panel };
-  if (tokenEl.value.trim()) runPendingDeepLink();
+  if (tokenEl.value.trim()) void runPendingDeepLink();
 }
 
 captureDeepLinkFromUrl();

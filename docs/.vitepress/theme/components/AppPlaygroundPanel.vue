@@ -4,6 +4,7 @@ import { useData } from 'vitepress';
 import { modelCatalogUnavailable, modelUnavailableSuffix, type CatalogModel } from '../models/catalog-api';
 import {
   catalogJobFieldDefs,
+  catalogJobFieldLabel,
   formatImageJobFieldSummary,
   resolveImageFieldValues,
   validateCatalogJobFields,
@@ -285,12 +286,15 @@ watch(
     </div>
 
     <div class="or-pg-body">
-      <section class="or-pg-form">
-        <label class="or-pg-field">
-          <span class="or-pg-label">{{ isVi ? 'Prompt' : 'Prompt' }}</span>
+      <section class="or-pg-form gw-job-panel">
+        <label class="gw-job-field">
+          <span class="gw-job-label">
+            <span class="gw-job-label-prefix" aria-hidden="true">//</span>
+            {{ isVi ? 'Prompt' : 'Prompt' }}
+          </span>
           <textarea
             v-model="prompt"
-            class="or-pg-prompt"
+            class="or-pg-prompt gw-job-input"
             rows="4"
             :disabled="running"
             :placeholder="
@@ -305,9 +309,12 @@ watch(
           />
         </label>
 
-        <label class="or-pg-field">
-          <span class="or-pg-label">{{ isVi ? 'Model' : 'Model' }}</span>
-          <select v-model="modelSlug" class="or-pg-select" :disabled="running || modelsLoading || !models.length">
+        <label class="gw-job-field">
+          <span class="gw-job-label">
+            <span class="gw-job-label-prefix" aria-hidden="true">//</span>
+            {{ isVi ? 'Model' : 'Model' }}
+          </span>
+          <select v-model="modelSlug" class="or-pg-select gw-job-input" :disabled="running || modelsLoading || !models.length">
             <option
               v-for="m in models"
               :key="m.slug"
@@ -327,19 +334,27 @@ watch(
           }}
         </p>
 
-        <label v-for="def in fieldDefs" :key="def.field" class="or-pg-field">
-          <span class="or-pg-label">{{ def.field }}</span>
-          <select
-            class="or-pg-select"
-            :value="fieldValues[def.field] || ''"
-            :disabled="running"
-            @change="setField(def.field, ($event.target as HTMLSelectElement).value)"
-          >
-            <option v-for="opt in def.options" :key="opt.value" :value="opt.value">
-              {{ opt.label !== opt.value ? `${opt.label} (${opt.value})` : opt.value }}
-            </option>
-          </select>
-        </label>
+        <div v-if="fieldDefs.length" class="gw-job-params">
+          <p class="gw-job-params-head">
+            {{ isVi ? 'Tham số catalog' : 'Catalog parameters' }}
+          </p>
+          <label v-for="def in fieldDefs" :key="def.field" class="gw-job-field">
+            <span class="gw-job-label">
+              <span class="gw-job-label-prefix" aria-hidden="true">//</span>
+              {{ catalogJobFieldLabel(def.field, isVi) }}
+            </span>
+            <select
+              class="or-pg-select gw-job-input"
+              :value="fieldValues[def.field] || ''"
+              :disabled="running"
+              @change="setField(def.field, ($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="opt in def.options" :key="opt.value" :value="opt.value">
+                {{ opt.label !== opt.value ? `${opt.label} (${opt.value})` : opt.value }}
+              </option>
+            </select>
+          </label>
+        </div>
 
         <p v-if="modelsLoading" class="or-pg-hint">{{ isVi ? 'Đang tải catalog…' : 'Loading catalog…' }}</p>
         <p v-else-if="activeModel?.credits != null" class="or-pg-hint">
@@ -406,7 +421,7 @@ watch(
           <div class="or-pg-result-meta">
             <span>{{ result.modelLabel }}</span>
             <span v-if="result.latencyMs">{{ (result.latencyMs / 1000).toFixed(1) }}s</span>
-            <span v-if="formatImageJobFieldSummary(result.fields)">{{ formatImageJobFieldSummary(result.fields) }}</span>
+            <span v-if="formatImageJobFieldSummary(result.fields, isVi)">{{ formatImageJobFieldSummary(result.fields, isVi) }}</span>
           </div>
           <div class="or-pg-result-actions">
             <a :href="result.resultUrl" target="_blank" rel="noreferrer" class="or-app-btn or-app-btn-ghost">

@@ -8,41 +8,8 @@
   background: var(--vp-c-bg);
 }
 
-.or-app-brand {
-  padding: 0.75rem 0.85rem 0.5rem;
-}
-
-.or-app-brand-link {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  text-decoration: none;
-  color: inherit;
-}
-
-.or-app-logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 6px;
-  background: var(--or-accent);
-  color: var(--vp-c-bg, #000);
-  font-size: 0.875rem;
-  flex-shrink: 0;
-}
-
-.or-app-brand-title {
-  margin: 0;
-  font-size: 0.9375rem;
-  font-weight: 700;
-  color: var(--or-text);
-  letter-spacing: -0.02em;
-}
-
 .or-app-workspace {
-  padding: 0 0.65rem 0.65rem;
+  padding: 0.85rem 0.65rem 0.65rem;
   border-bottom: 1px solid var(--or-border);
   margin-bottom: 0.35rem;
 }
@@ -1437,7 +1404,7 @@
   width: 100%;
   min-height: 420px;
   border: 1px solid var(--or-border);
-  border-radius: 10px;
+  border-radius: 2px;
   background: var(--or-bg-elevated);
 }
 
@@ -1505,13 +1472,106 @@
   align-items: start;
 }
 
+/* Shared job parameter UI — Playground + Chat gen bar (landing-aligned) */
+
+.gw-job-panel {
+  border: 1px solid var(--or-border);
+  border-left: 2px solid var(--or-accent);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--or-bg-elevated) 55%, transparent);
+}
+
+.gw-job-panel--compact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.65rem 1rem;
+  padding: 0.65rem 0.85rem;
+}
+
+.gw-job-panel-kicker {
+  flex: 0 0 100%;
+  margin: 0 0 0.15rem;
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--or-accent);
+}
+
+.gw-job-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  margin-bottom: 0.75rem;
+}
+
+.gw-job-panel--compact .gw-job-field {
+  margin-bottom: 0;
+  min-width: min(11rem, 42vw);
+}
+
+.gw-job-label {
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--or-text-dim);
+}
+
+.gw-job-label-prefix {
+  color: var(--or-accent);
+  margin-right: 0.12rem;
+}
+
+.gw-job-input,
+.gw-job-panel .or-pg-prompt,
+.gw-job-panel .or-pg-select {
+  width: 100%;
+  border: 1px solid var(--or-border);
+  border-radius: 2px;
+  background: var(--or-bg);
+  color: var(--or-text);
+  font-size: 0.8125rem;
+  padding: 0.48rem 0.55rem;
+}
+
+.gw-job-panel .or-pg-prompt {
+  resize: vertical;
+  min-height: 5.5rem;
+  line-height: 1.45;
+}
+
+.gw-job-params {
+  margin-top: 0.15rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--or-border);
+}
+
+.gw-job-params-head {
+  margin: 0 0 0.65rem;
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--or-accent);
+}
+
 .or-pg-form,
 .or-pg-result {
   border: 1px solid var(--or-border);
-  border-radius: 10px;
+  border-radius: 2px;
   background: var(--or-bg-elevated);
   padding: 1rem;
   min-height: 360px;
+}
+
+.or-pg-form.gw-job-panel {
+  border-left: 2px solid var(--or-accent);
+  background: color-mix(in srgb, var(--or-bg-elevated) 55%, transparent);
 }
 
 .or-pg-field {
@@ -1533,7 +1593,7 @@
 .or-pg-select {
   width: 100%;
   border: 1px solid var(--or-border);
-  border-radius: 8px;
+  border-radius: 2px;
   background: var(--or-bg);
   color: var(--or-text);
   font-size: 0.8125rem;
@@ -3962,33 +4022,9 @@
 }
 
 .or-chat-image-gen-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 0.65rem;
-  padding: 0.35rem 0 0;
+  margin: 0 0.45rem;
 }
 
-.or-chat-image-gen-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  font-size: 0.6875rem;
-  color: var(--or-text-muted);
-}
-
-.or-chat-image-gen-field select {
-  min-width: min(14rem, 55vw);
-  border: 1px solid var(--or-border);
-  border-radius: 0.45rem;
-  background: var(--or-bg);
-  color: var(--or-text);
-  font: inherit;
-  font-size: 0.75rem;
-  padding: 0.3rem 0.45rem;
-}
-
-.or-chat-image-gen-ratio,
 .or-chat-image-gen-loading {
   font-size: 0.75rem;
   color: var(--or-text-muted);
