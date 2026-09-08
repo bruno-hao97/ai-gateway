@@ -6,9 +6,19 @@ const STORAGE_DOMAIN = 'portal_login_domain';
 const STORAGE_CHAT_SESSION = 'portal_chat_session';
 const STORAGE_VOICES = 'portal_last_voices';
 const STORAGE_DEVICE_ID = 'gw_device_id';
+const STORAGE_RESPONSE_TAB = 'portal_response_tab';
+const RESPONSE_TABS = new Set(['request', 'result', 'endpoints', 'guide', 'skill']);
 const DEFAULT_API = 'http://localhost:3001';
 
 const $ = (id) => document.getElementById(id);
+
+function pgT(key, fallback) {
+  return globalThis.PortalI18n?.t(key, fallback) ?? fallback ?? key;
+}
+
+function pgLocale() {
+  return globalThis.PortalI18n?.getLocale() || 'en';
+}
 
 const tokenEl = $('token');
 const docsNav = $('docs-nav');
@@ -16,6 +26,21 @@ const openapiNav = $('openapi-nav');
 const responseOutput = $('responseOutput');
 const responseMeta = $('responseMeta');
 const resultPreview = $('resultPreview');
+const resultEmpty = $('resultEmpty');
+const responsePaneResult = $('responsePaneResult');
+
+function readSavedResponseTab() {
+  try {
+    const saved = sessionStorage.getItem(STORAGE_RESPONSE_TAB);
+    if (saved && RESPONSE_TABS.has(saved)) return saved;
+  } catch {
+    /* ignore */
+  }
+  return 'result';
+}
+
+let activeResponseTab = readSavedResponseTab();
+let playgroundBooting = true;
 const resultLink = $('resultLink');
 const resultImage = $('resultImage');
 const resultVideo = $('resultVideo');
@@ -69,10 +94,10 @@ function updateTokenBadge() {
   if (!tokenBadge) return;
   if (t) {
     const tail = t.length > 8 ? `…${t.slice(-6)}` : '••••';
-    tokenBadge.textContent = `Token saved (${tail})`;
+    tokenBadge.textContent = `${pgT('token.saved')} (${tail})`;
     tokenBadge.className = 'pg-token-badge ok';
   } else {
-    tokenBadge.textContent = 'No token — login or paste Bearer token';
+    tokenBadge.textContent = pgT('token.none');
     tokenBadge.className = 'pg-token-badge';
   }
 }
@@ -117,13 +142,107 @@ let pendingDeepLink = null;
 
 function applyEmbedChrome() {
   if (!isEmbed) return;
-  document.body.classList.add('pg-embed');
+  document.body.classList.add('pg-embed', 'pg-studio');
+}
+
+function updateEmbedStudio(type, model) {
+  if (!isEmbed) return;
+  const typeEl = $('embedCrumbType');
+  const modelEl = $('embedCrumbModel');
+  const modelSep = $('embedCrumbModelSep');
+  const connBtn = $('btnEmbedConnection');
+  const onConnection = $('panel-connection')?.classList.contains('active');
+
+  if (typeEl) {
+    typeEl.textContent = onConnection
+      ? pgT('embed.connection')
+      : MEDIA_JOB_SHORT[type] || MEDIA_JOB_LABELS[type] || type || 'Image';
+  }
+  if (model && !onConnection) {
+    if (modelEl) {
+      modelEl.textContent = model.name || model.slug;
+      modelEl.hidden = false;
+    }
+    if (modelSep) modelSep.hidden = false;
+  } else {
+    if (modelEl) modelEl.hidden = true;
+    if (modelSep) modelSep.hidden = true;
+  }
+  if (connBtn) connBtn.classList.toggle('active', onConnection);
+  document.querySelectorAll('#embedJobChips [data-job-type]').forEach((btn) => {
+    const active = !onConnection && btn.dataset.jobType === type;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+}
+
+function updateSendPriceLabel(model) {
+  const el = $('sendPriceLabel');
+  if (!el) return;
+  const label = model?.creditsLabel;
+  if (!label || label === '—') {
+    el.hidden = true;
+    el.textContent = '';
+    return;
+  }
+  el.hidden = false;
+  el.textContent = label;
+}
+
+function wireEmbedStudio() {
+  if (!isEmbed) return;
+  $('btnEmbedConnection')?.addEventListener('click', () => {
+    const onConnection = $('panel-connection')?.classList.contains('active');
+    if (onConnection) {
+      void openMediaJobPanel($('jobType')?.value || 'image');
+      return;
+    }
+    openPanelById('connection');
+    updateEmbedStudio('connection', null);
+  });
+  $('btnEmbedDev')?.addEventListener('click', () => {
+    const open = document.body.classList.toggle('pg-sidebar-open');
+    $('btnEmbedDev')?.classList.toggle('active', open);
+  });
+  document.querySelectorAll('#embedJobChips [data-job-type]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      void openMediaJobPanel(btn.dataset.jobType);
+    });
+  });
+}
+
+async function initEmbedStudio() {
+  if (!isEmbed) return;
+  wireEmbedStudio();
+  captureDeepLinkFromUrl();
+  if (pendingDeepLink) {
+    await runPendingDeepLink();
+  } else {
+    await openMediaJobPanel('image');
+  }
+  if (tokenEl?.value?.trim()) {
+    try {
+      await fetchUserMe(null, { silent: true });
+    } catch {
+      /* credits optional */
+    }
+  }
 }
 
 function handleEmbedTokenMessage(event) {
   if (!isEmbed || !isAllowedEmbedParent(event.origin)) return;
   const data = event.data;
-  if (!data || data.type !== 'ai-gateway-token') return;
+  if (!data || typeof data !== 'object') return;
+  if (data.type === 'ai-gateway-locale') {
+    const locale = data.locale || data.lang;
+    if (locale && globalThis.PortalI18n) {
+      PortalI18n.setLocale(locale);
+      updateTokenBadge();
+      renderAiGuidePanel();
+    }
+    return;
+  }
+  if (data.type !== 'ai-gateway-token') return;
   const token = typeof data.token === 'string' ? data.token.trim() : '';
   if (!token) return;
   saveToken(token);
@@ -137,6 +256,7 @@ function handleEmbedTokenMessage(event) {
 
 if (isEmbed) {
   applyEmbedChrome();
+  document.body?.classList.add('pg-booting');
   window.addEventListener('message', handleEmbedTokenMessage);
 }
 
@@ -286,14 +406,392 @@ function prettyJson(data) {
   return JSON.stringify(data, null, 2);
 }
 
-function showResponse(body, meta = {}) {
-  const text = typeof body === 'string' ? body : prettyJson(body);
-  responseOutput.textContent = text;
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function flattenRequestBodyRows(body) {
+  const rows = [];
+  if (!body || typeof body !== 'object') return rows;
+  if (body.modelSlug != null && body.modelSlug !== '') rows.push(['modelSlug', body.modelSlug]);
+  if (body.wait != null) rows.push(['wait', String(body.wait)]);
+  const fields = body.fields;
+  if (fields && typeof fields === 'object' && !Array.isArray(fields)) {
+    for (const [key, val] of Object.entries(fields)) {
+      if (val == null || val === '') continue;
+      rows.push([key, typeof val === 'object' ? JSON.stringify(val) : String(val)]);
+    }
+  }
+  return rows;
+}
+
+function renderKvTableRows(tbody, entries) {
+  if (!tbody) return;
+  if (!entries.length) {
+    tbody.innerHTML = '<tr><td colspan="2" class="pg-kv-empty">—</td></tr>';
+    return;
+  }
+  tbody.innerHTML = entries
+    .map(
+      ([key, val]) =>
+        `<tr><td class="pg-kv-key"><code>${escapeHtml(key)}</code></td><td class="pg-kv-val">${escapeHtml(val)}</td></tr>`,
+    )
+    .join('');
+}
+
+let requestBodyRawView = false;
+
+function setRequestBodyView(raw) {
+  requestBodyRawView = raw;
+  const tableWrap = $('requestBodyTableWrap');
+  const rawEl = $('requestBodyRaw');
+  const toggle = $('btnRequestBodyView');
+  if (tableWrap) tableWrap.hidden = raw;
+  if (rawEl) rawEl.hidden = !raw;
+  if (toggle) {
+    toggle.textContent = raw ? pgT('request.keyValue') : pgT('request.rawJson');
+    toggle.setAttribute('aria-pressed', raw ? 'true' : 'false');
+  }
+}
+
+$('btnRequestBodyView')?.addEventListener('click', () => {
+  setRequestBodyView(!requestBodyRawView);
+});
+
+function setResponseTab(tab) {
+  if (!RESPONSE_TABS.has(tab)) return;
+  activeResponseTab = tab;
+  document.querySelectorAll('.pg-response-tab').forEach((btn) => {
+    const active = btn.dataset.responseTab === tab;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  document.querySelectorAll('[data-response-pane]').forEach((pane) => {
+    const match = pane.dataset.responsePane === tab;
+    pane.classList.toggle('active', match);
+    pane.hidden = !match;
+  });
+  try {
+    sessionStorage.setItem(STORAGE_RESPONSE_TAB, tab);
+  } catch {
+    /* ignore */
+  }
+}
+
+function restoreResponseTab() {
+  try {
+    const saved = sessionStorage.getItem(STORAGE_RESPONSE_TAB);
+    if (saved && RESPONSE_TABS.has(saved)) setResponseTab(saved);
+  } catch {
+    /* ignore */
+  }
+}
+
+restoreResponseTab();
+
+function getGuideContext() {
+  const jobType = $('jobType')?.value || 'image';
+  const modelSlug = $('mediaModelSelect')?.value || '';
+  const prompt = $('mediaPrompt')?.value?.trim() || '';
+  const domain = $('loginDomain')?.value?.trim() || GatewayAiGuide?.DEFAULT_DOMAIN || '79ai.net';
+  let base = '';
+  try {
+    base = baseUrl();
+  } catch {
+    base = window.location.origin.replace(/\/$/, '');
+  }
+  const fields = readJobFields(prompt);
+  let modelName = modelSlug;
+  const envelope = modelSlug ? getStoredModelsEnvelope(jobType) : null;
+  if (envelope && modelSlug) {
+    const m = normalizeModels(envelope).find((x) => x.slug === modelSlug);
+    if (m?.name) modelName = m.name;
+  }
+  return { baseUrl: base, jobType, modelSlug, modelName, domain, prompt, fields };
+}
+
+function renderAiGuidePanel() {
+  if (!globalThis.GatewayAiGuide) return;
+  const ctx = getGuideContext();
+  const guide = GatewayAiGuide;
+  const locale = pgLocale();
+
+  const baseEl = $('guideMetaBase');
+  if (baseEl) baseEl.textContent = ctx.baseUrl;
+
+  const guideText = guide.buildSystemPrompt(ctx);
+  const guideEl = $('aiGuideText');
+  if (guideEl) guideEl.textContent = guideText;
+
+  const tsEl = $('guideTsCode');
+  if (tsEl) tsEl.textContent = guide.buildTsSample(ctx);
+
+  const pyEl = $('guidePyCode');
+  if (pyEl) pyEl.textContent = guide.buildPySample(ctx);
+
+  const skillEl = $('aiSkillText');
+  if (skillEl) skillEl.textContent = guide.buildSkillPrompt(ctx, locale);
+
+  const playbook = guide.getSkillPlaybook ? guide.getSkillPlaybook(locale) : guide.SKILL_PLAYBOOK || [];
+  const playbookEl = $('skillPlaybookList');
+  if (playbookEl) {
+    playbookEl.innerHTML = playbook.map((step) => `<li>${step}</li>`).join('');
+  }
+
+  const examples = guide.getSkillExamples ? guide.getSkillExamples(locale) : guide.SKILL_EXAMPLES || [];
+  const examplesEl = $('skillExamplesList');
+  if (examplesEl) {
+    examplesEl.innerHTML = examples.map((ex) => `<li>${ex}</li>`).join('');
+  }
+
+  const fieldsByType = guide.getSkillFieldsByType
+    ? guide.getSkillFieldsByType(locale)
+    : guide.SKILL_FIELDS_BY_TYPE || [];
+  const fieldsEl = $('skillFieldsList');
+  if (fieldsEl) {
+    fieldsEl.innerHTML = fieldsByType
+      .map((row) => `<li><strong>${row.type}</strong> · ${row.fields}</li>`)
+      .join('');
+  }
+
+  const skillCtxDl = $('skillContextDl');
+  if (skillCtxDl) {
+    const pollMedia = guide.mediaForPoll(ctx.jobType);
+    skillCtxDl.innerHTML = `
+      <dt>${pgT('skill.ctx.type')}</dt><dd><code>${ctx.jobType}</code></dd>
+      <dt>${pgT('skill.ctx.model')}</dt><dd><code>${ctx.modelSlug || '—'}</code></dd>
+      <dt>${pgT('skill.ctx.domain')}</dt><dd><code>${ctx.domain}</code> <span class="pg-guide-context-note">${pgT('skill.ctx.domainNote')}</span></dd>
+      <dt>${pgT('skill.ctx.projectId')}</dt><dd><code>default</code></dd>
+      <dt>${pgT('skill.ctx.pollMedia')}</dt><dd><code>${pollMedia}</code></dd>
+    `;
+  }
+
+  const endpointsEl = $('guideEndpointsList');
+  if (endpointsEl && !endpointsEl.dataset.built) {
+    endpointsEl.dataset.built = '1';
+    endpointsEl.innerHTML = guide.GUIDE_ENDPOINTS
+      .map(
+        (ep) =>
+          `<li class="pg-guide-endpoint"><span class="pg-method ${ep.method.toLowerCase()}">${ep.method}</span><code>${ep.path}</code><span class="pg-guide-endpoint-name">${ep.name}</span></li>`,
+      )
+      .join('');
+  }
+
+  const tipsEl = $('guideTipsList');
+  if (tipsEl && !tipsEl.dataset.built) {
+    tipsEl.dataset.built = '1';
+    tipsEl.innerHTML = guide.INTEGRATION_TIPS.map((t) => `<li>${t}</li>`).join('');
+  }
+
+  const ctxDl = $('guideContextDl');
+  if (ctxDl) {
+    const pollMedia = guide.mediaForPoll(ctx.jobType);
+    ctxDl.innerHTML = `
+      <dt>${pgT('guide.ctx.type')}</dt><dd><code>${ctx.jobType}</code></dd>
+      <dt>${pgT('guide.ctx.modelSlug')}</dt><dd><code>${ctx.modelSlug || '—'}</code></dd>
+      <dt>${pgT('guide.ctx.model')}</dt><dd>${ctx.modelName || '—'}</dd>
+      <dt>${pgT('guide.ctx.domain')}</dt><dd><code>${ctx.domain}</code> <span class="pg-guide-context-note">${pgT('guide.ctx.domainNote')}</span></dd>
+      <dt>${pgT('guide.ctx.pollMedia')}</dt><dd><code>${pollMedia}</code></dd>
+    `;
+  }
+}
+
+function buildAiGuideText() {
+  if (globalThis.GatewayAiGuide) return GatewayAiGuide.buildSystemPrompt(getGuideContext());
+  return '';
+}
+
+function buildAiSkillText() {
+  if (globalThis.GatewayAiGuide) {
+    return GatewayAiGuide.buildSkillPrompt(getGuideContext(), pgLocale());
+  }
+  return `You are a content-creation agent using AI Gateway REST.`;
+}
+
+function initPortalI18n() {
+  if (!globalThis.PortalI18n) return;
+  PortalI18n.applyDom();
+  window.addEventListener('portal-locale-change', () => {
+    PortalI18n.applyDom();
+    setRequestBodyView(requestBodyRawView);
+    updateTokenBadge();
+    renderAiGuidePanel();
+  });
+}
+
+function buildMediaJobRequestPreview() {
+  const jobType = $('jobType')?.value || 'image';
+  const modelSlug = $('mediaModelSelect')?.value || '';
+  const prompt = $('mediaPrompt')?.value?.trim() || '';
+  const wait = $('mediaWait')?.checked ?? false;
+  const fields = readJobFields(prompt);
+  const body = {
+    modelSlug: modelSlug || '<modelSlug>',
+    wait,
+    fields,
+  };
+  const path = `/gateway/jobs/${jobType}`;
+  let base = '';
+  try {
+    base = baseUrl();
+  } catch {
+    base = window.location.origin.replace(/\/$/, '');
+  }
+  const url = `${base}${path}`;
+  const token = tokenEl?.value?.trim();
+  const tokenMask = token ? `${token.slice(0, 12)}…` : '<ACCESS_TOKEN>';
+  const headers = {
+    Authorization: `Bearer ${tokenMask}`,
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
+  const curlToken = token || '<ACCESS_TOKEN>';
+  const curl = `curl -X POST '${url}' \\\n  -H 'Authorization: Bearer ${curlToken}' \\\n  -H 'Content-Type: application/json' \\\n  -d '${JSON.stringify(body)}'`;
+  return { path, url, headers, body, curl };
+}
+
+function refreshRequestPreview() {
+  const preview = buildMediaJobRequestPreview();
+  const methodEl = $('requestMethod');
+  const endpointEl = $('requestEndpoint');
+  const fullUrlEl = $('requestFullUrl');
+  const headersRows = $('requestHeadersRows');
+  const bodyRows = $('requestBodyRows');
+  const bodyRawEl = $('requestBodyRaw');
+  const curlEl = $('requestCurl');
+
+  if (methodEl) methodEl.textContent = 'POST';
+  if (endpointEl) endpointEl.textContent = preview.path;
+  if (fullUrlEl) fullUrlEl.textContent = preview.url;
+
+  renderKvTableRows(
+    headersRows,
+    Object.entries(preview.headers).map(([k, v]) => [k, v]),
+  );
+  renderKvTableRows(bodyRows, flattenRequestBodyRows(preview.body));
+  if (bodyRawEl) GwJsonHighlight?.setJsonPre(bodyRawEl, preview.body);
+  if (curlEl) curlEl.textContent = preview.curl;
+  renderAiGuidePanel();
+}
+
+function initGuidePanels() {
+  initPortalI18n();
+  renderAiGuidePanel();
+}
+
+function getActiveCopyText() {
+  if (activeResponseTab === 'request') return $('requestCurl')?.textContent || '';
+  if (activeResponseTab === 'guide') return $('aiGuideText')?.textContent || '';
+  if (activeResponseTab === 'skill') return $('aiSkillText')?.textContent || '';
+  if (activeResponseTab === 'result' && $('resultMain') && !$('resultMain').hidden) {
+    const create = GwJsonHighlight?.getRawText($('resultCreateJson')) || '';
+    const poll = GwJsonHighlight?.getRawText($('resultPollJson')) || '';
+    if (create || poll) return `--- CREATE ---\n${create}\n\n--- POLL ---\n${poll}`;
+  }
+  return GwJsonHighlight?.getRawText(responseOutput) || responseOutput?.textContent || '';
+}
+
+document.querySelectorAll('.pg-response-tab').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.responseTab;
+    if (tab) setResponseTab(tab);
+  });
+});
+
+function showResponse(body, meta = {}, opts = {}) {
+  if (!opts.silent) {
+    if ($('resultMain')) $('resultMain').hidden = true;
+    if ($('resultLegacyJsonWrap')) $('resultLegacyJsonWrap').hidden = false;
+  }
+  if (responseOutput && !opts.silent) {
+    GwJsonHighlight?.displayInPre(responseOutput, body);
+  }
   const parts = [];
   if (meta.status) parts.push(String(meta.status));
   if (meta.ms != null) parts.push(`${meta.ms}ms`);
   if (meta.label) parts.unshift(meta.label);
-  responseMeta.textContent = parts.length ? parts.join(' · ') : '—';
+  if (!opts.silent) responseMeta.textContent = parts.length ? parts.join(' · ') : '—';
+  if (!meta.keepTab && !opts.silent && !playgroundBooting) setResponseTab('result');
+}
+
+function displayJsonPre(el, body) {
+  if (!el) return;
+  if (body == null) {
+    el.textContent = '—';
+    return;
+  }
+  GwJsonHighlight?.displayInPre(el, body);
+}
+
+function showJobResultLayout() {
+  if (resultEmpty) resultEmpty.hidden = true;
+  const main = $('resultMain');
+  if (main) main.hidden = false;
+  const legacy = $('resultLegacyJsonWrap');
+  if (legacy) legacy.hidden = true;
+  if (!playgroundBooting) setResponseTab('result');
+}
+
+function displayCreateJson(body) {
+  displayJsonPre($('resultCreateJson'), body);
+}
+
+function displayPollJson(body) {
+  displayJsonPre($('resultPollJson'), body);
+}
+
+function showJobProgress(visible, label, pct) {
+  const wrap = $('resultProgress');
+  const bar = $('resultProgressBar');
+  const lbl = $('resultProgressLabel');
+  if (wrap) wrap.hidden = !visible;
+  if (lbl && label != null) lbl.textContent = label;
+  if (bar && pct != null) bar.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+}
+
+function formatElapsed(ms) {
+  if (ms == null || Number.isNaN(ms)) return '—';
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  return `${(ms / 1000).toFixed(2)}s`;
+}
+
+function updateResultHeader({ model, domain, type, elapsedMs }) {
+  const modelEl = $('resultHdrModel');
+  const domainEl = $('resultHdrDomain');
+  const typeEl = $('resultHdrType');
+  const elapsedEl = $('resultHdrElapsed');
+  if (modelEl) modelEl.textContent = model || '—';
+  if (domainEl) domainEl.textContent = domain || '—';
+  if (typeEl) typeEl.textContent = type || '—';
+  if (elapsedEl) elapsedEl.textContent = formatElapsed(elapsedMs);
+}
+
+function jobTypeNeedsRefUrl(jobType) {
+  return /upscale|remove-bg|avatar-lipsync|edit/i.test(jobType || '');
+}
+
+function jobTypeNeedsPrompt(jobType) {
+  return !jobTypeNeedsRefUrl(jobType);
+}
+
+function updateRefUrlFieldVisibility(jobType) {
+  const wrap = $('mediaRefUrlWrap');
+  if (!wrap) return;
+  wrap.hidden = !jobTypeNeedsRefUrl(jobType);
+}
+
+function readJobFields(prompt) {
+  const fields = { ...readCatalogFieldValues() };
+  if (prompt) fields.prompt = prompt;
+  const ref = $('mediaRefUrl')?.value?.trim();
+  if (ref) fields.images = [{ url: ref }];
+  const projectId = $('mediaProjectId')?.value?.trim();
+  if (projectId) fields.project_id = projectId;
+  return fields;
 }
 
 function clearPreviewPlayers() {
@@ -316,11 +814,16 @@ function clearPreviewPlayers() {
 function hidePreviewMedia() {
   resultPreview.hidden = true;
   clearPreviewPlayers();
+  if (resultEmpty) resultEmpty.hidden = false;
 }
 
 function showResultUrl(url, mediaHint = '') {
   if (!url) return;
-  resultPreview.hidden = false;
+  showJobResultLayout();
+  if (resultEmpty) resultEmpty.hidden = true;
+  const preview = $('resultPreview');
+  if (preview) preview.hidden = false;
+  setResponseTab('result');
   resultLink.href = url;
   resultLink.title = url;
   resultLink.textContent = 'Open in new tab ↗';
@@ -417,6 +920,21 @@ const MEDIA_JOB_LABELS = {
   'avatar-lipsync': 'Avatar lipsync',
 };
 
+const MEDIA_JOB_SHORT = {
+  image: 'Image',
+  video: 'Video',
+  music: 'Music',
+  tts: 'TTS',
+  'image-upscale': 'Upscale',
+  'remove-bg': 'Remove BG',
+  'video-upscale': 'Vid upscale',
+  'video-vfx': 'VFX',
+  'video-subtitle': 'Subtitles',
+  'video-cut': 'Cut',
+  'avatar-lipsync': 'Lipsync',
+  connection: 'Connection',
+};
+
 const DEFAULT_PROMPTS = {
   image: 'A cute cat, studio photo',
   video: 'A cat walking in a sunny garden, cinematic',
@@ -434,6 +952,7 @@ const DEFAULT_PROMPTS = {
 const POLL_INTERVAL_MS = 3500;
 const POLL_MAX_ATTEMPTS = 80;
 let pollLoopGeneration = 0;
+let jobPollGeneration = 0;
 
 function pollMediaForJobType(jobType) {
   if (jobType === 'music') return 'music';
@@ -479,13 +998,29 @@ function migrateLegacyModelsStorage() {
   }
 }
 
+function parseModelCredits(m) {
+  const raw = m.credits ?? m.credit ?? m.price ?? m.cost;
+  if (typeof raw === 'number' && !Number.isNaN(raw)) {
+    return { credits: raw, creditsLabel: `${raw.toLocaleString()} credits` };
+  }
+  if (typeof raw === 'string' && raw.trim()) {
+    const n = Number(raw);
+    if (!Number.isNaN(n)) return { credits: n, creditsLabel: `${n.toLocaleString()} credits` };
+    return { credits: null, creditsLabel: raw.trim() };
+  }
+  return { credits: null, creditsLabel: '—' };
+}
+
 function normalizeModels(envelope) {
   return parseModelsList(envelope)
     .map((m) => {
       const slug = modelSlug(m);
+      const { credits, creditsLabel } = parseModelCredits(m);
       return {
         slug,
         name: m.name || slug,
+        credits,
+        creditsLabel,
         ratios: pickCatalogList(m, 'ratios', 'ratio'),
         modes: pickCatalogList(m, 'modes', 'mode'),
         resolutions: pickCatalogList(m, 'resolutions', 'resolution'),
@@ -553,7 +1088,7 @@ async function apiStreamFetch(path, init = {}, label = '') {
 
   const decoder = new TextDecoder();
   let accumulated = '';
-  showResponse('(streaming…)\n', { status: res.status, label });
+  showResponse('(streaming…)\n', { status: res.status, label, keepTab: true });
 
   while (true) {
     const { done, value } = await reader.read();
@@ -563,6 +1098,7 @@ async function apiStreamFetch(path, init = {}, label = '') {
       status: res.status,
       label,
       ms: Math.round(performance.now() - start),
+      keepTab: true,
     });
   }
   return accumulated;
@@ -743,6 +1279,7 @@ function renderCatalogFields(model) {
     const sel = document.createElement('select');
     sel.id = `cat_${def.field}`;
     sel.dataset.catalogField = def.field;
+    sel.addEventListener('change', refreshRequestPreview);
     for (const opt of list) {
       sel.appendChild(new Option(opt, opt));
     }
@@ -750,6 +1287,7 @@ function renderCatalogFields(model) {
     wrap.appendChild(sel);
     container.appendChild(wrap);
   }
+  refreshRequestPreview();
 }
 
 function onMediaModelChange() {
@@ -758,17 +1296,41 @@ function onMediaModelChange() {
   const envelope = getStoredModelsEnvelope(type);
   if (!envelope || !slug) {
     renderCatalogFields(null);
+    updateModelMetaBar(null);
+    updateMediaJobChrome(type, null);
     return;
   }
   const model = normalizeModels(envelope).find((m) => m.slug === slug);
   renderCatalogFields(model || null);
+  updateModelMetaBar(model || null);
+  updateMediaJobChrome(type, model || null);
+  globalThis.GatewayEndpointDetail?.refresh();
 }
 
-function updateMediaJobChrome(type) {
+function updateModelMetaBar(model) {
+  const bar = $('mediaModelMeta');
+  if (!bar) return;
+  if (!model) {
+    bar.hidden = true;
+    return;
+  }
+  bar.hidden = false;
+  const nameEl = $('mediaModelMetaName');
+  const slugEl = $('mediaModelMetaSlug');
+  const creditsEl = $('mediaModelMetaCredits');
+  if (nameEl) nameEl.textContent = model.name;
+  if (slugEl) slugEl.textContent = model.slug;
+  if (creditsEl) creditsEl.textContent = model.creditsLabel || '—';
+  refreshRequestPreview();
+}
+
+function updateMediaJobChrome(type, model) {
   const title = $('mediaJobTitle');
   const endpoint = $('mediaJobEndpoint');
-  if (title) title.textContent = MEDIA_JOB_LABELS[type] || 'Media job';
+  if (title) title.textContent = model?.name || MEDIA_JOB_LABELS[type] || 'Media job';
   if (endpoint) endpoint.textContent = `POST /gateway/jobs/${type}`;
+  updateEmbedStudio(type, model);
+  updateSendPriceLabel(model);
 }
 
 function activateNavForPanel(panel, jobType) {
@@ -782,6 +1344,7 @@ function activateNavForPanel(panel, jobType) {
 async function openMediaJobPanel(type, { autoFetch = true } = {}) {
   if ($('jobType')) $('jobType').value = type;
   if ($('modelType')) $('modelType').value = type;
+  updateRefUrlFieldVisibility(type);
   const promptEl = $('mediaPrompt');
   if (promptEl && DEFAULT_PROMPTS[type] && !promptEl.dataset.userEdited) {
     promptEl.value = DEFAULT_PROMPTS[type];
@@ -796,7 +1359,7 @@ async function openMediaJobPanel(type, { autoFetch = true } = {}) {
 async function loadMediaJobForType(type, { autoFetch = false } = {}) {
   if ($('jobType')) $('jobType').value = type;
   if ($('modelType')) $('modelType').value = type;
-  updateMediaJobChrome(type);
+  updateMediaJobChrome(type, null);
 
   let models = normalizeModels(getStoredModelsEnvelope(type));
 
@@ -813,6 +1376,7 @@ async function loadMediaJobForType(type, { autoFetch = false } = {}) {
     onMediaModelChange();
   } else {
     renderCatalogFields(null);
+    updateModelMetaBar(null);
   }
 }
 
@@ -1120,18 +1684,104 @@ function filterSidebar(query) {
 
 function extractJobId(data) {
   const candidates = [
+    data?.data?.providerJobId,
     data?.data?.jobId,
     data?.data?.id_base,
     data?.data?.idBase,
     data?.data?.pollResult?.idBase,
+    data?.data?.createEnvelope?.raw?.imageInfo?.id_base,
+    data?.data?.createEnvelope?.data?.imageInfo?.id_base,
+    data?.data?.imageInfo?.id_base,
     data?.raw?.imageInfo?.id_base,
     data?.raw?.videoInfo?.id_base,
     data?.raw?.musicInfo?.id_base,
+    data?.imageInfo?.id_base,
+    data?.videoInfo?.id_base,
   ];
   for (const c of candidates) {
     if (typeof c === 'string' && c.trim()) return c.trim();
   }
   return null;
+}
+
+function buildWaitPollView(data) {
+  const d = data?.data;
+  if (!d) return data;
+  return {
+    success: data.success,
+    message: data.message,
+    data: {
+      resultUrl: d.resultUrl ?? d.pollResult?.resultUrl ?? null,
+      status: d.pollResult?.status ?? (d.resultUrl ? 'SUCCESS' : 'PROCESSING'),
+      coverUrl: d.coverUrl ?? d.pollResult?.coverUrl ?? null,
+      idBase: d.providerJobId ?? d.pollResult?.idBase ?? null,
+      pollResult: d.pollResult,
+    },
+  };
+}
+
+async function fetchPollQuiet(jobId, media) {
+  const url = `${baseUrl()}/gateway/jobs/${encodeURIComponent(jobId)}?media=${encodeURIComponent(media)}`;
+  const res = await fetch(url, { headers: authHeaders(false) });
+  const ct = res.headers.get('content-type') || '';
+  let body;
+  if (ct.includes('application/json')) body = await res.json();
+  else body = { _raw: await res.text() };
+  if (!res.ok) throw new Error(apiErrorMessage(body, res.status));
+  return body;
+}
+
+async function runMediaJobPollLoop(jobId, media, jobMeta, gen) {
+  const start = performance.now();
+  const labelBase = pgT('result.polling', 'Polling…');
+
+  for (let attempt = 1; attempt <= POLL_MAX_ATTEMPTS; attempt++) {
+    if (jobPollGeneration !== gen) return { cancelled: true };
+
+    const pct = Math.min(92, 8 + (attempt / POLL_MAX_ATTEMPTS) * 84);
+    showJobProgress(true, `${labelBase} ${attempt}/${POLL_MAX_ATTEMPTS}`, pct);
+    responseMeta.textContent = `GET poll · ${attempt}/${POLL_MAX_ATTEMPTS}`;
+
+    try {
+      const data = await fetchPollQuiet(jobId, media);
+      displayPollJson(data);
+      const resultUrl = extractPollResultUrl(data);
+      if (resultUrl) showResultUrl(resultUrl, media);
+
+      if (isPollSuccess(data)) {
+        const elapsed = performance.now() - start;
+        showJobProgress(false);
+        updateResultHeader({ ...jobMeta, elapsedMs: elapsed });
+        responseMeta.textContent = `${pgT('result.done', 'Completed')} · ${formatElapsed(elapsed)}`;
+        logPollUsage(jobId, media, data, resultUrl);
+        logUsageEvent({
+          jobType: jobMeta.type,
+          model: jobMeta.model,
+          prompt: jobMeta.prompt,
+          status: 'success',
+          jobId,
+          resultUrl: resultUrl || undefined,
+        });
+        return { success: true, data, resultUrl };
+      }
+      if (isPollFailed(data)) {
+        showJobProgress(false);
+        updateResultHeader({ ...jobMeta, elapsedMs: performance.now() - start });
+        logPollUsage(jobId, media, data, resultUrl);
+        return { success: false, data };
+      }
+      if (attempt >= POLL_MAX_ATTEMPTS) {
+        showJobProgress(false);
+        return { success: false, timeout: true };
+      }
+      if (jobPollGeneration === gen) await sleep(POLL_INTERVAL_MS);
+    } catch (err) {
+      showJobProgress(false);
+      throw err;
+    }
+  }
+  showJobProgress(false);
+  return { success: false, timeout: true };
 }
 
 function extractCredits(data) {
@@ -1145,16 +1795,26 @@ function extractCredits(data) {
 
 function showCredits(credits) {
   const el = $('creditsBadge');
-  if (!el) return;
-  if (credits == null) {
-    el.hidden = true;
-    return;
+  if (el) {
+    if (credits == null) {
+      el.hidden = true;
+    } else {
+      el.hidden = false;
+      el.textContent = `credits_ai: ${credits.toLocaleString()}`;
+    }
   }
-  el.hidden = false;
-  el.textContent = `credits_ai: ${credits.toLocaleString()}`;
+  const embed = $('embedCreditsBadge');
+  if (embed) {
+    if (credits == null) {
+      embed.hidden = true;
+    } else {
+      embed.hidden = false;
+      embed.textContent = `${credits.toLocaleString()} credits`;
+    }
+  }
 }
 
-async function fetchUserMe(statusEl) {
+async function fetchUserMe(statusEl, fetchOpts = {}) {
   const domain = $('loginDomain').value.trim() || '79ai.net';
   const body = new URLSearchParams({ access_token: getToken(), domain });
   appendDeviceToForm(body);
@@ -1166,6 +1826,7 @@ async function fetchUserMe(statusEl) {
       body: body.toString(),
     },
     'POST /ai/me',
+    fetchOpts,
   );
   const credits = extractCredits(data);
   showCredits(credits);
@@ -1175,7 +1836,48 @@ async function fetchUserMe(statusEl) {
   return data;
 }
 
-async function apiFetch(path, init = {}, label = '') {
+async function sandboxApiFetch(path, init = {}) {
+  const start = performance.now();
+  const url = `${baseUrl()}${path}`;
+  let res;
+  try {
+    res = await fetch(url, init);
+  } catch (err) {
+    const hint =
+      err.message === 'Failed to fetch'
+        ? `${err.message} — is npm run dev running at ${baseUrl()}?`
+        : err.message;
+    return {
+      ok: false,
+      status: 0,
+      body: { success: false, message: hint, code: 'NETWORK_ERROR' },
+      ms: Math.round(performance.now() - start),
+    };
+  }
+  const ms = Math.round(performance.now() - start);
+  const ct = res.headers.get('content-type') || '';
+  let body;
+  if (ct.includes('application/json')) {
+    body = await res.json();
+  } else {
+    body = { _raw: await res.text() };
+  }
+  const logicalFail = body && typeof body === 'object' && body.success === false;
+  return { ok: res.ok && !logicalFail, status: res.status, body, ms };
+}
+
+function sandboxAuthHeaders(json = true, required = true) {
+  const t = tokenEl.value.trim();
+  if (!t && required) {
+    throw new Error(pgT('ep.sandbox.needToken', 'Login or paste a Bearer token in Connection first.'));
+  }
+  const headers = {};
+  if (t) headers.Authorization = `Bearer ${t}`;
+  if (json) headers['Content-Type'] = 'application/json';
+  return headers;
+}
+
+async function apiFetch(path, init = {}, label = '', opts = {}) {
   const start = performance.now();
   const url = `${baseUrl()}${path}`;
   let res;
@@ -1200,7 +1902,7 @@ async function apiFetch(path, init = {}, label = '') {
   } else {
     body = { _raw: await res.text() };
   }
-  showResponse(body, { status: res.status, ms, label });
+  showResponse(body, { status: res.status, ms, label }, opts);
 
   const logicalFail = body && typeof body === 'object' && body.success === false;
   if (!res.ok || logicalFail) {
@@ -1216,13 +1918,17 @@ $('mediaModelSelect')?.addEventListener('change', onMediaModelChange);
 
 $('jobType')?.addEventListener('change', async () => {
   const type = $('jobType').value;
+  updateRefUrlFieldVisibility(type);
   activateNavForPanel('media-job', type);
   await loadMediaJobForType(type, { autoFetch: true });
 });
 
 $('mediaPrompt')?.addEventListener('input', () => {
   $('mediaPrompt').dataset.userEdited = '1';
+  refreshRequestPreview();
 });
+
+$('mediaWait')?.addEventListener('change', refreshRequestPreview);
 
 $('sidebarSearch')?.addEventListener('input', (e) => {
   filterSidebar(e.target.value);
@@ -1265,11 +1971,51 @@ document.querySelectorAll('.pg-tab[data-upload-tab]').forEach((tab) => {
 
 $('btnCopyResponse').addEventListener('click', async () => {
   try {
-    await navigator.clipboard.writeText(responseOutput.textContent);
+    await navigator.clipboard.writeText(getActiveCopyText());
     responseMeta.textContent = 'Copied';
     setTimeout(() => {
       if (responseMeta.textContent === 'Copied') responseMeta.textContent = '—';
     }, 1500);
+  } catch {
+    /* ignore */
+  }
+});
+
+$('btnCopyGuide')?.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('aiGuideText')?.textContent || buildAiGuideText());
+    const meta = $('responseMeta');
+    if (meta) {
+      meta.textContent = 'Copied guide';
+      setTimeout(() => {
+        if (meta.textContent === 'Copied guide') meta.textContent = '—';
+      }, 1500);
+    }
+  } catch {
+    /* ignore */
+  }
+});
+
+document.querySelectorAll('.pg-copy-code').forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    const id = btn.dataset.copyTarget;
+    const el = id ? $(id) : null;
+    if (!el) return;
+    try {
+      await navigator.clipboard.writeText(el.textContent || '');
+      btn.textContent = 'Copied';
+      setTimeout(() => {
+        btn.textContent = 'Copy';
+      }, 1500);
+    } catch {
+      /* ignore */
+    }
+  });
+});
+
+$('btnCopySkill')?.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('aiSkillText')?.textContent || '');
   } catch {
     /* ignore */
   }
@@ -1350,19 +2096,27 @@ $('btnModels').addEventListener('click', async () => {
 
 $('btnMediaJob')?.addEventListener('click', async () => {
   const status = $('mediaJobStatus');
-  setStatus(status, 'Running… (wait may take 1–5 min)', 'running');
+  jobPollGeneration += 1;
+  const pollGen = jobPollGeneration;
 
   const jobType = $('jobType').value;
   const modelSlugVal = $('mediaModelSelect').value;
   const prompt = $('mediaPrompt').value.trim();
   const wait = $('mediaWait').checked;
+  const domain = $('loginDomain')?.value?.trim() || '79ai.net';
+  const media = pollMediaForJobType(jobType);
 
   if (!modelSlugVal) {
     setStatus(status, 'Select modelSlug from catalog', false);
     return;
   }
-  if (!prompt) {
+  const refUrl = $('mediaRefUrl')?.value?.trim();
+  if (jobTypeNeedsPrompt(jobType) && !prompt) {
     setStatus(status, 'prompt required', false);
+    return;
+  }
+  if (jobTypeNeedsRefUrl(jobType) && !refUrl && !prompt) {
+    setStatus(status, pgT('media.refHint', 'Reference image URL required'), false);
     return;
   }
 
@@ -1381,7 +2135,22 @@ $('btnMediaJob')?.addEventListener('click', async () => {
     return;
   }
 
-  const fields = { prompt, ...readCatalogFieldValues() };
+  const fields = readJobFields(prompt);
+  const jobMeta = {
+    model: modelSlugVal,
+    domain,
+    type: jobType,
+    prompt,
+  };
+
+  const jobStart = performance.now();
+  showJobResultLayout();
+  updateResultHeader({ ...jobMeta, elapsedMs: null });
+  displayCreateJson(null);
+  displayPollJson(null);
+  showJobProgress(true, pgT('result.creating', 'Creating job…'), 6);
+  setStatus(status, pgT('result.creating', 'Creating job…'), 'running');
+  responseMeta.textContent = `POST /gateway/jobs/${jobType}`;
 
   try {
     const payload = { modelSlug: modelSlugVal, wait, fields };
@@ -1393,38 +2162,100 @@ $('btnMediaJob')?.addEventListener('click', async () => {
         body: JSON.stringify(payload),
       },
       `POST /gateway/jobs/${jobType}`,
+      { silent: true },
     );
-    const url = extractJobResultUrl(data, jobType);
-    showResultUrl(url, pollMediaForJobType(jobType));
-
-    const jobId = extractJobId(data);
-    if (jobId && !wait) {
-      $('pollJobId').value = jobId;
-      const pollMedia = pollMediaForJobType(jobType);
-      if ($('pollMedia')) $('pollMedia').value = pollMedia;
-    }
 
     if (wait) {
+      const createBody = data?.data?.createEnvelope ?? data;
+      displayCreateJson(createBody);
+      displayPollJson(buildWaitPollView(data));
+      const url = extractJobResultUrl(data, jobType);
+      const elapsed = performance.now() - jobStart;
+      showJobProgress(false);
+      updateResultHeader({ ...jobMeta, elapsedMs: elapsed });
+      if (url) showResultUrl(url, media);
+      responseMeta.textContent = `${pgT('result.done', 'Completed')} · ${formatElapsed(elapsed)}`;
       logUsageEvent({
         jobType,
         model: modelSlugVal,
         prompt,
         status: 'success',
-        jobId: jobId || undefined,
+        jobId: extractJobId(data) || undefined,
         resultUrl: url || undefined,
-        credits: extractCredits(data),
       });
+      setStatus(status, url ? '' : pgT('result.done', 'Completed'), url ? 'preview' : 'ok');
+      return;
     }
 
-    if (url) {
+    displayCreateJson(data);
+    displayPollJson({ message: pgT('result.polling', 'Polling…'), status: 'pending' });
+
+    const jobId = extractJobId(data);
+    if ($('pollJobId') && jobId) $('pollJobId').value = jobId;
+    if ($('pollMedia')) $('pollMedia').value = media;
+
+    if (!jobId) {
+      showJobProgress(false);
+      setStatus(status, 'No job id in create response', false);
+      return;
+    }
+
+    if (pollGen !== jobPollGeneration) return;
+
+    const pollOutcome = await runMediaJobPollLoop(jobId, media, jobMeta, pollGen);
+    if (pollOutcome?.cancelled) return;
+
+    if (pollOutcome?.success) {
       setStatus(status, '', 'preview');
-    } else if (jobId && !wait) {
-      setStatus(status, `Job id ${jobId.slice(0, 8)}… — use Poll panel`, 'ok');
+    } else if (pollOutcome?.timeout) {
+      setStatus(status, 'Poll timeout — max 80 attempts', false);
     } else {
-      setStatus(status, 'Finished — check RESPONSE', 'ok');
+      setStatus(status, 'Job failed — see Poll JSON', false);
     }
   } catch (err) {
+    showJobProgress(false);
     setStatus(status, err.message, false);
+    if (err.body) displayCreateJson(err.body);
+  }
+});
+
+$('btnMediaRefUpload')?.addEventListener('click', () => {
+  $('mediaRefFile')?.click();
+});
+
+$('mediaRefFile')?.addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const status = $('mediaJobStatus');
+  setStatus(status, 'Uploading reference…', 'running');
+  try {
+    getToken();
+  } catch (err) {
+    setStatus(status, err.message, false);
+    return;
+  }
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const res = await fetch(`${baseUrl()}/gateway/upload/image`, {
+      method: 'POST',
+      headers: authHeaders(false),
+      body: form,
+    });
+    const body = await res.json();
+    const url =
+      body?.data?.url ||
+      body?.data?.file_url ||
+      body?.url ||
+      body?.data?.imageInfo?.url;
+    if (!url) throw new Error('No URL in upload response');
+    const refEl = $('mediaRefUrl');
+    if (refEl) refEl.value = url;
+    setStatus(status, 'Reference uploaded', 'ok');
+  } catch (err) {
+    setStatus(status, err.message, false);
+  } finally {
+    e.target.value = '';
   }
 });
 
@@ -1701,9 +2532,20 @@ void (async () => {
   if (sessionStorage.getItem(STORAGE_MODELS_LEGACY) || sessionStorage.getItem(modelsStorageKey('image'))) {
     migrateLegacyModelsStorage();
   }
-  const initialType = $('jobType')?.value || 'image';
-  const hasToken = Boolean(tokenEl?.value?.trim());
-  await loadMediaJobForType(initialType, { autoFetch: hasToken });
+  if (isEmbed) {
+    await initEmbedStudio();
+  } else {
+    const initialType = $('jobType')?.value || 'image';
+    const hasToken = Boolean(tokenEl?.value?.trim());
+    await loadMediaJobForType(initialType, { autoFetch: hasToken });
+  }
+  initGuidePanels();
+  refreshRequestPreview();
+  updateRefUrlFieldVisibility($('jobType')?.value || 'image');
+  globalThis.GatewayEndpointDetail?.init();
+  playgroundBooting = false;
+  restoreResponseTab();
+  document.body?.classList.remove('pg-booting');
 })();
 
 if (sessionStorage.getItem(STORAGE_VOICES)) {
@@ -1718,6 +2560,7 @@ function openPanelById(panelId) {
   const btn = document.querySelector(`.pg-nav-item[data-panel="${panelId}"]:not([disabled])`);
   if (btn) {
     btn.click();
+    if (isEmbed && panelId === 'connection') updateEmbedStudio('connection', null);
     return;
   }
   document.querySelectorAll('.pg-panel').forEach((p) => {
@@ -1726,6 +2569,7 @@ function openPanelById(panelId) {
   document.querySelectorAll('.pg-nav-item').forEach((b) => {
     b.classList.toggle('active', b.dataset.panel === panelId && !b.dataset.jobType);
   });
+  if (isEmbed && panelId === 'connection') updateEmbedStudio('connection', null);
 }
 
 async function runPendingDeepLink() {
@@ -1762,4 +2606,17 @@ function captureDeepLinkFromUrl() {
   if (tokenEl.value.trim()) void runPendingDeepLink();
 }
 
-captureDeepLinkFromUrl();
+if (!isEmbed) captureDeepLinkFromUrl();
+
+globalThis.baseUrl = baseUrl;
+globalThis.normalizeModels = normalizeModels;
+globalThis.getStoredModelsEnvelope = getStoredModelsEnvelope;
+globalThis.parseModelsList = parseModelsList;
+globalThis.modelSlug = modelSlug;
+globalThis.CATALOG_FIELD_DEFS = CATALOG_FIELD_DEFS;
+globalThis.setResponseTab = setResponseTab;
+globalThis.refreshRequestPreview = refreshRequestPreview;
+globalThis.openMediaJobPanel = openMediaJobPanel;
+globalThis.openPanelById = openPanelById;
+globalThis.sandboxApiFetch = sandboxApiFetch;
+globalThis.sandboxAuthHeaders = sandboxAuthHeaders;

@@ -2372,6 +2372,26 @@
   border: 1px solid color-mix(in srgb, #22c55e 25%, transparent);
 }
 
+.or-app-playground-layout.or-catalog {
+  grid-template-columns: 1fr;
+}
+
+.or-app-playground-layout .or-main {
+  min-width: 0;
+  padding: 0;
+}
+
+.or-app-playground-layout .or-app-playground-wrap {
+  border: 0;
+}
+
+body.gw-api-playground-immersive .or-app-has-playground.or-catalog,
+body.gw-api-playground-immersive .or-app-playground-layout.or-catalog {
+  min-height: calc(100dvh - var(--vp-nav-height, 64px));
+  height: calc(100dvh - var(--vp-nav-height, 64px));
+  max-height: calc(100dvh - var(--vp-nav-height, 64px));
+}
+
 /* ── Chat panel ── */
 
 .or-app-chat-layout.or-catalog {

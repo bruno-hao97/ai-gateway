@@ -23,8 +23,9 @@ import {
 } from '../models/user-api';
 import AppNavIcon from './AppNavIcon.vue';
 import AppChatPanel from './AppChatPanel.vue';
-import AppPlaygroundPanel from './AppPlaygroundPanel.vue';
+import ApiPlaygroundEmbed from './ApiPlaygroundEmbed.vue';
 import CreditsCheckoutModal from './CreditsCheckoutModal.vue';
+import type { PlaygroundPortalLocale } from '../models/playground-locale-bridge';
 import ProfileUsagePanel from './ProfileUsagePanel.vue';
 import ProfileActivityPanel from './ProfileActivityPanel.vue';
 import { formatApproxUsd, formatPayTotalLine } from '../models/invoice-buyer';
@@ -50,18 +51,6 @@ const { lang } = useData();
 const route = useRoute();
 const isVi = computed(() => lang.value === 'vi-VN');
 const prefix = computed(() => (isVi.value ? '/vi' : ''));
-
-function readEmbedQueryFromLocation(): { type?: string; model?: string; panel?: string } {
-  if (typeof window === 'undefined') return {};
-  const q = new URLSearchParams(window.location.search);
-  return {
-    type: q.get('type') || undefined,
-    model: q.get('model') || undefined,
-    panel: q.get('panel') || undefined,
-  };
-}
-
-const embedQuery = ref(readEmbedQueryFromLocation());
 
 const ready = ref(false);
 const me = ref<MeResponse | null>(getCachedMe());
@@ -98,7 +87,7 @@ let checkoutToastTimer: ReturnType<typeof setTimeout> | null = null;
 const usagePanelRef = ref<InstanceType<typeof ProfileUsagePanel> | null>(null);
 const logsPanelRef = ref<InstanceType<typeof ProfileUsagePanel> | null>(null);
 
-const apiExplorerLink = computed(() => `${prefix.value}/reference/playground/`);
+const playgroundLocale = computed((): PlaygroundPortalLocale => (isVi.value ? 'vi' : 'en'));
 
 const credits = computed(() => getCredits(me.value));
 const displayName = computed(() => getDisplayName(me.value));
@@ -331,9 +320,6 @@ async function loadProfileView() {
 
 onMounted(async () => {
   importSessionFromUrl();
-  if (props.view === 'playground') {
-    embedQuery.value = readEmbedQueryFromLocation();
-  }
   if (!getStoredToken()) {
     const returnPath = route.path + (typeof window !== 'undefined' ? window.location.search : '');
     window.location.href = loginUrlWithRedirect(returnPath, prefix.value as '' | '/vi');
@@ -352,9 +338,6 @@ onMounted(async () => {
 watch(
   () => route.fullPath,
   () => {
-    if (props.view === 'playground') {
-      embedQuery.value = readEmbedQueryFromLocation();
-    }
     if (props.view === 'profile') {
       profileSection.value = readProfileSectionFromLocation();
       if (profileSection.value === 'activity') {
@@ -367,8 +350,15 @@ watch(
 </script>
 
 <template>
-  <div class="or-catalog or-app" :class="{ 'or-app-has-playground': isImmersiveView(), 'or-app-chat-layout': view === 'chat' }">
-    <aside v-if="view !== 'chat'" class="or-sidebar">
+  <div
+    class="or-catalog or-app"
+    :class="{
+      'or-app-has-playground': isImmersiveView(),
+      'or-app-chat-layout': view === 'chat',
+      'or-app-playground-layout': view === 'playground',
+    }"
+  >
+    <aside v-if="view !== 'chat' && view !== 'playground'" class="or-sidebar">
       <div class="or-app-workspace" aria-label="Workspace">
         <button type="button" class="or-app-workspace-btn" disabled>
           <span>{{ isVi ? 'Workspace mặc định' : 'Default workspace' }}</span>
@@ -420,7 +410,7 @@ watch(
     </aside>
 
     <div class="or-main or-app-main" :class="{ 'or-app-main-playground': isImmersiveView() }">
-      <header v-if="view !== 'chat'" class="or-app-header">
+      <header v-if="view !== 'chat' && view !== 'playground'" class="or-app-header">
         <div>
           <h1 class="or-app-title">
             <template v-if="view === 'overview'">{{ isVi ? 'Tổng quan' : 'Overview' }}</template>
@@ -480,13 +470,6 @@ watch(
           </p>
         </div>
         <div class="or-app-header-actions">
-          <a
-            v-if="view === 'playground'"
-            :href="apiExplorerLink"
-            class="or-app-btn or-app-btn-ghost"
-          >
-            {{ isVi ? 'API explorer' : 'API explorer' }}
-          </a>
           <button
             v-if="view === 'profile'"
             type="button"
@@ -516,12 +499,7 @@ watch(
       <template v-else>
         <!-- Playground embed -->
         <section v-if="view === 'playground'" class="or-app-playground-wrap">
-          <AppPlaygroundPanel
-            :credits="credits"
-            :initial-type="embedQuery.type"
-            :initial-model="embedQuery.model"
-            :on-credits-refresh="refreshProfile"
-          />
+          <ApiPlaygroundEmbed :locale="playgroundLocale" />
         </section>
 
         <!-- Chat -->

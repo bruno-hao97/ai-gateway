@@ -81,8 +81,13 @@ export function isChatImmersivePath(path: string): boolean {
   return p === '/app/chat' || p.startsWith('/app/chat/');
 }
 
-/** API Playground embed — full-height below nav + docs subnav, no footer. */
-export function isApiPlaygroundImmersivePath(path: string): boolean {
+/** API Playground embed — full-height below VPNav at /app/playground (no docs sub-nav). */
+export function isPlaygroundImmersivePath(path: string): boolean {
   const { path: p } = stripLocale(path);
-  return p === '/reference/playground' || p.startsWith('/reference/playground/');
+  return p === '/app/playground' || p.startsWith('/app/playground/');
+}
+
+/** @deprecated Use isPlaygroundImmersivePath — kept for Layout/CSS class names. */
+export function isApiPlaygroundImmersivePath(path: string): boolean {
+  return isPlaygroundImmersivePath(path);
 }

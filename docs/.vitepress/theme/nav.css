@@ -1,6 +1,7 @@
 /* Top nav — OpenRouter-style: logo + title pinned left */
 
-body.gw-app-shell {
+body.gw-app-shell,
+body.gw-api-playground-immersive {
   --gw-shell-sidebar-w: 260px;
 }
 
@@ -21,53 +22,63 @@ body.gw-app-shell {
   flex-shrink: 0;
 }
 
-/* App / models shell — brand flush left, full-width bar (matches or-sidebar column) */
-body.gw-app-shell .VPNavBar .wrapper {
+/* App / models shell + API playground immersive — brand flush left */
+body.gw-app-shell .VPNavBar .wrapper,
+body.gw-api-playground-immersive .VPNavBar .wrapper {
   padding: 0;
 }
 
-body.gw-app-shell .VPNavBar .container {
+body.gw-app-shell .VPNavBar .container,
+body.gw-api-playground-immersive .VPNavBar .container {
   max-width: none;
   justify-content: flex-start;
 }
 
-body.gw-app-shell .VPNavBar .title {
+body.gw-app-shell .VPNavBar .title,
+body.gw-api-playground-immersive .VPNavBar .title {
   flex-shrink: 0;
   padding: 0 1.25rem;
   width: var(--gw-shell-sidebar-w, 260px);
   box-sizing: border-box;
 }
 
-body.gw-app-shell .VPNavBar .content {
+body.gw-app-shell .VPNavBar .content,
+body.gw-api-playground-immersive .VPNavBar .content {
   flex-grow: 1;
   padding-right: 1.25rem;
 }
 
-body.gw-app-shell .VPNavBar .content-body {
+body.gw-app-shell .VPNavBar .content-body,
+body.gw-api-playground-immersive .VPNavBar .content-body {
   justify-content: flex-end;
 }
 
 @media (min-width: 768px) {
-  body.gw-app-shell .VPNavBar .title {
+  body.gw-app-shell .VPNavBar .title,
+  body.gw-api-playground-immersive .VPNavBar .title {
     padding-left: 1.5rem;
   }
 
-  body.gw-app-shell .VPNavBar .content {
+  body.gw-app-shell .VPNavBar .content,
+  body.gw-api-playground-immersive .VPNavBar .content {
     padding-right: 2rem;
   }
 }
 
 @media (max-width: 767px) {
-  body.gw-app-shell .VPNavBar .title {
+  body.gw-app-shell .VPNavBar .title,
+  body.gw-api-playground-immersive .VPNavBar .title {
     width: auto;
     padding: 0 0.75rem;
   }
 
-  body.gw-app-shell .VPNavBarTitle .title > span {
+  body.gw-app-shell .VPNavBarTitle .title > span,
+  body.gw-api-playground-immersive .VPNavBarTitle .title > span {
     display: none;
   }
 
-  body.gw-app-shell .VPNavBarTitle :deep(.logo) {
+  body.gw-app-shell .VPNavBarTitle :deep(.logo),
+  body.gw-api-playground-immersive .VPNavBarTitle :deep(.logo) {
     width: 1.5rem;
     height: 1.5rem;
   }

@@ -4,18 +4,42 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Playground — AI Gateway</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="css/playground.css" />
 </head>
 <body class="pg-body">
   <header class="pg-topbar">
-    <a class="logo" href="#" id="logo-link">AI <span>Gateway</span></a>
+    <a class="logo" href="#" id="logo-link">
+      <img class="logo-img" src="logo.png" width="28" height="28" alt="79ai" />
+      AI <span>Gateway</span>
+    </a>
     <nav class="pg-topnav">
       <a href="models.html">Models</a>
       <a href="playground.html" class="active" aria-current="page">Playground</a>
       <a href="#" id="docs-nav">Docs</a>
       <a href="#" id="openapi-nav">OpenAPI</a>
     </nav>
+  </header>
+
+  <header class="pg-studio-bar" id="pgStudioBar" aria-label="API Playground">
+    <div class="pg-studio-left">
+      <img class="pg-studio-logo" src="logo.png" width="24" height="24" alt="79ai" />
+      <nav class="pg-studio-crumb" id="embedBreadcrumb" aria-label="Breadcrumb">
+        <span class="pg-crumb-root">Playground</span>
+        <span class="pg-crumb-sep" aria-hidden="true">›</span>
+        <span id="embedCrumbType">Image</span>
+        <span class="pg-crumb-sep pg-crumb-model-sep" id="embedCrumbModelSep" hidden aria-hidden="true">›</span>
+        <strong id="embedCrumbModel" class="pg-crumb-model" hidden></strong>
+      </nav>
+    </div>
+    <div class="pg-studio-actions">
+      <span class="pg-studio-credits" id="embedCreditsBadge" hidden title="Account credits">—</span>
+      <button type="button" class="pg-studio-btn" id="btnEmbedConnection" data-i18n="embed.connection">Connection</button>
+      <button type="button" class="pg-studio-btn pg-studio-btn--ghost" id="btnEmbedDev" data-i18n-title="embed.devTitle" title="Show endpoint sidebar" data-i18n="embed.dev">Dev</button>
+    </div>
   </header>
 
   <div class="pg-shell">
@@ -201,8 +225,29 @@
           <p class="pg-endpoint"><code id="mediaJobEndpoint">POST /gateway/jobs/image</code></p>
         </header>
 
+        <div class="pg-type-chips" id="embedJobChips" role="tablist" aria-label="Job type">
+          <button type="button" class="pg-type-chip active" data-job-type="image" role="tab" aria-selected="true">Image</button>
+          <button type="button" class="pg-type-chip" data-job-type="video" role="tab">Video</button>
+          <button type="button" class="pg-type-chip" data-job-type="music" role="tab">Music</button>
+          <button type="button" class="pg-type-chip" data-job-type="tts" role="tab">TTS</button>
+        </div>
+
+        <div class="pg-model-meta" id="mediaModelMeta" hidden>
+          <div class="pg-model-meta-main">
+            <strong id="mediaModelMetaName">—</strong>
+            <code id="mediaModelMetaSlug" class="pg-model-meta-slug">—</code>
+          </div>
+          <span class="pg-model-meta-credits" id="mediaModelMetaCredits">—</span>
+        </div>
+
         <div class="gw-job-panel">
         <div class="field">
+          <label for="mediaModelSelect">Model</label>
+          <select id="mediaModelSelect">
+            <option value="">— Select model —</option>
+          </select>
+        </div>
+        <div class="field pg-field-advanced">
           <label for="jobType">Job type</label>
           <select id="jobType">
             <optgroup label="Core">
@@ -222,13 +267,20 @@
             </optgroup>
           </select>
         </div>
-        <div class="field">
-          <label for="mediaModelSelect">Model</label>
-          <select id="mediaModelSelect">
-            <option value="">— Fetch models first —</option>
-          </select>
+        <div class="field pg-field-advanced">
+          <label for="mediaProjectId" data-i18n="media.project">Project</label>
+          <input id="mediaProjectId" type="text" value="default" autocomplete="off" spellcheck="false" />
         </div>
         <div id="catalogFields" class="pg-catalog-fields"></div>
+        <div class="field" id="mediaRefUrlWrap" hidden>
+          <label for="mediaRefUrl" data-i18n="media.refUrl">Reference image URL</label>
+          <div class="pg-ref-url-row">
+            <input id="mediaRefUrl" type="url" placeholder="https://…" autocomplete="off" spellcheck="false" />
+            <button type="button" class="btn btn-secondary btn-sm" id="btnMediaRefUpload" data-i18n="media.uploadRef">Upload</button>
+          </div>
+          <p class="hint pg-ref-hint" data-i18n="media.refHint">Required for upscale / image-to-image models. Upload or paste URL.</p>
+          <input id="mediaRefFile" type="file" accept="image/*" hidden />
+        </div>
         <div class="field-row">
           <div class="field pg-field-grow">
             <label for="mediaPrompt">Prompt</label>
@@ -236,15 +288,20 @@
           </div>
           <div class="field">
             <label for="mediaWait" class="pg-check-label">
-              <input id="mediaWait" type="checkbox" checked />
-              Wait (server poll)
+              <input id="mediaWait" type="checkbox" />
+              <span data-i18n="media.wait">Wait (server poll)</span>
             </label>
           </div>
         </div>
         </div>
-        <button type="button" class="btn btn-primary pg-run" id="btnMediaJob">Run request</button>
-        <div class="pg-status-slot" id="mediaJobStatus" role="status" aria-live="polite"></div>
-        <p class="hint">Fetch models for the same <code>type</code> on List models first. Uncheck wait → use Poll job with returned job id.</p>
+        <div class="pg-workspace-footer">
+          <div class="pg-send-bar">
+            <span class="pg-send-price" id="sendPriceLabel" hidden></span>
+            <button type="button" class="btn btn-primary pg-run pg-send-btn" id="btnMediaJob" data-i18n="media.send">Send request</button>
+          </div>
+          <div class="pg-status-slot" id="mediaJobStatus" role="status" aria-live="polite"></div>
+        </div>
+        <p class="hint pg-hint-advanced">Catalog loads automatically when signed in. Uncheck wait → poll with job id.</p>
       </div>
 
       <div class="pg-panel" id="panel-poll-job" data-panel="poll-job">
@@ -405,27 +462,277 @@
       </div>
     </main>
 
-    <aside class="pg-response" aria-label="Response">
+    <aside class="pg-response" aria-label="Output">
       <div class="pg-response-head">
-        <span class="pg-response-title">RESPONSE</span>
+        <nav class="pg-response-tabs" role="tablist" aria-label="Playground views">
+          <button type="button" class="pg-response-tab" data-response-tab="request" role="tab" data-i18n="tab.request">Request</button>
+          <button type="button" class="pg-response-tab active" data-response-tab="result" role="tab" aria-selected="true" data-i18n="tab.result">Result</button>
+          <button type="button" class="pg-response-tab" data-response-tab="endpoints" role="tab" data-i18n="tab.endpoints">Endpoints</button>
+          <button type="button" class="pg-response-tab" data-response-tab="guide" role="tab" data-i18n="tab.guide">AI Guide</button>
+          <button type="button" class="pg-response-tab" data-response-tab="skill" role="tab" data-i18n="tab.skill">AI Skill</button>
+        </nav>
         <div class="pg-response-actions">
           <span class="pg-response-meta" id="responseMeta">—</span>
-          <button type="button" class="btn btn-ghost btn-sm" id="btnCopyResponse" title="Copy JSON">Copy</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btnCopyResponse" title="Copy" data-i18n="copy">Copy</button>
         </div>
       </div>
       <div class="pg-response-scroll gw-scroll">
-        <div class="pg-preview" id="resultPreview" hidden>
-          <p class="pg-preview-label">Preview</p>
-          <a id="resultLink" class="pg-preview-open" href="#" target="_blank" rel="noopener noreferrer">Open in new tab ↗</a>
-          <img id="resultImage" alt="Generated image" hidden />
-          <video id="resultVideo" controls hidden></video>
-          <audio id="resultAudio" controls hidden></audio>
+        <div class="pg-response-pane" id="responsePaneRequest" data-response-pane="request" role="tabpanel" hidden>
+          <div class="pg-request-block">
+            <p class="pg-request-label" data-i18n="request.endpoint">Endpoint</p>
+            <div class="pg-request-endpoint-row">
+              <span class="pg-method post" id="requestMethod">POST</span>
+              <code class="pg-request-endpoint" id="requestEndpoint">/gateway/jobs/image</code>
+            </div>
+            <p class="pg-request-url" id="requestFullUrl"></p>
+          </div>
+          <div class="pg-request-block">
+            <p class="pg-request-label" data-i18n="request.headers">Headers</p>
+            <div class="pg-kv-table-wrap">
+              <table class="pg-kv-table">
+                <thead>
+                  <tr><th>Key</th><th>Value</th></tr>
+                </thead>
+                <tbody id="requestHeadersRows"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="pg-request-block">
+            <div class="pg-request-label-row">
+              <p class="pg-request-label" data-i18n="request.body">Body</p>
+              <button type="button" class="pg-request-view-toggle" id="btnRequestBodyView" aria-pressed="false" data-i18n="request.rawJson">Raw JSON</button>
+            </div>
+            <div class="pg-kv-table-wrap" id="requestBodyTableWrap">
+              <table class="pg-kv-table">
+                <thead>
+                  <tr><th>Key</th><th>Value</th></tr>
+                </thead>
+                <tbody id="requestBodyRows"></tbody>
+              </table>
+            </div>
+            <pre class="pg-request-pre pg-request-pre--raw pg-json-panel" id="requestBodyRaw" hidden></pre>
+          </div>
+          <div class="pg-request-block">
+            <p class="pg-request-label" data-i18n="request.curl">cURL</p>
+            <pre class="pg-request-pre pg-request-curl" id="requestCurl"></pre>
+          </div>
+          <p class="hint pg-request-hint" data-i18n="request.hint">Updates from the form on the left. Token masked until saved.</p>
         </div>
-        <pre class="pg-response-body" id="responseOutput">Run a request to see JSON here.</pre>
+
+        <div class="pg-response-pane active" id="responsePaneResult" data-response-pane="result" role="tabpanel">
+          <div class="pg-result-empty" id="resultEmpty">
+            <p class="pg-result-empty-title" data-i18n="result.emptyTitle">Result will appear here</p>
+            <p class="pg-result-empty-sub" data-i18n="result.emptySub">Choose a model, enter a prompt, then <strong>Send request</strong>.</p>
+          </div>
+
+          <div class="pg-result-main" id="resultMain" hidden>
+            <div class="pg-result-stack gw-scroll">
+              <section class="pg-result-meta" id="resultHeader">
+                <h3 class="pg-result-meta-title" data-i18n="result.modelInfo">Model info</h3>
+                <div class="pg-result-meta-grid">
+                  <div class="pg-result-meta-item">
+                    <span class="pg-result-meta-k" data-i18n="result.hdr.model">Model</span>
+                    <code class="pg-result-meta-v" id="resultHdrModel">—</code>
+                  </div>
+                  <div class="pg-result-meta-item">
+                    <span class="pg-result-meta-k" data-i18n="result.hdr.domain">Domain</span>
+                    <code class="pg-result-meta-v" id="resultHdrDomain">—</code>
+                  </div>
+                  <div class="pg-result-meta-item">
+                    <span class="pg-result-meta-k" data-i18n="result.hdr.type">Type</span>
+                    <code class="pg-result-meta-v" id="resultHdrType">—</code>
+                  </div>
+                  <div class="pg-result-meta-item">
+                    <span class="pg-result-meta-k" data-i18n="result.hdr.elapsed">Elapsed</span>
+                    <span class="pg-result-meta-v" id="resultHdrElapsed">—</span>
+                  </div>
+                </div>
+              </section>
+
+              <div class="pg-result-progress" id="resultProgress" hidden>
+                <div class="pg-result-progress-track">
+                  <div class="pg-result-progress-bar" id="resultProgressBar"></div>
+                </div>
+                <p class="pg-result-progress-label" id="resultProgressLabel">—</p>
+              </div>
+
+              <section class="pg-result-output" id="resultPreview">
+                <div class="pg-result-output-head">
+                  <p class="pg-result-output-label" data-i18n="result.output">Output</p>
+                  <a id="resultLink" class="pg-result-output-open" href="#" target="_blank" rel="noopener noreferrer" data-i18n="result.openTab">Open in new tab ↗</a>
+                </div>
+                <div class="pg-preview-media pg-preview-media--compact">
+                  <img id="resultImage" alt="Generated image" hidden />
+                  <video id="resultVideo" controls hidden></video>
+                  <audio id="resultAudio" controls hidden></audio>
+                </div>
+              </section>
+
+              <div class="pg-result-dual-json">
+              <section class="pg-result-json-col">
+                <div class="pg-result-json-head">
+                  <span class="pg-method post">POST</span>
+                  <span class="pg-result-json-title" data-i18n="result.createLabel">Create</span>
+                </div>
+                <pre class="pg-result-json-pre" id="resultCreateJson">—</pre>
+              </section>
+              <section class="pg-result-json-col">
+                <div class="pg-result-json-head">
+                  <span class="pg-method get">GET</span>
+                  <span class="pg-result-json-title" data-i18n="result.pollLabel">Poll</span>
+                </div>
+                <pre class="pg-result-json-pre" id="resultPollJson">—</pre>
+              </section>
+              </div>
+            </div>
+          </div>
+
+          <div class="pg-result-json-wrap gw-scroll" id="resultLegacyJsonWrap" hidden>
+            <p class="pg-preview-label" data-i18n="result.response">Response</p>
+            <pre class="pg-response-body pg-json-panel" id="responseOutput">Run a request to see JSON here.</pre>
+          </div>
+        </div>
+
+        <div class="pg-response-pane" id="responsePaneEndpoints" data-response-pane="endpoints" role="tabpanel" hidden>
+          <p class="pg-pane-intro" data-i18n="endpoints.intro">Gateway REST (Mode B) — base URL is your gateway origin.</p>
+          <div class="pg-endpoints-table-wrap">
+            <table class="pg-endpoints-table">
+              <thead>
+                <tr><th>Name</th><th>Method</th><th>Path</th><th></th></tr>
+              </thead>
+              <tbody id="endpointsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="pg-response-pane" id="responsePaneGuide" data-response-pane="guide" role="tabpanel" hidden>
+          <div class="pg-guide">
+            <div class="pg-guide-meta" id="guideMeta">
+              <div class="pg-guide-meta-card">
+                <span class="pg-guide-meta-key" data-i18n="guide.baseUrl">Base URL</span>
+                <code class="pg-guide-meta-val" id="guideMetaBase">—</code>
+              </div>
+              <div class="pg-guide-meta-card">
+                <span class="pg-guide-meta-key" data-i18n="guide.preferredAuth">Preferred auth</span>
+                <code class="pg-guide-meta-val">Authorization: Bearer &lt;ACCESS_TOKEN&gt;</code>
+              </div>
+              <div class="pg-guide-meta-card">
+                <span class="pg-guide-meta-key" data-i18n="guide.contentType">Content-Type</span>
+                <code class="pg-guide-meta-val">application/json</code>
+              </div>
+              <div class="pg-guide-meta-card">
+                <span class="pg-guide-meta-key" data-i18n="guide.supportedMedia">Supported media</span>
+                <span class="pg-guide-meta-val" id="guideMetaMedia">image, video, music, tts, tools</span>
+              </div>
+            </div>
+
+            <section class="pg-guide-section">
+              <div class="pg-guide-section-head">
+                <h2 class="pg-guide-section-title" data-i18n="guide.systemPrompt">System prompt</h2>
+                <button type="button" class="btn btn-secondary btn-sm" id="btnCopyGuide" data-i18n="copy.guide">Copy system prompt</button>
+              </div>
+              <pre class="pg-guide-pre pg-guide-pre--system" id="aiGuideText"></pre>
+            </section>
+
+            <section class="pg-guide-section">
+              <h2 class="pg-guide-section-title" data-i18n="guide.gatewayEndpoints">Gateway endpoints</h2>
+              <ul class="pg-guide-endpoints" id="guideEndpointsList"></ul>
+            </section>
+
+            <section class="pg-guide-section">
+              <div class="pg-guide-section-head">
+                <h2 class="pg-guide-section-title" data-i18n="guide.tsFetch">TypeScript · fetch</h2>
+                <button type="button" class="btn btn-secondary btn-sm pg-copy-code" data-copy-target="guideTsCode" data-i18n="copy">Copy</button>
+              </div>
+              <pre class="pg-guide-pre pg-guide-pre--code" id="guideTsCode"></pre>
+            </section>
+
+            <section class="pg-guide-section">
+              <div class="pg-guide-section-head">
+                <h2 class="pg-guide-section-title" data-i18n="guide.pyRequests">Python · requests</h2>
+                <button type="button" class="btn btn-secondary btn-sm pg-copy-code" data-copy-target="guidePyCode" data-i18n="copy">Copy</button>
+              </div>
+              <pre class="pg-guide-pre pg-guide-pre--code" id="guidePyCode"></pre>
+            </section>
+
+            <section class="pg-guide-section">
+              <h2 class="pg-guide-section-title" data-i18n="guide.integrationTips">Integration tips for AI agents</h2>
+              <ul class="pg-guide-tips" id="guideTipsList"></ul>
+            </section>
+
+            <section class="pg-guide-section pg-guide-context">
+              <h2 class="pg-guide-section-title" data-i18n="guide.playgroundContext">Playground context</h2>
+              <dl class="pg-guide-context-dl" id="guideContextDl"></dl>
+            </section>
+          </div>
+        </div>
+
+        <div class="pg-response-pane" id="responsePaneSkill" data-response-pane="skill" role="tabpanel" hidden>
+          <div class="pg-skill">
+            <section class="pg-guide-section">
+              <div class="pg-guide-section-head">
+                <h2 class="pg-guide-section-title" data-i18n="skill.systemPrompt">System prompt — AI Skill</h2>
+                <button type="button" class="btn btn-secondary btn-sm" id="btnCopySkill" data-i18n="copy.skill">Copy skill prompt</button>
+              </div>
+              <pre class="pg-guide-pre pg-guide-pre--system" id="aiSkillText"></pre>
+            </section>
+
+            <div class="pg-skill-grid">
+              <section class="pg-skill-card">
+                <h3 class="pg-skill-card-title" data-i18n="skill.playbook">Fixed playbook</h3>
+                <ol class="pg-skill-playbook" id="skillPlaybookList"></ol>
+              </section>
+
+              <section class="pg-skill-card">
+                <h3 class="pg-skill-card-title" data-i18n="skill.examples">Example commands</h3>
+                <ul class="pg-skill-examples" id="skillExamplesList"></ul>
+              </section>
+
+              <section class="pg-skill-card pg-skill-card--wide">
+                <h3 class="pg-skill-card-title" data-i18n="skill.fieldsByType">Fields the agent should confirm by type</h3>
+                <ul class="pg-skill-fields" id="skillFieldsList"></ul>
+              </section>
+
+              <section class="pg-skill-card">
+                <h3 class="pg-skill-card-title" data-i18n="skill.currentContext">Current context</h3>
+                <dl class="pg-guide-context-dl" id="skillContextDl"></dl>
+              </section>
+            </div>
+          </div>
+        </div>
       </div>
     </aside>
   </div>
 
+  <div id="endpointDetailOverlay" class="pg-ep-detail-overlay" hidden>
+    <div class="pg-ep-detail" role="dialog" aria-modal="true" aria-labelledby="epDetailTitle">
+      <header class="pg-ep-detail-head">
+        <div class="pg-ep-detail-head-main">
+          <span class="pg-method post" id="epDetailMethod">POST</span>
+          <div>
+            <h2 class="pg-ep-detail-title" id="epDetailTitle">Endpoint</h2>
+            <code class="pg-ep-detail-path" id="epDetailPath">/gateway/…</code>
+          </div>
+        </div>
+        <div class="pg-ep-detail-head-actions">
+          <button type="button" class="btn btn-primary btn-sm" id="epDetailTry" data-i18n="ep.try">Try</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="epDetailCopy" data-i18n="ep.copy">Copy</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="epDetailOpen" data-i18n="ep.openRequest">Open in Request</button>
+          <button type="button" class="pg-ep-detail-close" id="epDetailClose" aria-label="Close">×</button>
+        </div>
+      </header>
+      <div class="pg-ep-detail-body">
+        <nav class="pg-ep-detail-nav" id="epDetailNav" aria-label="Endpoint documentation"></nav>
+        <div class="pg-ep-detail-content gw-scroll" id="epDetailContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/portal-i18n.js"></script>
+  <script src="js/json-highlight.js"></script>
+  <script src="js/ai-guide-content.js"></script>
+  <script src="js/endpoint-registry.js"></script>
+  <script src="js/endpoint-detail.js"></script>
   <script src="js/playground.js"></script>
 </body>
 </html>

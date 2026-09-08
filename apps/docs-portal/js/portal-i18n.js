@@ -1,0 +1,396 @@
+/**
+ * Playground UI i18n — sync with VitePress locale via ?lang=vi or postMessage.
+ */
+(function (global) {
+  const STORAGE_LANG = 'portal_ui_lang';
+
+  const MESSAGES = {
+    en: {
+      'tab.request': 'Request',
+      'tab.result': 'Result',
+      'tab.endpoints': 'Endpoints',
+      'tab.guide': 'AI Guide',
+      'tab.skill': 'AI Skill',
+      'copy': 'Copy',
+      'copy.skill': 'Copy skill prompt',
+      'copy.guide': 'Copy system prompt',
+      'request.endpoint': 'Endpoint',
+      'request.headers': 'Headers',
+      'request.body': 'Body',
+      'request.curl': 'cURL',
+      'request.rawJson': 'Raw JSON',
+      'request.keyValue': 'Key-value',
+      'request.hint': 'Updates from the form on the left. Token masked until saved.',
+      'result.emptyTitle': 'Result will appear here',
+      'result.emptySub': 'Choose a model, enter a prompt, then Send request.',
+      'result.output': 'Output',
+      'result.openTab': 'Open in new tab ↗',
+      'result.response': 'Response',
+      'result.runHint': 'Run a request to see JSON here.',
+      'endpoints.intro': 'Gateway REST (Mode B) — base URL is your gateway origin.',
+      'guide.baseUrl': 'Base URL',
+      'guide.preferredAuth': 'Preferred auth',
+      'guide.contentType': 'Content-Type',
+      'guide.supportedMedia': 'Supported media',
+      'guide.systemPrompt': 'System prompt',
+      'guide.gatewayEndpoints': 'Gateway endpoints',
+      'guide.tsFetch': 'TypeScript · fetch',
+      'guide.pyRequests': 'Python · requests',
+      'guide.integrationTips': 'Integration tips for AI agents',
+      'guide.playgroundContext': 'Playground context',
+      'guide.ctx.type': 'Type',
+      'guide.ctx.modelSlug': 'modelSlug',
+      'guide.ctx.model': 'Model',
+      'guide.ctx.domain': 'domain',
+      'guide.ctx.domainNote': '(gateway default)',
+      'guide.ctx.pollMedia': 'Poll media',
+      'skill.systemPrompt': 'System prompt — AI Skill',
+      'skill.playbook': 'Fixed playbook',
+      'skill.examples': 'Example commands',
+      'skill.fieldsByType': 'Fields the agent should confirm by type',
+      'skill.currentContext': 'Current context',
+      'skill.ctx.type': 'type',
+      'skill.ctx.model': 'model',
+      'skill.ctx.domain': 'domain',
+      'skill.ctx.domainNote': '(gateway default)',
+      'skill.ctx.projectId': 'project_id',
+      'skill.ctx.pollMedia': 'poll media',
+      'embed.playground': 'Playground',
+      'embed.connection': 'Connection',
+      'embed.dev': 'Dev',
+      'embed.devTitle': 'Show endpoint sidebar',
+      'token.saved': 'Token saved',
+      'token.none': 'No token — login or paste Bearer token',
+      'media.send': 'Send request',
+      'media.wait': 'Wait (server poll)',
+      'media.prompt': 'Prompt',
+      'media.model': 'Model',
+      'media.jobType': 'Job type',
+      'media.project': 'Project',
+      'media.refUrl': 'Reference image URL',
+      'media.uploadRef': 'Upload',
+      'media.refHint': 'Required for upscale / image-to-image models. Upload or paste URL.',
+      'result.modelInfo': 'Model info',
+      'result.hdr.model': 'Model',
+      'result.hdr.domain': 'Domain',
+      'result.hdr.type': 'Type',
+      'result.hdr.elapsed': 'Elapsed',
+      'result.createLabel': 'Create',
+      'result.pollLabel': 'Poll',
+      'result.polling': 'Polling…',
+      'result.creating': 'Creating job…',
+      'result.done': 'Completed',
+      'ep.view': 'View',
+      'ep.try': 'Try',
+      'ep.copy': 'Copy',
+      'ep.openRequest': 'Open in Request',
+      'ep.tab.overview': 'Overview',
+      'ep.tab.auth': 'Auth & headers',
+      'ep.tab.parameters': 'Parameters',
+      'ep.tab.payload': 'Payload',
+      'ep.tab.code': 'Code',
+      'ep.tab.sandbox': 'Sandbox',
+      'ep.tab.responses': 'Responses',
+      'ep.tab.workflow': 'Workflow',
+      'ep.tab.ai': 'AI instructions',
+      'ep.col.name': 'Name',
+      'ep.col.in': 'In',
+      'ep.col.type': 'Type',
+      'ep.col.required': 'Required',
+      'ep.col.description': 'Description',
+      'ep.col.code': 'Code',
+      'ep.col.http': 'HTTP',
+      'ep.col.recovery': 'Recovery',
+      'ep.yes': 'Yes',
+      'ep.optional': 'Optional',
+      'ep.noParams': 'No parameters documented.',
+      'ep.mode.gateway': 'Gateway REST',
+      'ep.mode.proxy': 'Proxy /v2',
+      'ep.payloadVariants': 'Request payload variants',
+      'ep.modelContext': 'Model context',
+      'ep.capabilities': 'Model capabilities',
+      'ep.noModel': 'Select a model in the form to see catalog-specific parameters.',
+      'ep.overview.group': 'Group',
+      'ep.overview.execution': 'Execution',
+      'ep.overview.contentTypes': 'Content types',
+      'ep.overview.upstream': 'Upstream (Mode A/C)',
+      'ep.overview.gatewayPath': 'Gateway path',
+      'ep.overview.proxyPath': 'Proxy path',
+      'ep.overview.baseUrl': 'Base URL',
+      'ep.auth.none': 'No authentication required.',
+      'ep.auth.warn': 'Authentication required. Use HTTPS; never expose tokens in URLs or logs.',
+      'ep.auth.headers': 'Headers',
+      'ep.auth.credentials': 'Accepted credentials',
+      'ep.auth.loginVia': 'Login via',
+      'ep.params.pathQueryBody': 'Path / query / body',
+      'ep.responses.envelope': 'Envelope',
+      'ep.responses.checklist': 'Validation checklist',
+      'ep.responses.errors': 'Error reference',
+      'ep.responses.recovery': 'Recovery strategy',
+      'ep.workflow.policy': 'Polling policy',
+      'ep.workflow.interval': 'Interval',
+      'ep.workflow.maxAttempts': 'Max attempts',
+      'ep.workflow.processing': 'Processing',
+      'ep.workflow.success': 'Success',
+      'ep.workflow.failure': 'Failure',
+      'ep.ai.purpose': 'Purpose',
+      'ep.ai.purposeDefault': 'Call this gateway endpoint with correct auth and catalog fields.',
+      'ep.ai.rules': 'Rules',
+      'ep.ai.ruleNoGuess': 'Never invent ratio, resolution, mode, or duration.',
+      'ep.ai.ruleModels': 'Load GET /gateway/models before create.',
+      'ep.ai.rulePoll': 'Poll with id_base from create response.',
+      'ep.ai.skillExcerpt': 'Skill prompt (excerpt)',
+      'ep.ai.guideMissing': 'AI guide not loaded.',
+      'ep.cap.requiredWhen': 'Required when flag is true',
+      'ep.cap.catalogEnum': '{label} — enum from catalog (never guess)',
+      'ep.cap.refUrls': 'Style/component reference URLs',
+      'ep.cap.frameUrls': 'Start/end frame image URLs',
+      'ep.sandbox.run': 'Send request',
+      'ep.sandbox.running': 'Sending…',
+      'ep.sandbox.path': 'Request path',
+      'ep.sandbox.body': 'Request body (JSON)',
+      'ep.sandbox.pollId': 'Job id (id_base)',
+      'ep.sandbox.media': 'Media type',
+      'ep.sandbox.response': 'Response',
+      'ep.sandbox.empty': 'Run a request to see the response here.',
+      'ep.sandbox.uploadHint': 'Multipart upload is not supported in sandbox — use the Upload panel.',
+      'ep.sandbox.needToken': 'Login or paste a Bearer token in Connection first.',
+      'ep.sandbox.invalidJson': 'Request body must be valid JSON.',
+      'ep.sandbox.needPollId': 'Enter a job id to poll.',
+    },
+    vi: {
+      'tab.request': 'Request',
+      'tab.result': 'Kết quả',
+      'tab.endpoints': 'Endpoints',
+      'tab.guide': 'AI Guide',
+      'tab.skill': 'AI Skill',
+      'copy': 'Sao chép',
+      'copy.skill': 'Sao chép skill prompt',
+      'copy.guide': 'Sao chép system prompt',
+      'request.endpoint': 'Endpoint',
+      'request.headers': 'Headers',
+      'request.body': 'Body',
+      'request.curl': 'cURL',
+      'request.rawJson': 'JSON thô',
+      'request.keyValue': 'Key-value',
+      'request.hint': 'Cập nhật từ form bên trái. Token được ẩn cho đến khi lưu.',
+      'result.emptyTitle': 'Kết quả sẽ hiển thị ở đây',
+      'result.emptySub': 'Chọn model, nhập prompt, rồi Gửi request.',
+      'result.output': 'Kết quả',
+      'result.openTab': 'Mở tab mới ↗',
+      'result.response': 'Response',
+      'result.runHint': 'Chạy request để xem JSON ở đây.',
+      'endpoints.intro': 'Gateway REST (Mode B) — base URL là origin gateway của bạn.',
+      'guide.baseUrl': 'Base URL',
+      'guide.preferredAuth': 'Auth ưu tiên',
+      'guide.contentType': 'Content-Type',
+      'guide.supportedMedia': 'Media hỗ trợ',
+      'guide.systemPrompt': 'System prompt',
+      'guide.gatewayEndpoints': 'Gateway endpoints',
+      'guide.tsFetch': 'TypeScript · fetch',
+      'guide.pyRequests': 'Python · requests',
+      'guide.integrationTips': 'Mẹo tích hợp cho AI agent',
+      'guide.playgroundContext': 'Ngữ cảnh playground',
+      'guide.ctx.type': 'Type',
+      'guide.ctx.modelSlug': 'modelSlug',
+      'guide.ctx.model': 'Model',
+      'guide.ctx.domain': 'domain',
+      'guide.ctx.domainNote': '(mặc định gateway)',
+      'guide.ctx.pollMedia': 'Poll media',
+      'skill.systemPrompt': 'System prompt — AI Skill',
+      'skill.playbook': 'Quy trình cố định',
+      'skill.examples': 'Câu lệnh ví dụ',
+      'skill.fieldsByType': 'Các trường cần xác nhận theo loại',
+      'skill.currentContext': 'Ngữ cảnh hiện tại',
+      'skill.ctx.type': 'type',
+      'skill.ctx.model': 'model',
+      'skill.ctx.domain': 'domain',
+      'skill.ctx.domainNote': '(mặc định gateway)',
+      'skill.ctx.projectId': 'project_id',
+      'skill.ctx.pollMedia': 'poll media',
+      'embed.playground': 'Playground',
+      'embed.connection': 'Kết nối',
+      'embed.dev': 'Dev',
+      'embed.devTitle': 'Hiện sidebar endpoint',
+      'token.saved': 'Đã lưu token',
+      'token.none': 'Chưa có token — đăng nhập hoặc dán Bearer token',
+      'media.send': 'Gửi request',
+      'media.wait': 'Chờ kết quả (server poll)',
+      'media.prompt': 'Prompt',
+      'media.model': 'Model',
+      'media.jobType': 'Loại job',
+      'media.project': 'Dự án',
+      'media.refUrl': 'URL ảnh tham chiếu',
+      'media.uploadRef': 'Upload',
+      'media.refHint': 'Bắt buộc cho upscale / image-to-image. Upload hoặc dán URL.',
+      'result.modelInfo': 'Thông tin model',
+      'result.hdr.model': 'Model',
+      'result.hdr.domain': 'Domain',
+      'result.hdr.type': 'Type',
+      'result.hdr.elapsed': 'Thời gian',
+      'result.createLabel': 'Tạo lệnh',
+      'result.pollLabel': 'Poll',
+      'result.polling': 'Đang poll…',
+      'result.creating': 'Đang tạo job…',
+      'result.done': 'Hoàn tất',
+      'ep.view': 'Xem',
+      'ep.try': 'Thử',
+      'ep.copy': 'Sao chép',
+      'ep.openRequest': 'Mở tab Request',
+      'ep.tab.overview': 'Tổng quan',
+      'ep.tab.auth': 'Auth & headers',
+      'ep.tab.parameters': 'Parameters',
+      'ep.tab.payload': 'Payload',
+      'ep.tab.code': 'Code',
+      'ep.tab.sandbox': 'Thử API',
+      'ep.tab.responses': 'Responses',
+      'ep.tab.workflow': 'Workflow',
+      'ep.tab.ai': 'AI instructions',
+      'ep.col.name': 'Tên',
+      'ep.col.in': 'Vị trí',
+      'ep.col.type': 'Kiểu',
+      'ep.col.required': 'Bắt buộc',
+      'ep.col.description': 'Mô tả',
+      'ep.col.code': 'Code',
+      'ep.col.http': 'HTTP',
+      'ep.col.recovery': 'Xử lý',
+      'ep.yes': 'Có',
+      'ep.optional': 'Tùy chọn',
+      'ep.noParams': 'Chưa có parameters.',
+      'ep.mode.gateway': 'Gateway REST',
+      'ep.mode.proxy': 'Proxy /v2',
+      'ep.payloadVariants': 'Biến thể payload',
+      'ep.modelContext': 'Ngữ cảnh model',
+      'ep.capabilities': 'Khả năng model',
+      'ep.noModel': 'Chọn model ở form để xem parameters theo catalog.',
+      'ep.overview.group': 'Nhóm',
+      'ep.overview.execution': 'Thực thi',
+      'ep.overview.contentTypes': 'Content types',
+      'ep.overview.upstream': 'Upstream (Mode A/C)',
+      'ep.overview.gatewayPath': 'Gateway path',
+      'ep.overview.proxyPath': 'Proxy path',
+      'ep.overview.baseUrl': 'Base URL',
+      'ep.auth.none': 'Không cần xác thực.',
+      'ep.auth.warn': 'Cần xác thực. Dùng HTTPS; không lộ token trong URL hoặc log.',
+      'ep.auth.headers': 'Headers',
+      'ep.auth.credentials': 'Credentials chấp nhận',
+      'ep.auth.loginVia': 'Đăng nhập qua',
+      'ep.params.pathQueryBody': 'Path / query / body',
+      'ep.responses.envelope': 'Envelope',
+      'ep.responses.checklist': 'Preflight checklist',
+      'ep.responses.errors': 'Bảng lỗi',
+      'ep.responses.recovery': 'Chiến lược recovery',
+      'ep.workflow.policy': 'Chính sách poll',
+      'ep.workflow.interval': 'Interval',
+      'ep.workflow.maxAttempts': 'Max attempts',
+      'ep.workflow.processing': 'Processing',
+      'ep.workflow.success': 'Success',
+      'ep.workflow.failure': 'Failure',
+      'ep.ai.purpose': 'Mục đích',
+      'ep.ai.purposeDefault': 'Gọi endpoint gateway với auth và fields catalog đúng.',
+      'ep.ai.rules': 'Quy tắc',
+      'ep.ai.ruleNoGuess': 'Không đoán ratio, resolution, mode, duration.',
+      'ep.ai.ruleModels': 'Gọi GET /gateway/models trước khi create.',
+      'ep.ai.rulePoll': 'Poll bằng id_base từ response create.',
+      'ep.ai.skillExcerpt': 'Skill prompt (trích)',
+      'ep.ai.guideMissing': 'Chưa load AI guide.',
+      'ep.cap.requiredWhen': 'Bắt buộc khi flag bật',
+      'ep.cap.catalogEnum': '{label} — enum từ catalog (không đoán)',
+      'ep.cap.refUrls': 'URL tham chiếu style/thành phần',
+      'ep.cap.frameUrls': 'URL frame đầu/cuối',
+      'ep.sandbox.run': 'Gửi request',
+      'ep.sandbox.running': 'Đang gửi…',
+      'ep.sandbox.path': 'Request path',
+      'ep.sandbox.body': 'Request body (JSON)',
+      'ep.sandbox.pollId': 'Job id (id_base)',
+      'ep.sandbox.media': 'Loại media',
+      'ep.sandbox.response': 'Response',
+      'ep.sandbox.empty': 'Chạy request để xem response ở đây.',
+      'ep.sandbox.uploadHint': 'Upload multipart chưa hỗ trợ trong sandbox — dùng panel Upload.',
+      'ep.sandbox.needToken': 'Đăng nhập hoặc dán Bearer token trong Connection trước.',
+      'ep.sandbox.invalidJson': 'Body request phải là JSON hợp lệ.',
+      'ep.sandbox.needPollId': 'Nhập job id để poll.',
+    },
+  };
+
+  let currentLocale = 'en';
+
+  function normalizeLocale(raw) {
+    const v = String(raw || '').toLowerCase();
+    if (v === 'vi' || v === 'vi-vn' || v.startsWith('vi')) return 'vi';
+    return 'en';
+  }
+
+  function resolveInitialLocale() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = params.get('lang');
+      if (fromUrl) return normalizeLocale(fromUrl);
+    } catch {
+      /* ignore */
+    }
+    try {
+      const stored = localStorage.getItem(STORAGE_LANG);
+      if (stored) return normalizeLocale(stored);
+    } catch {
+      /* ignore */
+    }
+    return 'en';
+  }
+
+  function setLocale(locale) {
+    currentLocale = normalizeLocale(locale);
+    try {
+      localStorage.setItem(STORAGE_LANG, currentLocale);
+    } catch {
+      /* ignore */
+    }
+    document.documentElement.lang = currentLocale === 'vi' ? 'vi' : 'en';
+    applyDom();
+    window.dispatchEvent(new CustomEvent('portal-locale-change', { detail: { locale: currentLocale } }));
+  }
+
+  function getLocale() {
+    return currentLocale;
+  }
+
+  function t(key, fallback) {
+    const dict = MESSAGES[currentLocale] || MESSAGES.en;
+    return dict[key] ?? MESSAGES.en[key] ?? fallback ?? key;
+  }
+
+  function applyDom(root) {
+    const scope = root || document;
+    scope.querySelectorAll('[data-i18n]').forEach((el) => {
+      const key = el.getAttribute('data-i18n');
+      if (!key) return;
+      const val = t(key);
+      if (val) el.textContent = val;
+    });
+    scope.querySelectorAll('[data-i18n-title]').forEach((el) => {
+      const key = el.getAttribute('data-i18n-title');
+      if (!key) return;
+      const val = t(key);
+      if (val) el.setAttribute('title', val);
+    });
+    scope.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+      const key = el.getAttribute('data-i18n-placeholder');
+      if (!key) return;
+      const val = t(key);
+      if (val) el.setAttribute('placeholder', val);
+    });
+  }
+
+  currentLocale = resolveInitialLocale();
+  document.documentElement.lang = currentLocale === 'vi' ? 'vi' : 'en';
+
+  global.PortalI18n = {
+    MESSAGES,
+    normalizeLocale,
+    resolveInitialLocale,
+    setLocale,
+    getLocale,
+    t,
+    applyDom,
+  };
+})(typeof window !== 'undefined' ? window : globalThis);

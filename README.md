@@ -15,36 +15,38 @@ Express TypeScript gateway for **[Gommo](https://gommo.net)** — transparent pr
 ```bash
 cp .env.example .env
 npm install
-npm run dev          # http://localhost:3001  (+ /portal/ in dev)
+npm run docs:dev       # http://localhost:5173 — docs + /portal/ playground + API proxy
+# Optional local API: npm run docs:stack  (docs + gateway :3001)
+# Or set GATEWAY_PROXY_TARGET=https://api.yourdomain.com in .env
 ```
 
 ## Kiến trúc dev / prod
 
 | Dev | Port | Prod |
 |-----|------|------|
-| **API** (+ `/portal` playground) | 3001 | `api.yourdomain.com` |
-| **Developer docs** (VitePress) | 5173 | `docs.yourdomain.com` |
+| **Docs** (VitePress + portal embed) | **5173** | `docs.yourdomain.com` |
+| **API** (gateway) | 3001 (optional local) | `api.yourdomain.com` |
 
-Playground (signed-in): **`/app/playground/`** on docs (`:5173`) — embeds `:3001/portal/playground.html`.
+API Playground: **`/reference/playground/`** on docs (`:5173`) — iframe `/portal/playground.html`, same-origin proxy.
+
+Media Playground (signed-in): **`/app/playground/`** on docs.
 
 `GATEWAY_CORS_ORIGIN` — khi browser client khác origin (docs prod, v.v.).
 
-Developer docs: `npm run docs:dev` → port **5173** (portal `/app/`, models, **chat**, playground).
+Set `GATEWAY_PROXY_TARGET` in `.env` to use a remote API without running `npm run dev`.
 
 ## Docs portal & playground
 
-Gom vào Express — **`http://localhost:3001/portal/`** khi `npm run dev`:
+Portal static files are served from docs (`:5173/portal/`) in dev. Playground: models, jobs, chat — token in `sessionStorage`.
 
-- Landing + link docs / vmedia.ai
-- Playground: `GET /gateway/models`, `POST /gateway/jobs/image` (token trong `sessionStorage`)
-
-Docs khi **viết** vẫn tách: `npm run docs:dev` (port 5173, hot reload).
-
-Production: portal tắt mặc định (`NODE_ENV=production`). Docs static deploy riêng.
+Optional local gateway only:
 
 ```bash
-npm run portal:dev   # optional fallback :5180 — static serve docs-portal
+npm run dev            # http://localhost:3001 — API when not using GATEWAY_PROXY_TARGET
+npm run docs:stack     # docs :5173 + API :3001 together
 ```
+
+Production: portal tắt trên API mặc định (`NODE_ENV=production`). Docs static deploy riêng.
 
 ## Deploy
 

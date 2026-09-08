@@ -99,7 +99,7 @@ const opsSidebarVi = [
 
 const referenceSidebarEn = [
   { text: 'OpenAPI', link: '/reference/openapi' },
-  { text: 'API Playground', link: '/reference/playground' },
+  { text: 'API Playground', link: '/app/playground/' },
   { text: 'Media & jobs', link: '/reference/media' },
   { text: 'Upload', link: '/reference/upload' },
   { text: 'Chat', link: '/reference/chat' },
@@ -111,7 +111,7 @@ const referenceSidebarEn = [
 
 const referenceSidebarVi = [
   { text: 'OpenAPI', link: '/vi/reference/openapi' },
-  { text: 'API Playground', link: '/vi/reference/playground' },
+  { text: 'API Playground', link: '/vi/app/playground/' },
   { text: 'Media & jobs', link: '/vi/reference/media' },
   { text: 'Upload', link: '/vi/reference/upload' },
   { text: 'Chat', link: '/vi/reference/chat' },
@@ -302,6 +302,12 @@ export default defineConfig({
   appearance: 'dark',
   lastUpdated: true,
   ignoreDeadLinks: [/^https?:\/\/localhost/, /README/],
+  redirects: {
+    '/reference/playground': '/app/playground/',
+    '/reference/playground.html': '/app/playground/',
+    '/vi/reference/playground': '/vi/app/playground/',
+    '/vi/reference/playground.html': '/vi/app/playground/',
+  },
   vite: {
     plugins: [portalStaticPlugin()],
     server: {

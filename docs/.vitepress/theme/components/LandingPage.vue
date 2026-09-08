@@ -25,7 +25,6 @@ const modelsLink = computed(() => `${prefix.value}/models/`);
 const compareLink = computed(() => `${prefix.value}/models/compare/`);
 const chatLink = computed(() => `${prefix.value}/app/chat/`);
 const playgroundLink = computed(() => `${prefix.value}/app/playground/`);
-const apiPlaygroundLink = computed(() => `${prefix.value}/reference/playground/`);
 const creditsLink = computed(() => `${prefix.value}/app/credits/`);
 const mcpLink = computed(() => `${prefix.value}/mcp/`);
 const apiLink = computed(() => `${prefix.value}/reference/openapi`);
@@ -36,8 +35,8 @@ function t(en: string, vi: string): string {
   return isVi.value ? vi : en;
 }
 
-function apiPlaygroundHref(opts?: { type?: string; model?: string }): string {
-  const base = apiPlaygroundLink.value;
+function playgroundHref(opts?: { type?: string; model?: string }): string {
+  const base = playgroundLink.value;
   if (!opts?.type && !opts?.model) return base;
   const params = new URLSearchParams();
   if (opts.type) params.set('type', opts.type);
@@ -61,7 +60,7 @@ const toolChips = computed(() =>
   JOB_TYPES.map((jt) => ({
     id: jt.id,
     label: jt.label,
-    href: apiPlaygroundHref({ type: jt.id }),
+    href: playgroundHref({ type: jt.id }),
   })),
 );
 
@@ -174,7 +173,7 @@ onMounted(async () => {
             }}
           </p>
           <div class="gw-hero-actions">
-            <a :href="apiPlaygroundLink" class="gw-btn gw-btn-primary">{{
+            <a :href="playgroundLink" class="gw-btn gw-btn-primary">{{
               t('Try API Playground', 'Thử API Playground')
             }}</a>
             <a :href="quickstartLink" class="gw-btn gw-btn-outline">{{
@@ -184,8 +183,8 @@ onMounted(async () => {
           <p class="gw-hero-note">
             {{
               t(
-                'No account needed — sign in inside the playground Connection panel.',
-                'Không cần tài khoản docs — đăng nhập trong panel Connection của playground.',
+                'Sign in via Connection — then pick a model and send a request.',
+                'Đăng nhập qua Connection — chọn model và gửi request.',
               )
             }}
           </p>
@@ -290,7 +289,7 @@ onMounted(async () => {
                 <td class="gw-model-table-provider">{{ m.provider || '—' }}</td>
                 <td class="gw-model-table-credits">{{ m.creditsLabel }}</td>
                 <td class="gw-model-table-action">
-                  <a :href="apiPlaygroundHref({ type: m.jobType, model: m.slug })">→</a>
+                  <a :href="playgroundHref({ type: m.jobType, model: m.slug })">→</a>
                 </td>
               </tr>
             </tbody>
@@ -393,7 +392,7 @@ onMounted(async () => {
             }}
           </p>
         </div>
-        <a :href="apiPlaygroundLink" class="gw-btn gw-btn-primary gw-btn-lg">{{
+        <a :href="playgroundLink" class="gw-btn gw-btn-primary gw-btn-lg">{{
           t('Try API Playground', 'Thử API Playground')
         }}</a>
       </div>

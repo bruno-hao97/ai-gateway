@@ -1,12 +1,19 @@
-/* API Playground embed — /reference/playground (immersive) */
+/* API Playground embed — /app/playground (immersive, full portal iframe) */
+
+body.gw-api-playground-immersive {
+  overflow: hidden;
+}
+
+body.gw-api-playground-immersive .VPContent {
+  padding-bottom: 0 !important;
+}
 
 .gw-api-playground {
   display: flex;
   flex-direction: column;
-  min-height: calc(
-    100dvh - var(--vp-nav-height, 64px) - var(--gw-docs-subnav-height, 2.75rem)
-  );
-  height: calc(100dvh - var(--vp-nav-height, 64px) - var(--gw-docs-subnav-height, 2.75rem));
+  flex: 1;
+  min-height: 0;
+  height: 100%;
   gap: 0;
   padding: 0;
 }
@@ -42,10 +49,6 @@
   padding: 0 !important;
 }
 
-body.gw-api-playground-immersive .VPContent {
-  padding-bottom: 0 !important;
-}
-
 .gw-api-playground-loading {
   flex: 1;
   display: flex;
@@ -64,11 +67,4 @@ body.gw-api-playground-immersive .VPContent {
   border: none;
   border-radius: 0;
   background: var(--vp-c-bg-soft);
-}
-
-@media (max-width: 768px) {
-  .gw-api-playground {
-    min-height: calc(100dvh - var(--vp-nav-height, 64px) - var(--gw-docs-subnav-height, 2.75rem));
-    height: calc(100dvh - var(--vp-nav-height, 64px) - var(--gw-docs-subnav-height, 2.75rem));
-  }
 }

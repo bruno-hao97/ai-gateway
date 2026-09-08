@@ -18,6 +18,7 @@ export interface PlaygroundEmbedOptions {
   model?: string;
   panel?: string;
   parentOrigin?: string;
+  lang?: string;
 }
 
 function resolvePlaygroundUrl(base: string): URL {
@@ -77,5 +78,6 @@ export function playgroundEmbedUrl(opts?: PlaygroundEmbedOptions): string {
   if (opts?.model) u.searchParams.set('model', opts.model);
   if (opts?.panel) u.searchParams.set('panel', opts.panel);
   if (opts?.parentOrigin) u.searchParams.set('parentOrigin', opts.parentOrigin);
+  if (opts?.lang) u.searchParams.set('lang', opts.lang);
   return u.pathname + u.search;
 }

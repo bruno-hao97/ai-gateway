@@ -22,6 +22,16 @@
   --gw-scroll-size: 6px;
   --gw-scroll-thumb: rgba(255, 255, 255, 0.14);
   --gw-scroll-thumb-hover: rgba(255, 255, 255, 0.22);
+
+  /* JSON syntax (GitHub-dark / 79ai-style) */
+  --json-bg: #0d1117;
+  --json-key: #79c0ff;
+  --json-string: #7ee787;
+  --json-number: #ffa657;
+  --json-bool: #d2a8ff;
+  --json-null: #d2a8ff;
+  --json-punct: #8b949e;
+  --json-text: #c9d1d9;
 }
 
 *,
@@ -373,4 +383,55 @@ footer.site-footer {
 
 .gw-scroll::-webkit-scrollbar-thumb:hover {
   background: var(--gw-scroll-thumb-hover);
+}
+
+/* ── JSON syntax highlight (portal-wide) ── */
+
+pre.pg-json-highlight,
+.pg-json-highlight {
+  color: var(--json-text);
+}
+
+.json-key {
+  color: var(--json-key);
+}
+
+.json-string {
+  color: var(--json-string);
+}
+
+.json-number {
+  color: var(--json-number);
+}
+
+.json-bool {
+  color: var(--json-bool);
+}
+
+.json-null {
+  color: var(--json-null);
+}
+
+.json-punct {
+  color: var(--json-punct);
+}
+
+.pg-json-panel {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--json-bg);
+  overflow: auto;
+  max-height: min(52vh, 520px);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  white-space: pre;
+  word-break: normal;
+  tab-size: 2;
+}
+
+.pg-json-panel.pg-json-highlight {
+  color: var(--json-text);
 }

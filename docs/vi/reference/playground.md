@@ -1,11 +1,6 @@
 ---
 title: API Playground
-description: API explorer tương tác — login, models, jobs, chat, upload
-layout: page
-sidebar: false
-outline: false
-prev: false
-next: false
+description: Chuyển sang /vi/app/playground/
 ---
 
-<ApiPlaygroundEmbed />
+<!-- Playground chính: /vi/app/playground/ (redirect trong config.ts). -->

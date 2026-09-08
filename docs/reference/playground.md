@@ -1,11 +1,6 @@
 ---
 title: API Playground
-description: Interactive API explorer — login, models, jobs, chat, upload
-layout: page
-sidebar: false
-outline: false
-prev: false
-next: false
+description: Moved to /app/playground/
 ---
 
-<ApiPlaygroundEmbed />
+<!-- Canonical playground: /app/playground/ (see vitepress redirects in config.ts). -->
