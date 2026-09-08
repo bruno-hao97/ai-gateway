@@ -27,9 +27,7 @@ npm run docs:dev       # http://localhost:5173 — docs + /portal/ playground + 
 | **Docs** (VitePress + portal embed) | **5173** | `docs.yourdomain.com` |
 | **API** (gateway) | 3001 (optional local) | `api.yourdomain.com` |
 
-API Playground: **`/reference/playground/`** on docs (`:5173`) — iframe `/portal/playground.html`, same-origin proxy.
-
-Media Playground (signed-in): **`/app/playground/`** on docs.
+API Playground: **`/app/playground/`** on docs (`:5173`) — embed iframe `/portal/playground.html?embed=1`, same-origin proxy.
 
 `GATEWAY_CORS_ORIGIN` — khi browser client khác origin (docs prod, v.v.).
 

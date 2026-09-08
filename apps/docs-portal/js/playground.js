@@ -20,6 +20,11 @@ function pgLocale() {
   return globalThis.PortalI18n?.getLocale() || 'en';
 }
 
+function workerIconHtml(name) {
+  if (typeof globalThis.workerIconSvg === 'function') return globalThis.workerIconSvg(name);
+  return '';
+}
+
 const tokenEl = $('token');
 const docsNav = $('docs-nav');
 const openapiNav = $('openapi-nav');
@@ -140,6 +145,498 @@ function isAllowedEmbedParent(origin) {
 
 let pendingDeepLink = null;
 
+const EMBED_WORKER_SECTIONS = [
+  {
+    sectionKey: 'worker.section.create',
+    items: [
+      { id: 'create-image', icon: 'image', labelKey: 'worker.create.image', kind: 'media-job', jobType: 'image' },
+      { id: 'create-video', icon: 'video', labelKey: 'worker.create.video', kind: 'media-job', jobType: 'video' },
+      { id: 'create-tts', icon: 'mic', labelKey: 'worker.create.tts', kind: 'media-job', jobType: 'tts' },
+      { id: 'create-music', icon: 'music', labelKey: 'worker.create.music', kind: 'media-job', jobType: 'music' },
+      { id: 'create-avatar', icon: 'bot', labelKey: 'worker.create.avatar', kind: 'media-job', jobType: 'avatar-lipsync' },
+    ],
+  },
+  {
+    sectionKey: 'worker.section.tools',
+    items: [
+      { id: 'tool-image-upscale', icon: 'arrow-up', labelKey: 'worker.tool.image-upscale', kind: 'media-job', jobType: 'image-upscale' },
+      { id: 'tool-remove-bg', icon: 'scissors', labelKey: 'worker.tool.remove-bg', kind: 'media-job', jobType: 'remove-bg' },
+      { id: 'tool-video-upscale', icon: 'arrow-up', labelKey: 'worker.tool.video-upscale', kind: 'media-job', jobType: 'video-upscale' },
+      { id: 'tool-video-vfx', icon: 'sparkles', labelKey: 'worker.tool.video-vfx', kind: 'media-job', jobType: 'video-vfx' },
+      { id: 'tool-video-subtitle', icon: 'subtitles', labelKey: 'worker.tool.video-subtitle', kind: 'media-job', jobType: 'video-subtitle' },
+      { id: 'tool-video-cut', icon: 'scissors', labelKey: 'worker.tool.video-cut', kind: 'media-job', jobType: 'video-cut' },
+    ],
+  },
+  {
+    sectionKey: 'worker.section.upload',
+    items: [
+      { id: 'upload-image', icon: 'upload', labelKey: 'worker.upload.image', kind: 'upload', uploadTab: 'image' },
+      { id: 'upload-video', icon: 'upload', labelKey: 'worker.upload.video', kind: 'upload', uploadTab: 'video' },
+    ],
+  },
+  {
+    sectionKey: 'worker.section.status',
+    items: [
+      { id: 'info-image', icon: 'file-text', labelKey: 'worker.status.infoImage', kind: 'info', infoKind: 'image' },
+      { id: 'info-video', icon: 'file-text', labelKey: 'worker.status.infoVideo', kind: 'info', infoKind: 'video' },
+      { id: 'info-music', icon: 'file-text', labelKey: 'worker.status.infoMusic', kind: 'info', infoKind: 'music' },
+    ],
+  },
+  {
+    sectionKey: 'worker.section.library',
+    items: [
+      { id: 'library-images', icon: 'image', labelKey: 'worker.library.images', kind: 'library', libraryKind: 'images' },
+      { id: 'library-videos', icon: 'video', labelKey: 'worker.library.videos', kind: 'library', libraryKind: 'videos' },
+      { id: 'library-musics', icon: 'music', labelKey: 'worker.library.musics', kind: 'library', libraryKind: 'musics' },
+      { id: 'library-audios', icon: 'mic', labelKey: 'worker.library.audios', kind: 'library', libraryKind: 'audios' },
+      { id: 'library-album-videos', icon: 'folder', labelKey: 'worker.library.albumVideos', kind: 'library', libraryKind: 'album-videos' },
+    ],
+  },
+  {
+    sectionKey: 'worker.section.system',
+    items: [
+      { id: 'list-models', icon: 'server', labelKey: 'worker.system.models', kind: 'panel', panel: 'models' },
+      { id: 'health', icon: 'zap', labelKey: 'worker.system.health', kind: 'panel', panel: 'health' },
+    ],
+  },
+  {
+    sectionKey: 'worker.section.platform',
+    items: [
+      { id: 'chat', icon: 'message', labelKey: 'worker.platform.chat', kind: 'panel', panel: 'chat' },
+      { id: 'audio-tts', icon: 'volume', labelKey: 'worker.platform.audio', kind: 'panel', panel: 'audio' },
+      { id: 'audio-lists', icon: 'list', labelKey: 'worker.platform.audioLists', kind: 'panel', panel: 'audio-lists' },
+    ],
+  },
+];
+
+const EMBED_WORKER_BY_ID = new Map();
+for (const section of EMBED_WORKER_SECTIONS) {
+  for (const item of section.items) EMBED_WORKER_BY_ID.set(item.id, item);
+}
+
+let activeEmbedWorkerId = 'create-image';
+let embedMenuOpen = null;
+let activeInfoKind = 'image';
+let activeLibraryKind = 'images';
+let workerMenuFilter = '';
+let workerMenuFocusIndex = -1;
+
+const INFO_CONFIGS = {
+  image: {
+    titleKey: 'worker.status.infoImage',
+    endpointTemplate: 'POST /ai/info/image/{id}',
+    idLabelKey: 'proxy.info.idBase',
+    idPlaceholderKey: 'proxy.info.idBase',
+    formIdKey: 'id_base',
+    media: 'image',
+    showProject: false,
+  },
+  video: {
+    titleKey: 'worker.status.infoVideo',
+    endpointTemplate: 'POST /ai/info/video/{id}',
+    idLabelKey: 'proxy.info.videoId',
+    idPlaceholderKey: 'proxy.info.videoId',
+    formIdKey: 'video_id',
+    media: 'video',
+    showProject: false,
+  },
+  music: {
+    titleKey: 'worker.status.infoMusic',
+    endpointTemplate: 'POST /ai/info/music/{id}',
+    idLabelKey: 'proxy.info.idBase',
+    idPlaceholderKey: 'proxy.info.idBase',
+    formIdKey: 'id_base',
+    media: 'music',
+    showProject: true,
+  },
+};
+
+const LIBRARY_CONFIGS = {
+  images: {
+    titleKey: 'worker.library.images',
+    path: '/ai/library/images',
+    showModel: true,
+    showCategory: true,
+    showSource: true,
+    showProject: false,
+  },
+  videos: {
+    titleKey: 'worker.library.videos',
+    path: '/ai/library/videos',
+    showModel: true,
+    showCategory: false,
+    showSource: false,
+    showProject: false,
+  },
+  musics: {
+    titleKey: 'worker.library.musics',
+    path: '/ai/library/musics',
+    showModel: false,
+    showCategory: false,
+    showSource: false,
+    showProject: true,
+  },
+  audios: {
+    titleKey: 'worker.library.audios',
+    path: '/ai/library/audios',
+    showModel: false,
+    showCategory: false,
+    showSource: false,
+    showProject: false,
+  },
+  'album-videos': {
+    titleKey: 'worker.library.albumVideos',
+    path: '/ai/library/album-videos',
+    showModel: true,
+    showCategory: false,
+    showSource: false,
+    showProject: false,
+  },
+};
+
+function workerItemLabel(item) {
+  return pgT(item.labelKey, item.labelKey);
+}
+
+function workerUsesModelPicker(workerId) {
+  const item = EMBED_WORKER_BY_ID.get(workerId);
+  return item?.kind === 'media-job';
+}
+
+function listWorkerMenuItems() {
+  const filter = workerMenuFilter.trim().toLowerCase();
+  const out = [];
+  for (const section of EMBED_WORKER_SECTIONS) {
+    for (const item of section.items) {
+      const label = workerItemLabel(item).toLowerCase();
+      const hay = `${label} ${item.id} ${pgT(section.sectionKey, section.sectionKey)}`.toLowerCase();
+      if (filter && !hay.includes(filter)) continue;
+      out.push({ section, item });
+    }
+  }
+  return out;
+}
+
+function renderEmbedWorkerMenu() {
+  const menu = $('embedWorkerMenu');
+  if (!menu) return;
+
+  const filter = workerMenuFilter.trim();
+  const searchPh = escapeHtml(pgT('worker.search', 'Search workers…'));
+  const searchVal = escapeHtml(workerMenuFilter);
+  const searchHtml = `<div class="pg-worker-menu-search-wrap">
+    <input type="search" class="pg-worker-menu-search" id="embedWorkerSearch" placeholder="${searchPh}" value="${searchVal}" autocomplete="off" aria-label="${searchPh}" />
+  </div>`;
+
+  const visible = listWorkerMenuItems();
+  if (!visible.length) {
+    menu.innerHTML = `${searchHtml}<p class="pg-worker-menu-empty">${escapeHtml(pgT('worker.searchEmpty', 'No matching workers'))}</p>`;
+    wireWorkerMenuSearch();
+    return;
+  }
+
+  let lastSectionKey = '';
+  const sectionsHtml = visible
+    .map(({ section, item }) => {
+      let heading = '';
+      if (section.sectionKey !== lastSectionKey) {
+        lastSectionKey = section.sectionKey;
+        heading = `<p class="pg-worker-menu-heading">${escapeHtml(pgT(section.sectionKey, section.sectionKey))}</p>`;
+      }
+      const active = item.id === activeEmbedWorkerId;
+      const label = escapeHtml(workerItemLabel(item));
+      const btn = `<button type="button" class="pg-worker-menu-item${active ? ' active' : ''}" role="option" data-worker-id="${item.id}" aria-selected="${active}">
+          <span class="pg-worker-menu-item-icon" aria-hidden="true">${workerIconHtml(item.icon)}</span>
+          <span class="pg-worker-menu-item-text">${label}</span>
+        </button>`;
+      return `${heading}${btn}`;
+    })
+    .join('');
+
+  menu.innerHTML = `${searchHtml}<div class="pg-worker-menu-section">${sectionsHtml}</div>`;
+  wireWorkerMenuSearch();
+  focusWorkerMenuItem(workerMenuFocusIndex);
+}
+
+function wireWorkerMenuSearch() {
+  const input = $('embedWorkerSearch');
+  if (!input || input.dataset.wired) return;
+  input.dataset.wired = '1';
+  input.addEventListener('input', () => {
+    workerMenuFilter = input.value;
+    workerMenuFocusIndex = 0;
+    renderEmbedWorkerMenu();
+    $('embedWorkerSearch')?.focus();
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      moveWorkerMenuFocus(1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      moveWorkerMenuFocus(-1);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      activateFocusedWorkerMenuItem();
+    } else if (e.key === 'Escape') {
+      closeEmbedMenus();
+    }
+  });
+}
+
+function workerMenuButtons() {
+  return [...($('embedWorkerMenu')?.querySelectorAll('.pg-worker-menu-item') || [])];
+}
+
+function moveWorkerMenuFocus(delta) {
+  const buttons = workerMenuButtons();
+  if (!buttons.length) return;
+  if (workerMenuFocusIndex < 0) workerMenuFocusIndex = 0;
+  else workerMenuFocusIndex = (workerMenuFocusIndex + delta + buttons.length) % buttons.length;
+  focusWorkerMenuItem(workerMenuFocusIndex);
+}
+
+function focusWorkerMenuItem(index) {
+  const buttons = workerMenuButtons();
+  buttons.forEach((btn, i) => btn.classList.toggle('is-focused', i === index));
+  const el = buttons[index];
+  if (el) {
+    workerMenuFocusIndex = index;
+    el.focus();
+  }
+}
+
+function activateFocusedWorkerMenuItem() {
+  const buttons = workerMenuButtons();
+  const btn = buttons[workerMenuFocusIndex] || buttons[0];
+  if (!btn) return;
+  void navigateEmbedWorker(btn.dataset.workerId);
+}
+
+function syncWorkerToUrl() {
+  if (!isEmbed) return;
+  const params = new URLSearchParams(window.location.search);
+  params.set('embed', '1');
+  params.delete('type');
+  params.delete('panel');
+
+  if (activeEmbedWorkerId) params.set('worker', activeEmbedWorkerId);
+  else params.delete('worker');
+
+  if (workerUsesModelPicker(activeEmbedWorkerId)) {
+    const model = $('mediaModelSelect')?.value?.trim();
+    if (model) params.set('model', model);
+    else params.delete('model');
+  } else {
+    params.delete('model');
+  }
+
+  const parentOrigin = params.get('parentOrigin');
+  const qs = params.toString();
+  const next = `${window.location.pathname}?${qs}`;
+  history.replaceState(null, '', next);
+
+  const payload = {
+    type: 'ai-gateway-playground-nav',
+    worker: activeEmbedWorkerId,
+    model: params.get('model') || undefined,
+  };
+  for (const origin of EMBED_PARENT_ORIGINS) {
+    try {
+      window.parent.postMessage(payload, origin);
+    } catch {
+      /* ignore */
+    }
+  }
+  if (parentOrigin) {
+    try {
+      window.parent.postMessage(payload, parentOrigin);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+
+function inferEmbedWorkerId() {
+  if ($('panel-connection')?.classList.contains('active')) return null;
+
+  const activePanel = document.querySelector('.pg-panel.active')?.dataset.panel;
+  if (activePanel === 'media-job') {
+    const jobType = $('jobType')?.value || 'image';
+    if (jobType === 'avatar-lipsync') return 'create-avatar';
+    if (['image', 'video', 'music', 'tts'].includes(jobType)) return `create-${jobType}`;
+    const toolItem = EMBED_WORKER_BY_ID.get(`tool-${jobType}`);
+    if (toolItem) return toolItem.id;
+    return activeEmbedWorkerId;
+  }
+  if (activePanel === 'upload') {
+    return $('upload-video')?.classList.contains('active') ? 'upload-video' : 'upload-image';
+  }
+  if (activePanel === 'info-job') {
+    return `info-${activeInfoKind}`;
+  }
+  if (activePanel === 'library') {
+    return `library-${activeLibraryKind}`;
+  }
+  const panelMap = {
+    'poll-job': 'poll-job',
+    models: 'list-models',
+    health: 'health',
+    chat: 'chat',
+    audio: 'audio-tts',
+    'audio-lists': 'audio-lists',
+  };
+  return panelMap[activePanel] || activeEmbedWorkerId;
+}
+
+function updateEmbedWorkerTrigger() {
+  const onConnection = $('panel-connection')?.classList.contains('active');
+  const labelEl = $('embedWorkerLabel');
+  const iconEl = $('embedWorkerIcon');
+  const inferred = inferEmbedWorkerId();
+  if (inferred) activeEmbedWorkerId = inferred;
+
+  const item = onConnection ? null : EMBED_WORKER_BY_ID.get(activeEmbedWorkerId);
+  if (labelEl) {
+    labelEl.textContent = onConnection
+      ? pgT('embed.connection')
+      : item
+        ? workerItemLabel(item)
+        : MEDIA_JOB_SHORT[$('jobType')?.value] || 'Image';
+  }
+  if (iconEl) iconEl.innerHTML = onConnection ? workerIconHtml('settings') : workerIconHtml(item?.icon || 'box');
+}
+
+function syncEmbedModelPicker(model) {
+  const wrap = $('embedModelPicker');
+  const menu = $('embedModelMenu');
+  const labelEl = $('embedModelLabel');
+  if (!wrap || !menu || !labelEl) return;
+
+  const onMediaJob = $('panel-media-job')?.classList.contains('active');
+  const onConnection = $('panel-connection')?.classList.contains('active');
+  if (!onMediaJob || onConnection) {
+    wrap.hidden = true;
+    return;
+  }
+
+  wrap.hidden = false;
+  const sel = $('mediaModelSelect');
+  const options = sel ? [...sel.options].filter((o) => o.value) : [];
+  const current = sel?.value || '';
+
+  menu.innerHTML = options.length
+    ? options
+        .map((opt) => {
+          const active = opt.value === current;
+          const text = escapeHtml(opt.textContent || opt.value);
+          return `<button type="button" class="pg-worker-menu-item${active ? ' active' : ''}" role="option" data-model-slug="${escapeHtml(opt.value)}" aria-selected="${active}">
+            <span class="pg-worker-menu-item-text">${text}</span>
+          </button>`;
+        })
+        .join('')
+    : `<p class="pg-worker-menu-empty">${escapeHtml(pgT('media.model', 'Model'))}</p>`;
+
+  const activeOpt = sel?.selectedOptions?.[0];
+  labelEl.textContent = model?.name || activeOpt?.textContent?.trim() || pgT('media.model', 'Model');
+}
+
+function closeEmbedMenus() {
+  const workerMenu = $('embedWorkerMenu');
+  const modelMenu = $('embedModelMenu');
+  const workerTrigger = $('embedWorkerTrigger');
+  const modelTrigger = $('embedModelTrigger');
+  if (workerMenu) workerMenu.hidden = true;
+  if (modelMenu) modelMenu.hidden = true;
+  workerTrigger?.setAttribute('aria-expanded', 'false');
+  modelTrigger?.setAttribute('aria-expanded', 'false');
+  embedMenuOpen = null;
+}
+
+function toggleEmbedMenu(which) {
+  const workerMenu = $('embedWorkerMenu');
+  const modelMenu = $('embedModelMenu');
+  const workerTrigger = $('embedWorkerTrigger');
+  const modelTrigger = $('embedModelTrigger');
+  if (!workerMenu || !modelMenu) return;
+
+  if (embedMenuOpen === which) {
+    closeEmbedMenus();
+    return;
+  }
+
+  closeEmbedMenus();
+  embedMenuOpen = which;
+  if (which === 'worker') {
+    renderEmbedWorkerMenu();
+    workerMenuFocusIndex = 0;
+    workerMenu.hidden = false;
+    workerTrigger?.setAttribute('aria-expanded', 'true');
+    requestAnimationFrame(() => {
+      $('embedWorkerSearch')?.focus();
+      focusWorkerMenuItem(0);
+    });
+  } else if (which === 'model') {
+    syncEmbedModelPicker();
+    modelMenu.hidden = false;
+    modelTrigger?.setAttribute('aria-expanded', 'true');
+  }
+}
+
+async function navigateEmbedWorker(workerId) {
+  const item = EMBED_WORKER_BY_ID.get(workerId);
+  if (!item) return;
+  activeEmbedWorkerId = workerId;
+  workerMenuFilter = '';
+  closeEmbedMenus();
+
+  if (item.kind === 'media-job') {
+    await openMediaJobPanel(item.jobType);
+    syncWorkerToUrl();
+    return;
+  }
+  if (item.kind === 'info') {
+    openInfoPanel(item.infoKind);
+    syncWorkerToUrl();
+    return;
+  }
+  if (item.kind === 'library') {
+    openLibraryPanel(item.libraryKind);
+    syncWorkerToUrl();
+    return;
+  }
+  if (item.kind === 'upload') {
+    openPanelById('upload');
+    document.querySelector(`.pg-tab[data-upload-tab="${item.uploadTab}"]`)?.click();
+    syncEmbedChromeFromState();
+    syncWorkerToUrl();
+    return;
+  }
+  if (item.kind === 'panel') {
+    if (item.panel === 'health') {
+      openHealthPanel();
+      syncWorkerToUrl();
+      return;
+    }
+    openPanelById(item.panel);
+    syncEmbedChromeFromState();
+    syncWorkerToUrl();
+  }
+}
+
+function syncEmbedChromeFromState(model) {
+  if (!isEmbed) return;
+  if ($('panel-info-job')?.classList.contains('active')) configureInfoPanelUi(activeInfoKind);
+  if ($('panel-library')?.classList.contains('active')) configureLibraryPanelUi(activeLibraryKind);
+  updateEmbedWorkerTrigger();
+  renderEmbedWorkerMenu();
+  syncEmbedModelPicker(model);
+  const connBtn = $('btnEmbedConnection');
+  const onConnection = $('panel-connection')?.classList.contains('active');
+  connBtn?.classList.toggle('active', onConnection);
+}
+
 function applyEmbedChrome() {
   if (!isEmbed) return;
   document.body.classList.add('pg-embed', 'pg-studio');
@@ -147,33 +644,14 @@ function applyEmbedChrome() {
 
 function updateEmbedStudio(type, model) {
   if (!isEmbed) return;
-  const typeEl = $('embedCrumbType');
-  const modelEl = $('embedCrumbModel');
-  const modelSep = $('embedCrumbModelSep');
-  const connBtn = $('btnEmbedConnection');
-  const onConnection = $('panel-connection')?.classList.contains('active');
+  syncEmbedChromeFromState(model);
+}
 
-  if (typeEl) {
-    typeEl.textContent = onConnection
-      ? pgT('embed.connection')
-      : MEDIA_JOB_SHORT[type] || MEDIA_JOB_LABELS[type] || type || 'Image';
-  }
-  if (model && !onConnection) {
-    if (modelEl) {
-      modelEl.textContent = model.name || model.slug;
-      modelEl.hidden = false;
-    }
-    if (modelSep) modelSep.hidden = false;
-  } else {
-    if (modelEl) modelEl.hidden = true;
-    if (modelSep) modelSep.hidden = true;
-  }
-  if (connBtn) connBtn.classList.toggle('active', onConnection);
-  document.querySelectorAll('#embedJobChips [data-job-type]').forEach((btn) => {
-    const active = !onConnection && btn.dataset.jobType === type;
-    btn.classList.toggle('active', active);
-    btn.setAttribute('aria-selected', active ? 'true' : 'false');
-  });
+function formatSendPriceLabel(creditsLabel) {
+  if (!creditsLabel || creditsLabel === '—') return '';
+  const num = creditsLabel.match(/^([\d,.]+)/);
+  if (num) return `${num[1].replace(/,/g, '')} cr`;
+  return creditsLabel.replace(/\s*credits?\s*$/i, ' cr').trim();
 }
 
 function updateSendPriceLabel(model) {
@@ -186,7 +664,14 @@ function updateSendPriceLabel(model) {
     return;
   }
   el.hidden = false;
-  el.textContent = label;
+  el.textContent = isEmbed ? formatSendPriceLabel(label) : label;
+}
+
+function initMediaSendChrome() {
+  const iconEl = $('mediaSendIcon');
+  if (iconEl && !iconEl.querySelector('svg')) {
+    iconEl.innerHTML = workerIconHtml('send');
+  }
 }
 
 function wireEmbedStudio() {
@@ -194,26 +679,69 @@ function wireEmbedStudio() {
   $('btnEmbedConnection')?.addEventListener('click', () => {
     const onConnection = $('panel-connection')?.classList.contains('active');
     if (onConnection) {
-      void openMediaJobPanel($('jobType')?.value || 'image');
+      void navigateEmbedWorker(activeEmbedWorkerId || 'create-image');
       return;
     }
     openPanelById('connection');
-    updateEmbedStudio('connection', null);
+    syncEmbedChromeFromState();
   });
   $('btnEmbedDev')?.addEventListener('click', () => {
     const open = document.body.classList.toggle('pg-sidebar-open');
     $('btnEmbedDev')?.classList.toggle('active', open);
   });
-  document.querySelectorAll('#embedJobChips [data-job-type]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      void openMediaJobPanel(btn.dataset.jobType);
-    });
+
+  $('embedWorkerTrigger')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleEmbedMenu('worker');
+  });
+  $('embedModelTrigger')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleEmbedMenu('model');
+  });
+  $('embedWorkerMenu')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-worker-id]');
+    if (!btn) return;
+    void navigateEmbedWorker(btn.dataset.workerId);
+  });
+  $('embedWorkerMenu')?.addEventListener('keydown', (e) => {
+    if (e.target.id === 'embedWorkerSearch') return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      moveWorkerMenuFocus(1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      moveWorkerMenuFocus(-1);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      activateFocusedWorkerMenuItem();
+    }
+  });
+  $('embedModelMenu')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-model-slug]');
+    if (!btn || !$('mediaModelSelect')) return;
+    $('mediaModelSelect').value = btn.dataset.modelSlug;
+    onMediaModelChange();
+    closeEmbedMenus();
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!embedMenuOpen) return;
+    if (e.target.closest('#embedWorkerPicker') || e.target.closest('#embedModelPicker')) return;
+    closeEmbedMenus();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeEmbedMenus();
+  });
+  window.addEventListener('portal-locale-change', () => {
+    syncEmbedChromeFromState();
   });
 }
 
 async function initEmbedStudio() {
   if (!isEmbed) return;
+  initMediaSendChrome();
   wireEmbedStudio();
+  renderEmbedWorkerMenu();
   captureDeepLinkFromUrl();
   if (pendingDeepLink) {
     await runPendingDeepLink();
@@ -227,6 +755,7 @@ async function initEmbedStudio() {
       /* credits optional */
     }
   }
+  syncWorkerToUrl();
 }
 
 function handleEmbedTokenMessage(event) {
@@ -239,6 +768,7 @@ function handleEmbedTokenMessage(event) {
       PortalI18n.setLocale(locale);
       updateTokenBadge();
       renderAiGuidePanel();
+      syncEmbedChromeFromState();
     }
     return;
   }
@@ -345,6 +875,316 @@ function authHeaders(json = true) {
   const headers = { Authorization: `Bearer ${getToken()}` };
   if (json) headers['Content-Type'] = 'application/json';
   return headers;
+}
+
+function buildGommoFormBody(fields = {}, { forPreview = false } = {}) {
+  const body = new URLSearchParams();
+  const token = tokenEl?.value?.trim();
+  if (!forPreview && !token) {
+    throw new Error('Login or paste access_token first (Connection panel)');
+  }
+  body.set('access_token', forPreview ? token || '<ACCESS_TOKEN>' : token);
+  body.set('domain', $('loginDomain')?.value?.trim() || '79ai.net');
+  if (!forPreview) appendDeviceToForm(body);
+  for (const [key, value] of Object.entries(fields)) {
+    if (value == null) continue;
+    const text = String(value).trim();
+    if (text) body.set(key, text);
+  }
+  return body;
+}
+
+async function apiFormPost(path, fields, label) {
+  return apiFetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: buildGommoFormBody(fields).toString(),
+  }, label);
+}
+
+function activateProxyNav(panel, matchFn) {
+  document.querySelectorAll('.pg-nav-item').forEach((b) => {
+    b.classList.toggle('active', b.dataset.panel === panel && matchFn(b));
+  });
+}
+
+function configureInfoPanelUi(kind) {
+  const cfg = INFO_CONFIGS[kind];
+  if (!cfg) return;
+  const title = $('infoJobTitle');
+  const endpoint = $('infoJobEndpoint');
+  const idLabel = $('infoJobIdLabel');
+  const idInput = $('infoJobId');
+  const projectWrap = $('infoProjectWrap');
+  if (title) title.textContent = pgT(cfg.titleKey);
+  if (endpoint) endpoint.textContent = cfg.endpointTemplate;
+  if (idLabel) idLabel.textContent = pgT(cfg.idLabelKey);
+  if (idInput) idInput.placeholder = pgT(cfg.idPlaceholderKey);
+  if (projectWrap) projectWrap.hidden = !cfg.showProject;
+}
+
+function openInfoPanel(kind) {
+  activeInfoKind = kind;
+  document.querySelectorAll('.pg-panel').forEach((p) => {
+    p.classList.toggle('active', p.dataset.panel === 'info-job');
+  });
+  activateProxyNav('info-job', (b) => b.dataset.infoKind === kind);
+  configureInfoPanelUi(kind);
+  refreshProxyPanelPreview();
+  syncEmbedChromeFromState();
+}
+
+function configureLibraryPanelUi(kind) {
+  const cfg = LIBRARY_CONFIGS[kind];
+  if (!cfg) return;
+  const title = $('libraryTitle');
+  const endpoint = $('libraryEndpoint');
+  if (title) title.textContent = pgT(cfg.titleKey);
+  if (endpoint) endpoint.textContent = `POST ${cfg.path}`;
+  const modelWrap = $('libModelWrap');
+  const categoryWrap = $('libCategoryWrap');
+  const sourceWrap = $('libSourceWrap');
+  const projectWrap = $('libProjectWrap');
+  if (modelWrap) modelWrap.hidden = !cfg.showModel;
+  if (categoryWrap) categoryWrap.hidden = !cfg.showCategory;
+  if (sourceWrap) sourceWrap.hidden = !cfg.showSource;
+  if (projectWrap) projectWrap.hidden = !cfg.showProject;
+}
+
+function openLibraryPanel(kind) {
+  activeLibraryKind = kind;
+  document.querySelectorAll('.pg-panel').forEach((p) => {
+    p.classList.toggle('active', p.dataset.panel === 'library');
+  });
+  activateProxyNav('library', (b) => b.dataset.libraryKind === kind);
+  configureLibraryPanelUi(kind);
+  refreshProxyPanelPreview();
+  syncEmbedChromeFromState();
+}
+
+function openHealthPanel() {
+  document.querySelectorAll('.pg-panel').forEach((p) => {
+    p.classList.toggle('active', p.dataset.panel === 'health');
+  });
+  activateProxyNav('health', () => true);
+  refreshProxyPanelPreview();
+  syncEmbedChromeFromState();
+}
+
+function readLibraryFormFields() {
+  const fields = {};
+  const limit = $('libLimit')?.value?.trim();
+  const afterId = $('libAfterId')?.value?.trim();
+  const model = $('libModel')?.value?.trim();
+  const category = $('libCategory')?.value?.trim();
+  const source = $('libSource')?.value?.trim();
+  const projectId = $('libProjectId')?.value?.trim();
+  if (limit) fields.limit = limit;
+  if (afterId) fields.after_id = afterId;
+  if (model) fields.model = model;
+  if (category) fields.category = category;
+  if (source) fields.source = source;
+  if (projectId) fields.project_id = projectId;
+  return fields;
+}
+
+function extractFirstListMediaUrl(data) {
+  const direct = pickUrlFromRaw(data) || pickUrlFromRaw(data?.data);
+  if (direct) return direct;
+  const root = data?.data;
+  const lists = [];
+  if (Array.isArray(root)) lists.push(root);
+  else if (root && typeof root === 'object') {
+    for (const key of ['items', 'data', 'images', 'videos', 'musics', 'audios', 'album_videos']) {
+      if (Array.isArray(root[key])) lists.push(root[key]);
+    }
+  }
+  for (const list of lists) {
+    for (const item of list) {
+      const url = pickUrlFromMediaInfo(item);
+      if (url) return url;
+    }
+  }
+  return null;
+}
+
+function previewBaseUrl() {
+  try {
+    return baseUrl();
+  } catch {
+    return window.location.origin.replace(/\/$/, '');
+  }
+}
+
+function applyRequestPreview({ method, path, headers, body, curl }) {
+  const methodEl = $('requestMethod');
+  const endpointEl = $('requestEndpoint');
+  const fullUrlEl = $('requestFullUrl');
+  const headersRows = $('requestHeadersRows');
+  const bodyRows = $('requestBodyRows');
+  const bodyRawEl = $('requestBodyRaw');
+  const curlEl = $('requestCurl');
+  const url = `${previewBaseUrl()}${path}`;
+
+  if (methodEl) methodEl.textContent = method;
+  if (endpointEl) endpointEl.textContent = path;
+  if (fullUrlEl) fullUrlEl.textContent = url;
+  renderKvTableRows(
+    headersRows,
+    Object.entries(headers).map(([k, v]) => [k, v]),
+  );
+  if (typeof body === 'string') {
+    renderKvTableRows(bodyRows, [['body', body]]);
+    if (bodyRawEl) bodyRawEl.textContent = body;
+  } else {
+    renderKvTableRows(bodyRows, flattenRequestBodyRows(body));
+    if (bodyRawEl) GwJsonHighlight?.setJsonPre(bodyRawEl, body);
+  }
+  if (curlEl) curlEl.textContent = curl;
+  renderAiGuidePanel();
+}
+
+function buildInfoRequestPreview() {
+  const cfg = INFO_CONFIGS[activeInfoKind];
+  const id = $('infoJobId')?.value?.trim() || '{id}';
+  const path = `/ai/info/${activeInfoKind}/${encodeURIComponent(id)}`;
+  const fields = { [cfg.formIdKey]: id === '{id}' ? '' : id };
+  if (cfg.showProject) {
+    const projectId = $('infoProjectId')?.value?.trim();
+    if (projectId) fields.project_id = projectId;
+  }
+  const body = buildGommoFormBody(fields, { forPreview: true });
+  const token = tokenEl?.value?.trim();
+  const tokenMask = token ? `${token.slice(0, 12)}…` : '<ACCESS_TOKEN>';
+  return {
+    method: 'POST',
+    path,
+    headers: {
+      Authorization: `Bearer ${tokenMask}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: body.toString(),
+    curl: `curl -X POST '${previewBaseUrl()}${path}' \\\n  -H 'Authorization: Bearer ${token || '<ACCESS_TOKEN>'}' \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n  -d '${body.toString()}'`,
+  };
+}
+
+function buildLibraryRequestPreview() {
+  const cfg = LIBRARY_CONFIGS[activeLibraryKind];
+  const path = cfg.path;
+  const fields = readLibraryFormFields();
+  if (!fields.limit) fields.limit = $('libLimit')?.value?.trim() || '30';
+  const body = buildGommoFormBody(fields, { forPreview: true });
+  const token = tokenEl?.value?.trim();
+  const tokenMask = token ? `${token.slice(0, 12)}…` : '<ACCESS_TOKEN>';
+  return {
+    method: 'POST',
+    path,
+    headers: {
+      Authorization: `Bearer ${tokenMask}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: body.toString(),
+    curl: `curl -X POST '${previewBaseUrl()}${path}' \\\n  -H 'Authorization: Bearer ${token || '<ACCESS_TOKEN>'}' \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n  -d '${body.toString()}'`,
+  };
+}
+
+function buildHealthRequestPreview() {
+  const path = '/health';
+  return {
+    method: 'GET',
+    path,
+    headers: { Accept: 'application/json' },
+    body: {},
+    curl: `curl '${previewBaseUrl()}${path}'`,
+  };
+}
+
+function refreshProxyPanelPreview() {
+  const panel = document.querySelector('.pg-panel.active')?.dataset.panel;
+  if (panel === 'info-job') {
+    applyRequestPreview(buildInfoRequestPreview());
+    return;
+  }
+  if (panel === 'library') {
+    applyRequestPreview(buildLibraryRequestPreview());
+    return;
+  }
+  if (panel === 'health') {
+    applyRequestPreview(buildHealthRequestPreview());
+  }
+}
+
+async function runInfoJob() {
+  const status = $('infoJobStatus');
+  const cfg = INFO_CONFIGS[activeInfoKind];
+  const id = $('infoJobId')?.value?.trim();
+  if (!id) {
+    setStatus(status, pgT('proxy.info.idBase') + ' required', false);
+    return;
+  }
+  setStatus(status, 'Sending…', 'running');
+  try {
+    getToken();
+  } catch (err) {
+    setStatus(status, err.message, false);
+    return;
+  }
+  const fields = { [cfg.formIdKey]: id };
+  if (cfg.showProject) {
+    const projectId = $('infoProjectId')?.value?.trim();
+    if (projectId) fields.project_id = projectId;
+  }
+  const path = `/ai/info/${activeInfoKind}/${encodeURIComponent(id)}`;
+  try {
+    const data = await apiFormPost(path, fields, cfg.endpointTemplate.replace('{id}', id));
+    const resultUrl =
+      extractPollResultUrl(data, cfg.media) ||
+      pickUrlFromRaw(data) ||
+      pickUrlFromRaw(data?.data);
+    if (resultUrl) showResultUrl(resultUrl, cfg.media === 'music' ? 'music' : cfg.media);
+    setStatus(status, resultUrl ? '' : 'OK — see RESPONSE', resultUrl ? 'preview' : 'ok');
+  } catch (err) {
+    setStatus(status, err.message, false);
+  }
+}
+
+async function runLibraryList() {
+  const status = $('libraryStatus');
+  const cfg = LIBRARY_CONFIGS[activeLibraryKind];
+  setStatus(status, 'Fetching…', 'running');
+  try {
+    getToken();
+  } catch (err) {
+    setStatus(status, err.message, false);
+    return;
+  }
+  const fields = readLibraryFormFields();
+  if (!fields.limit) fields.limit = $('libLimit')?.value?.trim() || '30';
+  try {
+    const data = await apiFormPost(cfg.path, fields, `POST ${cfg.path}`);
+    const resultUrl = extractFirstListMediaUrl(data);
+    const media =
+      activeLibraryKind === 'videos' || activeLibraryKind === 'album-videos'
+        ? 'video'
+        : activeLibraryKind === 'musics' || activeLibraryKind === 'audios'
+          ? 'audio'
+          : 'image';
+    if (resultUrl) showResultUrl(resultUrl, media);
+    setStatus(status, 'OK — see RESPONSE', true);
+  } catch (err) {
+    setStatus(status, err.message, false);
+  }
+}
+
+async function runHealthCheck() {
+  const status = $('healthStatus');
+  setStatus(status, 'Checking…', 'running');
+  try {
+    await apiFetch('/health', { headers: { Accept: 'application/json' } }, 'GET /health');
+    setStatus(status, 'OK — gateway is up', true);
+  } catch (err) {
+    setStatus(status, err.message, false);
+  }
 }
 
 /** @param {HTMLElement | null} el
@@ -480,6 +1320,7 @@ function setResponseTab(tab) {
   } catch {
     /* ignore */
   }
+  if (tab === 'endpoints') globalThis.GatewayEndpointDetail?.refreshEndpointsTable?.();
 }
 
 function restoreResponseTab() {
@@ -617,9 +1458,15 @@ function initPortalI18n() {
   PortalI18n.applyDom();
   window.addEventListener('portal-locale-change', () => {
     PortalI18n.applyDom();
+    applyMediaPromptDefaults($('jobType')?.value || 'image');
     setRequestBodyView(requestBodyRawView);
     updateTokenBadge();
     renderAiGuidePanel();
+    if ($('panel-info-job')?.classList.contains('active')) configureInfoPanelUi(activeInfoKind);
+    if ($('panel-library')?.classList.contains('active')) configureLibraryPanelUi(activeLibraryKind);
+    renderEmbedWorkerMenu();
+    syncEmbedChromeFromState();
+    if ($('panel-media-job')?.classList.contains('active')) onMediaModelChange();
   });
 }
 
@@ -655,6 +1502,11 @@ function buildMediaJobRequestPreview() {
 }
 
 function refreshRequestPreview() {
+  const panel = document.querySelector('.pg-panel.active')?.dataset.panel;
+  if (panel === 'info-job' || panel === 'library' || panel === 'health') {
+    refreshProxyPanelPreview();
+    return;
+  }
   const preview = buildMediaJobRequestPreview();
   const methodEl = $('requestMethod');
   const endpointEl = $('requestEndpoint');
@@ -676,6 +1528,7 @@ function refreshRequestPreview() {
   if (bodyRawEl) GwJsonHighlight?.setJsonPre(bodyRawEl, preview.body);
   if (curlEl) curlEl.textContent = preview.curl;
   renderAiGuidePanel();
+  globalThis.GatewayEndpointDetail?.refreshEndpointsTable?.();
 }
 
 function initGuidePanels() {
@@ -718,13 +1571,111 @@ function showResponse(body, meta = {}, opts = {}) {
   if (!meta.keepTab && !opts.silent && !playgroundBooting) setResponseTab('result');
 }
 
-function displayJsonPre(el, body) {
+function displayJsonPre(el, body, opts = {}) {
   if (!el) return;
+  if (opts.skeleton) el.classList.add('pg-result-json-pre--skeleton');
+  else el.classList.remove('pg-result-json-pre--skeleton');
   if (body == null) {
     el.textContent = '—';
+    el.classList.remove('pg-json-highlight');
     return;
   }
   GwJsonHighlight?.displayInPre(el, body);
+  if (opts.skeleton) el.classList.add('pg-result-json-pre--skeleton');
+}
+
+let resultElapsedTimer = null;
+let resultJobStartMs = null;
+let activeResultJobId = null;
+
+function setResultPhase(phase) {
+  const main = $('resultMain');
+  if (main) main.dataset.phase = phase || 'idle';
+}
+
+function setResultStatusPill(status, label) {
+  const pill = $('resultStatusPill');
+  if (!pill) return;
+  if (!status) {
+    pill.hidden = true;
+    return;
+  }
+  pill.hidden = false;
+  pill.dataset.status = status;
+  const labels = {
+    running: pgT('result.status.running', 'Running'),
+    success: pgT('result.status.success', 'Success'),
+    failed: pgT('result.status.failed', 'Failed'),
+    cancelled: pgT('result.status.cancelled', 'Stopped'),
+  };
+  pill.textContent = label || labels[status] || status;
+}
+
+function updateResultStepper(activeStep, opts = {}) {
+  const steps = document.querySelectorAll('#resultStepper .pg-result-step');
+  const order = ['send', 'create', 'poll', 'done'];
+  const activeIdx = order.indexOf(activeStep);
+  steps.forEach((el) => {
+    const step = el.dataset.step;
+    const idx = order.indexOf(step);
+    el.classList.remove('is-active', 'is-complete', 'is-error');
+    if (opts.errorStep === step) el.classList.add('is-error');
+    else if (idx < activeIdx) el.classList.add('is-complete');
+    else if (step === activeStep) el.classList.add('is-active');
+  });
+}
+
+function showResultStatusBar(visible, label, opts = {}) {
+  const bar = $('resultStatusBar');
+  const lbl = $('resultStatusLabel');
+  const cancelBtn = $('btnCancelPoll');
+  if (bar) bar.hidden = !visible;
+  if (lbl && label != null) lbl.textContent = label;
+  if (cancelBtn) cancelBtn.hidden = !opts.showCancel;
+}
+
+function startResultElapsedTimer() {
+  stopResultElapsedTimer();
+  resultJobStartMs = performance.now();
+  const elapsedEl = $('resultHdrElapsed');
+  if (!elapsedEl) return;
+  resultElapsedTimer = window.setInterval(() => {
+    if (resultJobStartMs == null) return;
+    elapsedEl.textContent = formatElapsed(performance.now() - resultJobStartMs);
+  }, 200);
+}
+
+function stopResultElapsedTimer() {
+  if (resultElapsedTimer != null) {
+    clearInterval(resultElapsedTimer);
+    resultElapsedTimer = null;
+  }
+}
+
+function formatResultPrice(model) {
+  const price = globalThis.ModelPriceUi?.getActivePrice?.();
+  if (price != null && globalThis.ModelPricing) {
+    const locale = globalThis.PortalI18n?.getLocale() || 'en';
+    return globalThis.ModelPricing.formatCredits(price, locale);
+  }
+  if (model?.creditsLabel && model.creditsLabel !== '—') return model.creditsLabel;
+  return null;
+}
+
+function buildJobRequestEcho(jobType, modelSlug, fields, wait) {
+  return {
+    _echo: pgT('result.requestEcho', 'Outgoing request'),
+    method: 'POST',
+    path: `/gateway/jobs/${jobType}`,
+    body: { modelSlug, wait: Boolean(wait), fields },
+  };
+}
+
+function buildPollPendingEcho(message) {
+  return {
+    status: 'pending',
+    message: message || pgT('result.awaitingCreate', 'Waiting for create response…'),
+  };
 }
 
 function showJobResultLayout() {
@@ -736,12 +1687,16 @@ function showJobResultLayout() {
   if (!playgroundBooting) setResponseTab('result');
 }
 
-function displayCreateJson(body) {
-  displayJsonPre($('resultCreateJson'), body);
+function displayCreateJson(body, opts = {}) {
+  displayJsonPre($('resultCreateJson'), body, opts);
 }
 
-function displayPollJson(body) {
-  displayJsonPre($('resultPollJson'), body);
+function displayPollJson(body, opts = {}) {
+  displayJsonPre($('resultPollJson'), body, opts);
+}
+
+function displayPollSkeleton(message) {
+  displayPollJson(buildPollPendingEcho(message), { skeleton: true });
 }
 
 function showJobProgress(visible, label, pct) {
@@ -759,29 +1714,165 @@ function formatElapsed(ms) {
   return `${(ms / 1000).toFixed(2)}s`;
 }
 
-function updateResultHeader({ model, domain, type, elapsedMs }) {
+function updateResultHeader({ model, domain, type, elapsedMs, jobId, modelObj, status }) {
   const modelEl = $('resultHdrModel');
   const domainEl = $('resultHdrDomain');
   const typeEl = $('resultHdrType');
   const elapsedEl = $('resultHdrElapsed');
+  const priceEl = $('resultHdrPrice');
+  const priceChip = $('resultChipPrice');
+  const jobChip = $('resultChipJobId');
+  const jobEl = $('resultHdrJobId');
+
   if (modelEl) modelEl.textContent = model || '—';
   if (domainEl) domainEl.textContent = domain || '—';
   if (typeEl) typeEl.textContent = type || '—';
-  if (elapsedEl) elapsedEl.textContent = formatElapsed(elapsedMs);
+  if (elapsedEl && elapsedMs != null) elapsedEl.textContent = formatElapsed(elapsedMs);
+
+  const priceLabel = formatResultPrice(modelObj);
+  if (priceChip && priceEl) {
+    if (priceLabel) {
+      priceEl.textContent = priceLabel;
+      priceChip.hidden = false;
+    } else {
+      priceChip.hidden = true;
+    }
+  }
+
+  if (jobId) activeResultJobId = jobId;
+  if (jobChip && jobEl) {
+    if (jobId) {
+      jobEl.textContent = jobId;
+      jobChip.hidden = false;
+    } else if (!activeResultJobId) {
+      jobChip.hidden = true;
+      jobEl.textContent = '—';
+    }
+  }
+
+  if (status) setResultStatusPill(status);
+}
+
+function resetResultPanelState() {
+  stopResultElapsedTimer();
+  resultJobStartMs = null;
+  activeResultJobId = null;
+  setResultPhase('idle');
+  setResultStatusPill(null);
+  updateResultStepper('send');
+  showResultStatusBar(false);
+  showJobProgress(false);
+  const cancelBtn = $('btnCancelPoll');
+  if (cancelBtn) cancelBtn.hidden = true;
+}
+
+function cancelActivePoll() {
+  abortActiveJobRequest();
+  jobPollGeneration += 1;
+  stopResultElapsedTimer();
+  const elapsed =
+    resultJobStartMs != null ? performance.now() - resultJobStartMs : null;
+  if (elapsed != null) updateResultHeader({ elapsedMs: elapsed });
+  setResultPhase('cancelled');
+  setResultStatusPill('cancelled');
+  const errStep = activeResultJobId ? 'poll' : 'create';
+  updateResultStepper(errStep, { errorStep: errStep });
+  showJobProgress(false);
+  showResultStatusBar(
+    true,
+    `${pgT('result.cancelled', 'Stopped tracking')}. ${pgT('result.cancelHint', 'Job may still run on the server. Credits are not refunded.')}`,
+    { showCancel: false },
+  );
+  const cancelBtn = $('btnCancelPoll');
+  if (cancelBtn) cancelBtn.hidden = true;
+}
+
+function finishResultJob(opts = {}) {
+  stopResultElapsedTimer();
+  const elapsed =
+    opts.elapsedMs ??
+    (resultJobStartMs != null ? performance.now() - resultJobStartMs : null);
+  if (elapsed != null) updateResultHeader({ elapsedMs: elapsed });
+  showJobProgress(false);
+  showResultStatusBar(false);
+  const cancelBtn = $('btnCancelPoll');
+  if (cancelBtn) cancelBtn.hidden = true;
+  if (opts.failed) {
+    setResultPhase('failed');
+    setResultStatusPill('failed');
+    const errStep = opts.errorStep || 'done';
+    updateResultStepper(errStep, { errorStep: errStep });
+  } else if (opts.cancelled) {
+    setResultPhase('cancelled');
+    setResultStatusPill('cancelled');
+  } else {
+    setResultPhase('done');
+    setResultStatusPill('success');
+    updateResultStepper('done');
+  }
 }
 
 function jobTypeNeedsRefUrl(jobType) {
   return /upscale|remove-bg|avatar-lipsync|edit/i.test(jobType || '');
 }
 
-function jobTypeNeedsPrompt(jobType) {
-  return !jobTypeNeedsRefUrl(jobType);
+function modelNeedsRefInput(jobType, model) {
+  if (jobTypeNeedsRefUrl(jobType)) return true;
+  const hay = `${model?.slug || ''} ${model?.name || ''}`.toLowerCase();
+  if (/upscale|remove-?bg|removebg|img2img|i2i|enhance|edit/.test(hay)) return true;
+  const raw = model?.raw;
+  if (raw && (raw.need_image || raw.requires_image || raw.image_required || raw.need_images)) {
+    return true;
+  }
+  return false;
+}
+
+function promptRequired(jobType, model) {
+  return !modelNeedsRefInput(jobType, model);
+}
+
+function jobTypeNeedsPrompt(jobType, model) {
+  return promptRequired(jobType, model);
+}
+
+function updateRefPreview() {
+  const url = $('mediaRefUrl')?.value?.trim();
+  const preview = $('mediaRefPreview');
+  const img = $('mediaRefPreviewImg');
+  if (!preview || !img) return;
+  if (url) {
+    img.src = url;
+    preview.hidden = false;
+  } else {
+    img.removeAttribute('src');
+    preview.hidden = true;
+  }
+}
+
+function updateStudioFieldVisibility(jobType, model) {
+  const refWrap = $('mediaRefUrlWrap');
+  if (refWrap) refWrap.hidden = !modelNeedsRefInput(jobType, model);
+  updateRefPreview();
 }
 
 function updateRefUrlFieldVisibility(jobType) {
-  const wrap = $('mediaRefUrlWrap');
-  if (!wrap) return;
-  wrap.hidden = !jobTypeNeedsRefUrl(jobType);
+  const type = jobType || $('jobType')?.value || 'image';
+  const slug = $('mediaModelSelect')?.value;
+  const envelope = slug ? getStoredModelsEnvelope(type) : null;
+  const model =
+    envelope && slug ? normalizeModels(envelope).find((m) => m.slug === slug) : null;
+  updateStudioFieldVisibility(type, model);
+}
+
+function applyMediaPromptDefaults(type) {
+  const promptEl = $('mediaPrompt');
+  if (!promptEl || promptEl.dataset.userEdited) return;
+  if (isEmbed) {
+    promptEl.value = '';
+    promptEl.placeholder = pgT('media.promptPlaceholder', 'Enter your prompt…');
+  } else if (DEFAULT_PROMPTS[type]) {
+    promptEl.value = DEFAULT_PROMPTS[type];
+  }
 }
 
 function readJobFields(prompt) {
@@ -815,6 +1906,7 @@ function hidePreviewMedia() {
   resultPreview.hidden = true;
   clearPreviewPlayers();
   if (resultEmpty) resultEmpty.hidden = false;
+  resetResultPanelState();
 }
 
 function showResultUrl(url, mediaHint = '') {
@@ -826,7 +1918,7 @@ function showResultUrl(url, mediaHint = '') {
   setResponseTab('result');
   resultLink.href = url;
   resultLink.title = url;
-  resultLink.textContent = 'Open in new tab ↗';
+  resultLink.textContent = pgT('result.openTab', 'Open in new tab ↗');
   clearPreviewPlayers();
 
   const hint = String(mediaHint || '').toLowerCase();
@@ -900,10 +1992,10 @@ function pickCatalogList(model, ...keys) {
 }
 
 const CATALOG_FIELD_DEFS = [
-  { field: 'ratio', label: 'Aspect ratio', keys: ['ratios', 'ratio'] },
-  { field: 'mode', label: 'Mode', keys: ['modes', 'mode'] },
-  { field: 'resolution', label: 'Resolution', keys: ['resolutions', 'resolution'] },
-  { field: 'duration', label: 'Duration', keys: ['durations', 'duration'] },
+  { field: 'ratio', label: 'Aspect ratio', i18n: 'media.ratio', keys: ['ratios', 'ratio'] },
+  { field: 'mode', label: 'Mode', i18n: 'media.mode', keys: ['modes', 'mode'] },
+  { field: 'resolution', label: 'Resolution', i18n: 'media.resolution', keys: ['resolutions', 'resolution'] },
+  { field: 'duration', label: 'Duration', i18n: 'media.duration', keys: ['durations', 'duration'] },
 ];
 
 const MEDIA_JOB_LABELS = {
@@ -953,6 +2045,17 @@ const POLL_INTERVAL_MS = 3500;
 const POLL_MAX_ATTEMPTS = 80;
 let pollLoopGeneration = 0;
 let jobPollGeneration = 0;
+let activeJobAbortController = null;
+
+function abortActiveJobRequest() {
+  if (!activeJobAbortController) return;
+  try {
+    activeJobAbortController.abort();
+  } catch {
+    /* ignore */
+  }
+  activeJobAbortController = null;
+}
 
 function pollMediaForJobType(jobType) {
   if (jobType === 'music') return 'music';
@@ -1019,6 +2122,9 @@ function normalizeModels(envelope) {
       return {
         slug,
         name: m.name || slug,
+        description: m.description_en || m.description || '',
+        descriptionVi: m.description || '',
+        raw: m,
         credits,
         creditsLabel,
         ratios: pickCatalogList(m, 'ratios', 'ratio'),
@@ -1264,22 +2370,30 @@ function renderCatalogFields(model) {
   }
   if (!defs.length) return;
 
-  container.className = 'pg-catalog-fields gw-job-params';
-  const head = document.createElement('p');
-  head.className = 'gw-job-params-head';
-  head.textContent = 'Catalog parameters';
-  container.appendChild(head);
+  container.className = isEmbed
+    ? 'pg-catalog-fields pg-studio-params'
+    : 'pg-catalog-fields gw-job-params';
+
+  if (!isEmbed) {
+    const head = document.createElement('p');
+    head.className = 'gw-job-params-head';
+    head.textContent = 'Catalog parameters';
+    container.appendChild(head);
+  }
 
   for (const { def, list } of defs) {
     const wrap = document.createElement('div');
-    wrap.className = 'field';
+    wrap.className = 'field pg-studio-param';
     const label = document.createElement('label');
     label.setAttribute('for', `cat_${def.field}`);
-    label.textContent = def.label;
+    label.textContent = isEmbed ? pgT(def.i18n, def.label) : def.label;
     const sel = document.createElement('select');
     sel.id = `cat_${def.field}`;
     sel.dataset.catalogField = def.field;
-    sel.addEventListener('change', refreshRequestPreview);
+    sel.addEventListener('change', () => {
+      refreshRequestPreview();
+      if (model) globalThis.ModelPriceUi?.sync(model);
+    });
     for (const opt of list) {
       sel.appendChild(new Option(opt, opt));
     }
@@ -1298,13 +2412,20 @@ function onMediaModelChange() {
     renderCatalogFields(null);
     updateModelMetaBar(null);
     updateMediaJobChrome(type, null);
+    updateStudioFieldVisibility(type, null);
+    globalThis.ModelPriceUi?.sync(null);
+    globalThis.GatewayEndpointDetail?.refreshEndpointsTable?.();
     return;
   }
   const model = normalizeModels(envelope).find((m) => m.slug === slug);
   renderCatalogFields(model || null);
   updateModelMetaBar(model || null);
   updateMediaJobChrome(type, model || null);
+  updateStudioFieldVisibility(type, model || null);
   globalThis.GatewayEndpointDetail?.refresh();
+  globalThis.GatewayEndpointDetail?.refreshEndpointsTable?.();
+  globalThis.ModelPriceUi?.sync(model || null);
+  if (isEmbed) syncWorkerToUrl();
 }
 
 function updateModelMetaBar(model) {
@@ -1317,10 +2438,22 @@ function updateModelMetaBar(model) {
   bar.hidden = false;
   const nameEl = $('mediaModelMetaName');
   const slugEl = $('mediaModelMetaSlug');
-  const creditsEl = $('mediaModelMetaCredits');
   if (nameEl) nameEl.textContent = model.name;
   if (slugEl) slugEl.textContent = model.slug;
-  if (creditsEl) creditsEl.textContent = model.creditsLabel || '—';
+  const descEl = $('mediaModelMetaDesc');
+  const desc =
+    pgLocale() === 'vi'
+      ? model.descriptionVi || model.description
+      : model.description || model.descriptionVi;
+  if (descEl) {
+    if (desc) {
+      descEl.textContent = desc;
+      descEl.hidden = false;
+    } else {
+      descEl.textContent = '';
+      descEl.hidden = true;
+    }
+  }
   refreshRequestPreview();
 }
 
@@ -1345,10 +2478,7 @@ async function openMediaJobPanel(type, { autoFetch = true } = {}) {
   if ($('jobType')) $('jobType').value = type;
   if ($('modelType')) $('modelType').value = type;
   updateRefUrlFieldVisibility(type);
-  const promptEl = $('mediaPrompt');
-  if (promptEl && DEFAULT_PROMPTS[type] && !promptEl.dataset.userEdited) {
-    promptEl.value = DEFAULT_PROMPTS[type];
-  }
+  applyMediaPromptDefaults(type);
   document.querySelectorAll('.pg-panel').forEach((p) => {
     p.classList.toggle('active', p.dataset.panel === 'media-job');
   });
@@ -1377,6 +2507,7 @@ async function loadMediaJobForType(type, { autoFetch = false } = {}) {
   } else {
     renderCatalogFields(null);
     updateModelMetaBar(null);
+    updateStudioFieldVisibility(type, null);
   }
 }
 
@@ -1740,6 +2871,7 @@ async function runMediaJobPollLoop(jobId, media, jobMeta, gen) {
 
     const pct = Math.min(92, 8 + (attempt / POLL_MAX_ATTEMPTS) * 84);
     showJobProgress(true, `${labelBase} ${attempt}/${POLL_MAX_ATTEMPTS}`, pct);
+    showResultStatusBar(true, `${labelBase} ${attempt}/${POLL_MAX_ATTEMPTS}`, { showCancel: true });
     responseMeta.textContent = `GET poll · ${attempt}/${POLL_MAX_ATTEMPTS}`;
 
     try {
@@ -1750,8 +2882,7 @@ async function runMediaJobPollLoop(jobId, media, jobMeta, gen) {
 
       if (isPollSuccess(data)) {
         const elapsed = performance.now() - start;
-        showJobProgress(false);
-        updateResultHeader({ ...jobMeta, elapsedMs: elapsed });
+        updateResultHeader({ ...jobMeta, elapsedMs: elapsed, jobId, status: 'success' });
         responseMeta.textContent = `${pgT('result.done', 'Completed')} · ${formatElapsed(elapsed)}`;
         logPollUsage(jobId, media, data, resultUrl);
         logUsageEvent({
@@ -1762,26 +2893,23 @@ async function runMediaJobPollLoop(jobId, media, jobMeta, gen) {
           jobId,
           resultUrl: resultUrl || undefined,
         });
-        return { success: true, data, resultUrl };
+        return { success: true, data, resultUrl, elapsedMs: elapsed };
       }
       if (isPollFailed(data)) {
-        showJobProgress(false);
-        updateResultHeader({ ...jobMeta, elapsedMs: performance.now() - start });
+        const elapsed = performance.now() - start;
+        updateResultHeader({ ...jobMeta, elapsedMs: elapsed, jobId, status: 'failed' });
         logPollUsage(jobId, media, data, resultUrl);
-        return { success: false, data };
+        return { success: false, data, elapsedMs: elapsed };
       }
       if (attempt >= POLL_MAX_ATTEMPTS) {
-        showJobProgress(false);
-        return { success: false, timeout: true };
+        return { success: false, timeout: true, elapsedMs: performance.now() - start };
       }
       if (jobPollGeneration === gen) await sleep(POLL_INTERVAL_MS);
     } catch (err) {
-      showJobProgress(false);
-      throw err;
+      return { success: false, error: err, elapsedMs: performance.now() - start };
     }
   }
-  showJobProgress(false);
-  return { success: false, timeout: true };
+  return { success: false, timeout: true, elapsedMs: performance.now() - start };
 }
 
 function extractCredits(data) {
@@ -1884,6 +3012,11 @@ async function apiFetch(path, init = {}, label = '', opts = {}) {
   try {
     res = await fetch(url, init);
   } catch (err) {
+    if (err?.name === 'AbortError') {
+      const abortErr = new Error('Request aborted');
+      abortErr.aborted = true;
+      throw abortErr;
+    }
     const hint =
       err.message === 'Failed to fetch'
         ? `${err.message} — is npm run dev running at ${baseUrl()}?`
@@ -1938,14 +3071,30 @@ document.querySelectorAll('.pg-nav-item:not([disabled])').forEach((btn) => {
   btn.addEventListener('click', () => {
     const panel = btn.dataset.panel;
     const jobType = btn.dataset.jobType;
+    const infoKind = btn.dataset.infoKind;
+    const libraryKind = btn.dataset.libraryKind;
     if (panel === 'media-job' && jobType) {
       void openMediaJobPanel(jobType);
+      return;
+    }
+    if (panel === 'info-job' && infoKind) {
+      openInfoPanel(infoKind);
+      return;
+    }
+    if (panel === 'library' && libraryKind) {
+      openLibraryPanel(libraryKind);
+      return;
+    }
+    if (panel === 'health') {
+      openHealthPanel();
       return;
     }
     document.querySelectorAll('.pg-nav-item').forEach((b) => b.classList.toggle('active', b === btn));
     document.querySelectorAll('.pg-panel').forEach((p) => {
       p.classList.toggle('active', p.dataset.panel === panel);
     });
+    if (isEmbed) syncEmbedChromeFromState();
+    refreshRequestPreview();
   });
 });
 
@@ -1966,6 +3115,7 @@ document.querySelectorAll('.pg-tab[data-upload-tab]').forEach((tab) => {
     });
     $('upload-image').classList.toggle('active', id === 'image');
     $('upload-video').classList.toggle('active', id === 'video');
+    if (isEmbed) syncEmbedChromeFromState();
   });
 });
 
@@ -1979,6 +3129,81 @@ $('btnCopyResponse').addEventListener('click', async () => {
   } catch {
     /* ignore */
   }
+});
+
+$('btnCancelPoll')?.addEventListener('click', () => {
+  cancelActivePoll();
+  const status = $('mediaJobStatus');
+  setStatus(status, pgT('result.cancelled', 'Stopped tracking'), false);
+});
+
+$('btnCopyJobId')?.addEventListener('click', async () => {
+  const id = activeResultJobId || $('resultHdrJobId')?.textContent?.trim();
+  if (!id || id === '—') return;
+  try {
+    await navigator.clipboard.writeText(id);
+    const btn = $('btnCopyJobId');
+    if (btn) {
+      const prev = btn.textContent;
+      btn.textContent = '✓';
+      setTimeout(() => {
+        btn.textContent = prev;
+      }, 1200);
+    }
+  } catch {
+    /* ignore */
+  }
+});
+
+function openResultJsonDialog(preId, title) {
+  const src = $(preId);
+  const dialog = $('resultJsonDialog');
+  const pre = $('resultJsonDialogPre');
+  const titleEl = $('resultJsonDialogTitle');
+  if (!src || !dialog || !pre) return;
+  const raw = GwJsonHighlight?.getRawText(src) || src.textContent || '';
+  pre.textContent = raw;
+  if (titleEl) titleEl.textContent = title || preId;
+  if (typeof dialog.showModal === 'function') dialog.showModal();
+  else dialog.hidden = false;
+}
+
+document.querySelectorAll('[data-json-copy]').forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    const id = btn.dataset.jsonCopy;
+    const el = id ? $(id) : null;
+    if (!el) return;
+    try {
+      const raw = GwJsonHighlight?.getRawText(el) || el.textContent || '';
+      await navigator.clipboard.writeText(raw);
+      const prev = btn.textContent;
+      btn.textContent = '✓';
+      setTimeout(() => {
+        btn.textContent = prev;
+      }, 1200);
+    } catch {
+      /* ignore */
+    }
+  });
+});
+
+document.querySelectorAll('[data-json-full]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const id = btn.dataset.jsonFull;
+    const col = btn.closest('.pg-result-json-col');
+    const title = col?.querySelector('.pg-result-json-title')?.textContent?.trim();
+    openResultJsonDialog(id, title);
+  });
+});
+
+$('btnCloseJsonDialog')?.addEventListener('click', () => {
+  const dialog = $('resultJsonDialog');
+  if (dialog?.open) dialog.close();
+  else if (dialog) dialog.hidden = true;
+});
+
+$('resultJsonDialog')?.addEventListener('click', (e) => {
+  if (e.target === $('resultJsonDialog')) $('resultJsonDialog')?.close?.();
 });
 
 $('btnCopyGuide')?.addEventListener('click', async () => {
@@ -2096,6 +3321,7 @@ $('btnModels').addEventListener('click', async () => {
 
 $('btnMediaJob')?.addEventListener('click', async () => {
   const status = $('mediaJobStatus');
+  abortActiveJobRequest();
   jobPollGeneration += 1;
   const pollGen = jobPollGeneration;
 
@@ -2110,18 +3336,18 @@ $('btnMediaJob')?.addEventListener('click', async () => {
     setStatus(status, 'Select modelSlug from catalog', false);
     return;
   }
+  const envelope = getStoredModelsEnvelope(jobType);
+  const model = normalizeModels(envelope).find((m) => m.slug === modelSlugVal);
   const refUrl = $('mediaRefUrl')?.value?.trim();
-  if (jobTypeNeedsPrompt(jobType) && !prompt) {
+  if (promptRequired(jobType, model) && !prompt) {
     setStatus(status, 'prompt required', false);
     return;
   }
-  if (jobTypeNeedsRefUrl(jobType) && !refUrl && !prompt) {
-    setStatus(status, pgT('media.refHint', 'Reference image URL required'), false);
+  if (modelNeedsRefInput(jobType, model) && !refUrl) {
+    setStatus(status, pgT('media.refHint', 'Reference image required'), false);
     return;
   }
 
-  const envelope = getStoredModelsEnvelope(jobType);
-  const model = normalizeModels(envelope).find((m) => m.slug === modelSlugVal);
   const catalogErr = validateCatalogFields(model);
   if (catalogErr) {
     setStatus(status, catalogErr, false);
@@ -2135,19 +3361,34 @@ $('btnMediaJob')?.addEventListener('click', async () => {
     return;
   }
 
+  const jobAbort = new AbortController();
+  activeJobAbortController = jobAbort;
+
   const fields = readJobFields(prompt);
   const jobMeta = {
     model: modelSlugVal,
     domain,
     type: jobType,
     prompt,
+    modelObj: model,
   };
 
   const jobStart = performance.now();
+  resetResultPanelState();
   showJobResultLayout();
-  updateResultHeader({ ...jobMeta, elapsedMs: null });
-  displayCreateJson(null);
-  displayPollJson(null);
+  setResultPhase('sending');
+  setResultStatusPill('running');
+  updateResultStepper('create');
+  updateResultHeader({
+    ...jobMeta,
+    elapsedMs: null,
+    jobId: null,
+    status: 'running',
+  });
+  displayCreateJson(buildJobRequestEcho(jobType, modelSlugVal, fields, wait));
+  displayPollSkeleton(pgT('result.awaitingCreate', 'Waiting for create response…'));
+  startResultElapsedTimer();
+  showResultStatusBar(true, pgT('result.creating', 'Creating job…'), { showCancel: true });
   showJobProgress(true, pgT('result.creating', 'Creating job…'), 6);
   setStatus(status, pgT('result.creating', 'Creating job…'), 'running');
   responseMeta.textContent = `POST /gateway/jobs/${jobType}`;
@@ -2160,19 +3401,27 @@ $('btnMediaJob')?.addEventListener('click', async () => {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify(payload),
+        signal: jobAbort.signal,
       },
       `POST /gateway/jobs/${jobType}`,
       { silent: true },
     );
+
+    activeJobAbortController = null;
+
+    if (pollGen !== jobPollGeneration) return;
+
+    if (!wait) updateResultStepper('poll');
 
     if (wait) {
       const createBody = data?.data?.createEnvelope ?? data;
       displayCreateJson(createBody);
       displayPollJson(buildWaitPollView(data));
       const url = extractJobResultUrl(data, jobType);
+      const jobId = extractJobId(data);
       const elapsed = performance.now() - jobStart;
-      showJobProgress(false);
-      updateResultHeader({ ...jobMeta, elapsedMs: elapsed });
+      finishResultJob({ elapsedMs: elapsed });
+      updateResultHeader({ ...jobMeta, elapsedMs: elapsed, jobId, status: 'success' });
       if (url) showResultUrl(url, media);
       responseMeta.textContent = `${pgT('result.done', 'Completed')} · ${formatElapsed(elapsed)}`;
       logUsageEvent({
@@ -2180,7 +3429,7 @@ $('btnMediaJob')?.addEventListener('click', async () => {
         model: modelSlugVal,
         prompt,
         status: 'success',
-        jobId: extractJobId(data) || undefined,
+        jobId: jobId || undefined,
         resultUrl: url || undefined,
       });
       setStatus(status, url ? '' : pgT('result.done', 'Completed'), url ? 'preview' : 'ok');
@@ -2188,17 +3437,21 @@ $('btnMediaJob')?.addEventListener('click', async () => {
     }
 
     displayCreateJson(data);
+    const jobId = extractJobId(data);
+    updateResultHeader({ ...jobMeta, jobId, status: 'running' });
+    setResultPhase('polling');
     displayPollJson({ message: pgT('result.polling', 'Polling…'), status: 'pending' });
 
-    const jobId = extractJobId(data);
     if ($('pollJobId') && jobId) $('pollJobId').value = jobId;
     if ($('pollMedia')) $('pollMedia').value = media;
 
     if (!jobId) {
-      showJobProgress(false);
+      finishResultJob({ failed: true, errorStep: 'create', elapsedMs: performance.now() - jobStart });
       setStatus(status, 'No job id in create response', false);
       return;
     }
+
+    showResultStatusBar(true, pgT('result.polling', 'Polling…'), { showCancel: true });
 
     if (pollGen !== jobPollGeneration) return;
 
@@ -2206,14 +3459,22 @@ $('btnMediaJob')?.addEventListener('click', async () => {
     if (pollOutcome?.cancelled) return;
 
     if (pollOutcome?.success) {
+      finishResultJob({ elapsedMs: pollOutcome.elapsedMs });
+      updateResultHeader({ ...jobMeta, elapsedMs: pollOutcome.elapsedMs, jobId, status: 'success' });
       setStatus(status, '', 'preview');
     } else if (pollOutcome?.timeout) {
+      finishResultJob({ failed: true, errorStep: 'poll', elapsedMs: pollOutcome.elapsedMs });
+      updateResultHeader({ ...jobMeta, elapsedMs: pollOutcome.elapsedMs, jobId, status: 'failed' });
       setStatus(status, 'Poll timeout — max 80 attempts', false);
     } else {
+      finishResultJob({ failed: true, errorStep: 'poll', elapsedMs: pollOutcome?.elapsedMs });
+      updateResultHeader({ ...jobMeta, elapsedMs: pollOutcome?.elapsedMs, jobId, status: 'failed' });
       setStatus(status, 'Job failed — see Poll JSON', false);
     }
   } catch (err) {
-    showJobProgress(false);
+    activeJobAbortController = null;
+    if (err.aborted || err.name === 'AbortError' || pollGen !== jobPollGeneration) return;
+    finishResultJob({ failed: true, errorStep: 'create', elapsedMs: performance.now() - jobStart });
     setStatus(status, err.message, false);
     if (err.body) displayCreateJson(err.body);
   }
@@ -2221,6 +3482,18 @@ $('btnMediaJob')?.addEventListener('click', async () => {
 
 $('btnMediaRefUpload')?.addEventListener('click', () => {
   $('mediaRefFile')?.click();
+});
+
+$('btnMediaRefClear')?.addEventListener('click', () => {
+  const refEl = $('mediaRefUrl');
+  if (refEl) refEl.value = '';
+  updateRefPreview();
+  refreshRequestPreview();
+});
+
+$('mediaRefUrl')?.addEventListener('input', () => {
+  updateRefPreview();
+  refreshRequestPreview();
 });
 
 $('mediaRefFile')?.addEventListener('change', async (e) => {
@@ -2251,6 +3524,7 @@ $('mediaRefFile')?.addEventListener('change', async (e) => {
     if (!url) throw new Error('No URL in upload response');
     const refEl = $('mediaRefUrl');
     if (refEl) refEl.value = url;
+    updateRefPreview();
     setStatus(status, 'Reference uploaded', 'ok');
   } catch (err) {
     setStatus(status, err.message, false);
@@ -2270,6 +3544,24 @@ $('btnPollLoop')?.addEventListener('click', () => {
 $('btnPollStop')?.addEventListener('click', () => {
   stopPollLoop();
 });
+
+$('btnInfoJob')?.addEventListener('click', () => {
+  void runInfoJob();
+});
+
+$('btnLibrary')?.addEventListener('click', () => {
+  void runLibraryList();
+});
+
+$('btnHealth')?.addEventListener('click', () => {
+  void runHealthCheck();
+});
+
+['infoJobId', 'infoProjectId', 'libLimit', 'libAfterId', 'libModel', 'libCategory', 'libSource', 'libProjectId'].forEach(
+  (id) => {
+    $(id)?.addEventListener('input', refreshProxyPanelPreview);
+  },
+);
 
 $('btnAudioLists')?.addEventListener('click', async () => {
   const status = $('audioListsStatus');
@@ -2540,6 +3832,8 @@ void (async () => {
     await loadMediaJobForType(initialType, { autoFetch: hasToken });
   }
   initGuidePanels();
+  initMediaSendChrome();
+  globalThis.ModelPriceUi?.init();
   refreshRequestPreview();
   updateRefUrlFieldVisibility($('jobType')?.value || 'image');
   globalThis.GatewayEndpointDetail?.init();
@@ -2560,7 +3854,7 @@ function openPanelById(panelId) {
   const btn = document.querySelector(`.pg-nav-item[data-panel="${panelId}"]:not([disabled])`);
   if (btn) {
     btn.click();
-    if (isEmbed && panelId === 'connection') updateEmbedStudio('connection', null);
+    if (isEmbed) syncEmbedChromeFromState();
     return;
   }
   document.querySelectorAll('.pg-panel').forEach((p) => {
@@ -2569,13 +3863,33 @@ function openPanelById(panelId) {
   document.querySelectorAll('.pg-nav-item').forEach((b) => {
     b.classList.toggle('active', b.dataset.panel === panelId && !b.dataset.jobType);
   });
-  if (isEmbed && panelId === 'connection') updateEmbedStudio('connection', null);
+  if (isEmbed) syncEmbedChromeFromState();
 }
 
 async function runPendingDeepLink() {
   if (!pendingDeepLink) return;
-  const { type, model, panel } = pendingDeepLink;
+  const { type, model, panel, worker } = pendingDeepLink;
   pendingDeepLink = null;
+
+  if (worker && EMBED_WORKER_BY_ID.has(worker)) {
+    await navigateEmbedWorker(worker);
+    if (model && $('mediaModelSelect')) {
+      const sel = $('mediaModelSelect');
+      for (let i = 0; i < 50; i++) {
+        if ([...sel.options].some((o) => o.value === model)) break;
+        await sleep(100);
+      }
+      if ([...sel.options].some((o) => o.value === model)) {
+        sel.value = model;
+        onMediaModelChange();
+      } else {
+        sel.appendChild(new Option(model, model));
+        sel.value = model;
+        onMediaModelChange();
+      }
+    }
+    return;
+  }
 
   if (panel && panel !== 'media-job') {
     openPanelById(panel);
@@ -2594,19 +3908,27 @@ async function runPendingDeepLink() {
     sel.value = model;
     onMediaModelChange();
   }
+  syncWorkerToUrl();
 }
 
 function captureDeepLinkFromUrl() {
+  const worker = urlParams.get('worker');
+  const model = urlParams.get('model');
+  if (worker && EMBED_WORKER_BY_ID.has(worker)) {
+    pendingDeepLink = { worker, model: model || undefined };
+    if (isEmbed && (worker === 'health' || tokenEl.value.trim())) void runPendingDeepLink();
+    return;
+  }
+
   if (!isEmbed) return;
   const type = urlParams.get('type');
-  const model = urlParams.get('model');
   const panel = urlParams.get('panel');
   if (!type && !model && !panel) return;
   pendingDeepLink = { type, model, panel };
   if (tokenEl.value.trim()) void runPendingDeepLink();
 }
 
-if (!isEmbed) captureDeepLinkFromUrl();
+captureDeepLinkFromUrl();
 
 globalThis.baseUrl = baseUrl;
 globalThis.normalizeModels = normalizeModels;
@@ -2618,5 +3940,8 @@ globalThis.setResponseTab = setResponseTab;
 globalThis.refreshRequestPreview = refreshRequestPreview;
 globalThis.openMediaJobPanel = openMediaJobPanel;
 globalThis.openPanelById = openPanelById;
+globalThis.openInfoPanel = openInfoPanel;
+globalThis.openLibraryPanel = openLibraryPanel;
+globalThis.openHealthPanel = openHealthPanel;
 globalThis.sandboxApiFetch = sandboxApiFetch;
 globalThis.sandboxAuthHeaders = sandboxAuthHeaders;

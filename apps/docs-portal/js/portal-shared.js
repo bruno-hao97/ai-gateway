@@ -27,6 +27,29 @@ export function docsUrl() {
   );
 }
 
+/** Canonical playground route in the docs app (not standalone /portal). */
+const CREATE_WORKER_BY_TYPE = {
+  image: 'create-image',
+  video: 'create-video',
+  music: 'create-music',
+  tts: 'create-tts',
+  'avatar-lipsync': 'create-avatar',
+};
+
+export function appPlaygroundUrl(opts = {}) {
+  const base = docsUrl().replace(/\/$/, '');
+  const path = `${base}/app/playground/`;
+  const params = new URLSearchParams();
+  if (opts.worker) params.set('worker', opts.worker);
+  else if (opts.type && CREATE_WORKER_BY_TYPE[opts.type]) {
+    params.set('worker', CREATE_WORKER_BY_TYPE[opts.type]);
+  } else if (opts.type) params.set('type', opts.type);
+  if (opts.model) params.set('model', opts.model);
+  if (opts.panel) params.set('panel', opts.panel);
+  const q = params.toString();
+  return q ? `${path}?${q}` : path;
+}
+
 export function defaultBaseUrl() {
   const saved = localStorage.getItem(STORAGE_BASE);
   if (saved) return saved.replace(/\/$/, '');

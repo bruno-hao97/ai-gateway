@@ -1,5 +1,5 @@
 import { playgroundOrigin } from './gateway-base';
-import { stripLocale } from './docs-nav';
+import { isPlaygroundImmersivePath, stripLocale } from './docs-nav';
 
 export type PlaygroundPortalLocale = 'en' | 'vi';
 
@@ -11,8 +11,28 @@ export function normalizePlaygroundPortalLocale(raw: string): PlaygroundPortalLo
   return 'en';
 }
 
-/** Same logical page in the other docs locale (playground hybrid switch). */
-export function resolvePlaygroundLocaleSwitch(
+/** Playground UI locale from browser path (/vi/ prefix). */
+export function playgroundLocaleFromPath(path?: string): PlaygroundPortalLocale {
+  const p = path ?? (typeof window !== 'undefined' ? window.location.pathname : '/');
+  return stripLocale(p).locale;
+}
+
+/** Keep portal_ui_lang aligned with the playground URL (URL is source of truth). */
+export function syncPlaygroundStorageFromUrl(path?: string): PlaygroundPortalLocale {
+  const locale = playgroundLocaleFromPath(path);
+  try {
+    localStorage.setItem('portal_ui_lang', locale);
+  } catch {
+    /* ignore */
+  }
+  return locale;
+}
+
+/**
+ * Locale target when clicking a VitePress locale link on the same playground path.
+ * Returns the target locale even when it matches the current URL (no-op switch).
+ */
+export function resolvePlaygroundLocaleNavTarget(
   linkHref: string,
   currentPath: string,
 ): PlaygroundPortalLocale | null {
@@ -20,17 +40,107 @@ export function resolvePlaygroundLocaleSwitch(
     const target = stripLocale(new URL(linkHref, window.location.origin).pathname);
     const current = stripLocale(currentPath);
     if (target.path !== current.path) return null;
-    if (target.locale === current.locale) return null;
     return target.locale;
   } catch {
     return null;
   }
 }
 
+/** Same logical page in the other docs locale (playground hybrid switch). */
+export function resolvePlaygroundLocaleSwitch(
+  linkHref: string,
+  currentPath: string,
+): PlaygroundPortalLocale | null {
+  const targetLocale = resolvePlaygroundLocaleNavTarget(linkHref, currentPath);
+  if (!targetLocale) return null;
+  const currentLocale = playgroundLocaleFromPath(currentPath);
+  if (targetLocale === currentLocale) return null;
+  return targetLocale;
+}
+
 export function localizedPlaygroundPath(path: string, locale: PlaygroundPortalLocale): string {
   const { path: bare } = stripLocale(path);
   if (locale === 'vi') return bare === '/' ? '/vi' : `/vi${bare}`;
   return bare;
+}
+
+export interface PlaygroundLocaleMenuItem {
+  locale: PlaygroundPortalLocale;
+  label: string;
+  href: string;
+  active: boolean;
+}
+
+/** Fixed EN/VI entries for hybrid playground locale menu (URL + query preserved). */
+export function playgroundLocaleMenuItems(): PlaygroundLocaleMenuItem[] {
+  const suffix =
+    typeof window !== 'undefined' ? window.location.search + window.location.hash : '';
+  const path =
+    typeof window !== 'undefined' ? window.location.pathname : '/app/playground';
+  const current = playgroundLocaleFromPath(path);
+  return (['en', 'vi'] as const).map((locale) => ({
+    locale,
+    label: locale === 'vi' ? 'Tiếng Việt' : 'English',
+    href: localizedPlaygroundPath(path, locale) + suffix,
+    active: locale === current,
+  }));
+}
+
+function normalizeNavPath(path: string): string {
+  return path.split('?')[0]?.split('#')[0] ?? path;
+}
+
+/** Same playground page, locale prefix may differ (/app/playground ↔ /vi/app/playground). */
+export function isPlaygroundHybridLocaleNav(fromPath: string, toHref: string): boolean {
+  try {
+    const fromBare = normalizeNavPath(fromPath);
+    const toBare = normalizeNavPath(toHref);
+    if (!isPlaygroundImmersivePath(fromBare) || !isPlaygroundImmersivePath(toBare)) return false;
+    const target = stripLocale(new URL(toBare, window.location.origin).pathname);
+    const current = stripLocale(fromBare);
+    return target.path === current.path;
+  } catch {
+    return false;
+  }
+}
+
+export const PLAYGROUND_LOCALE_EVENT = 'gw-playground-locale';
+
+/** Switch playground locale without VitePress navigation (iframe postMessage + URL replaceState). */
+export function applyPlaygroundHybridLocale(locale: PlaygroundPortalLocale) {
+  postPlaygroundLocale(locale);
+  try {
+    const path = localizedPlaygroundPath(window.location.pathname, locale);
+    const url = new URL(path, window.location.origin);
+    url.search = window.location.search;
+    url.hash = window.location.hash;
+    history.replaceState(null, '', url.pathname + url.search + url.hash);
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new CustomEvent(PLAYGROUND_LOCALE_EVENT, { detail: { locale } }));
+}
+
+/**
+ * Intercept VitePress locale navigation on playground — swap iframe locale only, no route change.
+ * @param fromPath VitePress route path (not URL bar — may differ after replaceState).
+ * @returns true when navigation should be cancelled
+ */
+export function tryPlaygroundHybridLocaleSwitch(to: string, fromPath?: string): boolean {
+  if (typeof window === 'undefined') return false;
+
+  const from = fromPath ?? window.location.pathname;
+  if (!isPlaygroundHybridLocaleNav(from, to)) return false;
+
+  const toBare = normalizeNavPath(to);
+  const targetLocale = resolvePlaygroundLocaleNavTarget(toBare, from);
+  if (!targetLocale) return false;
+
+  const currentLocale = playgroundLocaleFromPath(window.location.pathname);
+  if (targetLocale !== currentLocale) {
+    applyPlaygroundHybridLocale(targetLocale);
+  }
+  return true;
 }
 
 export function postPlaygroundLocale(locale: PlaygroundPortalLocale) {

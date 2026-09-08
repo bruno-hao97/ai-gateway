@@ -3,7 +3,9 @@ import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { getStoredDomain, getStoredToken } from '../models/auth-api';
 import { playgroundEmbedUrl, playgroundOrigin } from '../models/gateway-base';
 import type { PlaygroundPortalLocale } from '../models/playground-locale-bridge';
-import { postPlaygroundLocale } from '../models/playground-locale-bridge';
+import {
+  postPlaygroundLocale,
+} from '../models/playground-locale-bridge';
 
 const props = defineProps<{
   locale: PlaygroundPortalLocale;
@@ -20,14 +22,58 @@ const HOLD_ID = 'gw-api-playground-embed-hold';
 
 type EmbedStore = { iframe: HTMLIFrameElement; src: string };
 
-function readEmbedQuery(): { type?: string; model?: string; panel?: string } {
+function readEmbedQuery(): {
+  type?: string;
+  model?: string;
+  panel?: string;
+  worker?: string;
+} {
   if (typeof window === 'undefined') return {};
   const q = new URLSearchParams(window.location.search);
   return {
     type: q.get('type') || undefined,
     model: q.get('model') || undefined,
     panel: q.get('panel') || undefined,
+    worker: q.get('worker') || undefined,
   };
+}
+
+function syncParentPlaygroundUrl(opts: { worker?: string; model?: string }) {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  if (opts.worker) url.searchParams.set('worker', opts.worker);
+  else url.searchParams.delete('worker');
+  url.searchParams.delete('type');
+  url.searchParams.delete('panel');
+  if (opts.model) url.searchParams.set('model', opts.model);
+  else url.searchParams.delete('model');
+  const next = url.pathname + url.search + url.hash;
+  const current = window.location.pathname + window.location.search + window.location.hash;
+  if (next !== current) window.history.replaceState(null, '', next);
+}
+
+function onPlaygroundMessage(event: MessageEvent) {
+  const targetOrigin = playgroundOrigin();
+  if (!targetOrigin || event.origin !== targetOrigin) return;
+  const data = event.data;
+  if (!data || typeof data !== 'object') return;
+
+  if (data.type === 'ai-gateway-playground-nav') {
+    syncParentPlaygroundUrl({
+      worker: typeof data.worker === 'string' ? data.worker : undefined,
+      model: typeof data.model === 'string' ? data.model : undefined,
+    });
+  }
+}
+
+function embedSrcKey(src: string): string {
+  try {
+    const u = new URL(src, window.location.origin);
+    u.searchParams.delete('lang');
+    return u.pathname + u.search;
+  } catch {
+    return src;
+  }
 }
 
 function buildEmbedSrc() {
@@ -100,7 +146,7 @@ function mountIframe() {
   if (!container || !src) return;
 
   const existing = getEmbedStore();
-  if (existing?.iframe && existing.src === src) {
+  if (existing?.iframe && embedSrcKey(existing.src) === embedSrcKey(src)) {
     container.appendChild(existing.iframe);
     iframeRef.value = existing.iframe;
     iframeReady.value = true;
@@ -128,10 +174,12 @@ onMounted(() => {
   refreshTokenState();
   mountIframe();
   window.addEventListener('storage', onStorage);
+  window.addEventListener('message', onPlaygroundMessage);
 });
 
 onUnmounted(() => {
   window.removeEventListener('storage', onStorage);
+  window.removeEventListener('message', onPlaygroundMessage);
   if (iframeRef.value) parkIframe(iframeRef.value);
   iframeRef.value = null;
   iframeReady.value = false;

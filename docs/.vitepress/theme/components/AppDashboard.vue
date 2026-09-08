@@ -1,6 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useData, useRoute } from 'vitepress';
+import {
+  normalizePlaygroundPortalLocale,
+  PLAYGROUND_LOCALE_EVENT,
+  playgroundLocaleFromPath,
+  syncPlaygroundStorageFromUrl,
+  type PlaygroundPortalLocale,
+} from '../models/playground-locale-bridge';
 import { getStoredToken, getStoredDomain, importSessionFromUrl, loginUrlWithRedirect } from '../models/auth-api';
 import {
   fetchBillingPackages,
@@ -25,7 +32,6 @@ import AppNavIcon from './AppNavIcon.vue';
 import AppChatPanel from './AppChatPanel.vue';
 import ApiPlaygroundEmbed from './ApiPlaygroundEmbed.vue';
 import CreditsCheckoutModal from './CreditsCheckoutModal.vue';
-import type { PlaygroundPortalLocale } from '../models/playground-locale-bridge';
 import ProfileUsagePanel from './ProfileUsagePanel.vue';
 import ProfileActivityPanel from './ProfileActivityPanel.vue';
 import { formatApproxUsd, formatPayTotalLine } from '../models/invoice-buyer';
@@ -87,7 +93,28 @@ let checkoutToastTimer: ReturnType<typeof setTimeout> | null = null;
 const usagePanelRef = ref<InstanceType<typeof ProfileUsagePanel> | null>(null);
 const logsPanelRef = ref<InstanceType<typeof ProfileUsagePanel> | null>(null);
 
-const playgroundLocale = computed((): PlaygroundPortalLocale => (isVi.value ? 'vi' : 'en'));
+const playgroundUiLocale = ref<PlaygroundPortalLocale>(isVi.value ? 'vi' : 'en');
+
+const playgroundLocale = computed((): PlaygroundPortalLocale => {
+  if (props.view === 'playground') return playgroundUiLocale.value;
+  return isVi.value ? 'vi' : 'en';
+});
+
+function onPlaygroundLocaleEvent(event: Event) {
+  const detail = (event as CustomEvent<{ locale?: PlaygroundPortalLocale }>).detail;
+  if (!detail?.locale || props.view !== 'playground') return;
+  playgroundUiLocale.value = normalizePlaygroundPortalLocale(detail.locale);
+}
+
+function syncPlaygroundUiLocale() {
+  if (props.view !== 'playground') return;
+  if (typeof window !== 'undefined') {
+    playgroundUiLocale.value = playgroundLocaleFromPath(window.location.pathname);
+    syncPlaygroundStorageFromUrl(window.location.pathname);
+    return;
+  }
+  playgroundUiLocale.value = isVi.value ? 'vi' : 'en';
+}
 
 const credits = computed(() => getCredits(me.value));
 const displayName = computed(() => getDisplayName(me.value));
@@ -320,6 +347,8 @@ async function loadProfileView() {
 
 onMounted(async () => {
   importSessionFromUrl();
+  syncPlaygroundUiLocale();
+  window.addEventListener(PLAYGROUND_LOCALE_EVENT, onPlaygroundLocaleEvent);
   if (!getStoredToken()) {
     const returnPath = route.path + (typeof window !== 'undefined' ? window.location.search : '');
     window.location.href = loginUrlWithRedirect(returnPath, prefix.value as '' | '/vi');
@@ -333,6 +362,10 @@ onMounted(async () => {
     await loadProfileView();
   }
   ready.value = true;
+});
+
+onUnmounted(() => {
+  window.removeEventListener(PLAYGROUND_LOCALE_EVENT, onPlaygroundLocaleEvent);
 });
 
 watch(

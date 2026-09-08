@@ -2,11 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="refresh" content="0; url=playground.html" />
   <title>AI Gateway — Playground</title>
-  <script>location.replace('playground.html');</script>
+  <script>
+    (function () {
+      var docs = localStorage.getItem('portal_docs_url')
+        || (location.port === '5173' ? location.origin : '');
+      if (docs) {
+        location.replace(docs.replace(/\/$/, '') + '/app/playground/');
+      } else {
+        location.replace('playground.html');
+      }
+    })();
+  </script>
 </head>
 <body>
-  <p><a href="playground.html">Open Playground</a></p>
+  <p><a href="/app/playground/">Open Playground</a></p>
 </body>
 </html>

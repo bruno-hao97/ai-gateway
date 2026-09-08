@@ -908,6 +908,34 @@
       case 'poll-job':
         global.openPanelById?.('poll-job');
         break;
+      case 'info-image':
+        global.openInfoPanel?.('image');
+        break;
+      case 'info-video':
+        global.openInfoPanel?.('video');
+        break;
+      case 'info-music':
+        global.openInfoPanel?.('music');
+        break;
+      case 'library-images':
+        global.openLibraryPanel?.('images');
+        break;
+      case 'library-videos':
+        global.openLibraryPanel?.('videos');
+        break;
+      case 'library-musics':
+        global.openLibraryPanel?.('musics');
+        break;
+      case 'library-audios':
+        global.openLibraryPanel?.('audios');
+        break;
+      case 'library-album-videos':
+        global.openLibraryPanel?.('album-videos');
+        break;
+      case 'health':
+        global.openHealthPanel?.();
+        $('btnHealth')?.click();
+        break;
       case 'chat':
         global.openPanelById?.('chat');
         break;
@@ -938,18 +966,59 @@
     }
   }
 
+  function endpointsBaseUrl() {
+    try {
+      if (typeof global.baseUrl === 'function') return global.baseUrl().replace(/\/$/, '');
+    } catch {
+      /* ignore */
+    }
+    return window.location.origin.replace(/\/$/, '');
+  }
+
+  function renderEndpointsBase(ctx) {
+    const base = (ctx?.baseUrl || endpointsBaseUrl()).replace(/\/$/, '');
+    const baseEl = $('endpointsBaseUrl');
+    if (baseEl) baseEl.textContent = base;
+
+    const hintEl = $('endpointsContextHint');
+    if (hintEl) {
+      const jobType = ctx?.jobType || $('jobType')?.value || 'image';
+      const modelSlug = ctx?.modelSlug || $('mediaModelSelect')?.value || '';
+      const modelPart = modelSlug
+        ? (isVi() ? `, model=${modelSlug}` : `, model=${modelSlug}`)
+        : '';
+      const text = pgT('endpoints.contextHint', 'Resolved for type={type}{model}')
+        .replace('{type}', jobType)
+        .replace('{model}', modelPart);
+      hintEl.textContent = text;
+      hintEl.hidden = false;
+    }
+  }
+
+  function copyEndpointsBase() {
+    const base = $('endpointsBaseUrl')?.textContent?.trim();
+    if (!base || base === '—') return;
+    navigator.clipboard?.writeText(base).catch(() => {});
+  }
+
   function renderEndpointsTable() {
     const tbody = $('endpointsTableBody');
     const reg = global.GatewayEndpointRegistry;
     if (!tbody || !reg) return;
 
+    const ctx = readPlaygroundContext({});
+    const base = (ctx.baseUrl || endpointsBaseUrl()).replace(/\/$/, '');
+    renderEndpointsBase(ctx);
+
     tbody.innerHTML = reg.ENDPOINTS.map((ep) => {
       const name = label(ep);
       const m = ep.method.toLowerCase();
+      const path = resolvePath(ep, ctx, 'gateway');
+      const fullUrl = `${base}${path.startsWith('/') ? path : `/${path}`}`;
       return `<tr>
         <td>${escapeHtml(name)}</td>
         <td><span class="pg-method ${m}">${ep.method}</span></td>
-        <td><code>${escapeHtml(ep.path)}</code></td>
+        <td><code class="pg-endpoints-full-url">${escapeHtml(fullUrl)}</code></td>
         <td class="pg-endpoints-actions">
           <button type="button" class="btn btn-ghost btn-sm pg-endpoint-view" data-endpoint-id="${ep.id}">${pgT('ep.view')}</button>
         </td>
@@ -959,10 +1028,17 @@
     tbody.querySelectorAll('.pg-endpoint-view').forEach((btn) => {
       btn.addEventListener('click', () => openEndpointDetail(btn.dataset.endpointId));
     });
+
+    const overlay = $('endpointDetailOverlay');
+    if (overlay) global.PortalI18n?.applyDom(overlay);
+    const pane = $('responsePaneEndpoints');
+    if (pane) global.PortalI18n?.applyDom(pane);
   }
 
   function init() {
     renderEndpointsTable();
+
+    $('btnCopyEndpointsBase')?.addEventListener('click', copyEndpointsBase);
 
     $('epDetailClose')?.addEventListener('click', closeEndpointDetail);
     $('endpointDetailOverlay')?.addEventListener('click', (e) => {
@@ -994,5 +1070,6 @@
     open: openEndpointDetail,
     close: closeEndpointDetail,
     refresh: renderModal,
+    refreshEndpointsTable: renderEndpointsTable,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

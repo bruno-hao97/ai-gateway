@@ -1,12 +1,21 @@
 <script setup lang="ts">
 
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import DefaultTheme from 'vitepress/theme';
 
 import { useData, useRoute } from 'vitepress';
-
 import { clearAuth, getStoredToken } from './models/auth-api';
+
+import {
+  PLAYGROUND_LOCALE_EVENT,
+  playgroundLocaleFromPath,
+  playgroundLocaleMenuItems,
+  syncPlaygroundStorageFromUrl,
+  tryPlaygroundHybridLocaleSwitch,
+  type PlaygroundLocaleMenuItem,
+  type PlaygroundPortalLocale,
+} from './models/playground-locale-bridge';
 
 import {
 
@@ -44,7 +53,11 @@ const playgroundImmersive = computed(() => isPlaygroundImmersivePath(route.path)
 
 const isVi = computed(() => lang.value === 'vi-VN');
 
-const prefix = computed(() => (isVi.value ? '/vi' : ''));
+const hybridNavVi = ref<boolean | null>(null);
+
+const navIsVi = computed(() => hybridNavVi.value ?? isVi.value);
+
+const prefix = computed(() => (navIsVi.value ? '/vi' : ''));
 
 
 
@@ -88,6 +101,48 @@ function refreshSignedIn() {
 
 
 
+const HYBRID_VP_NAV = [
+  { en: 'Home', vi: 'Trang chủ', hrefEn: '/app/', hrefVi: '/vi/app/' },
+  { en: 'Models', vi: 'Models', hrefEn: '/models/', hrefVi: '/vi/models/' },
+  { en: 'Playground', vi: 'Playground', hrefEn: '/app/playground/', hrefVi: '/vi/app/playground/' },
+  { en: 'Chat', vi: 'Chat', hrefEn: '/app/chat/', hrefVi: '/vi/app/chat/' },
+  { en: 'Docs', vi: 'Docs', hrefEn: '/quickstart', hrefVi: '/vi/quickstart' },
+];
+
+function patchHybridVpNavMenu() {
+
+  if (typeof document === 'undefined' || !playgroundImmersive.value) return;
+
+  const vi = navIsVi.value;
+
+  const origin = window.location.origin;
+
+  for (const link of document.querySelectorAll('.VPNavBarMenu a')) {
+
+    if (!(link instanceof HTMLAnchorElement)) continue;
+
+    const label = link.textContent?.trim();
+
+    if (!label) continue;
+
+    for (const item of HYBRID_VP_NAV) {
+
+      if (label !== item.en && label !== item.vi) continue;
+
+      link.textContent = vi ? item.vi : item.en;
+
+      link.href = `${origin}${vi ? item.hrefVi : item.hrefEn}`;
+
+      break;
+
+    }
+
+  }
+
+}
+
+
+
 function patchNavTitleLink() {
 
   if (typeof document === 'undefined') return;
@@ -106,7 +161,7 @@ function patchNavHomeLink() {
 
   if (typeof document === 'undefined') return;
 
-  const homeLabels = isVi.value ? ['Trang chủ'] : ['Home'];
+  const homeLabels = navIsVi.value ? ['Trang chủ'] : ['Home'];
 
   for (const link of document.querySelectorAll('.VPNavBarMenu a')) {
 
@@ -188,9 +243,111 @@ function placeSubNavAfterNav() {
 
 
 
+function applyPlaygroundLocaleMenuItem(link: HTMLAnchorElement, item: PlaygroundLocaleMenuItem) {
+
+  link.textContent = item.label;
+
+  link.href = item.href;
+
+  link.classList.toggle('active', item.active);
+
+  if (item.active) link.setAttribute('aria-current', 'page');
+
+  else link.removeAttribute('aria-current');
+
+}
+
+
+
+function localeMenuLinkHost(root: Element): Element {
+
+  const menu = root.classList.contains('VPMenu') ? root : root.querySelector('.VPMenu');
+
+  const ul = menu?.querySelector(':scope > ul');
+
+  if (ul) return ul;
+
+  if (menu) return menu;
+
+  return root;
+
+}
+
+
+
+function syncPlaygroundLocaleLinksInRoot(root: Element, items: PlaygroundLocaleMenuItem[]) {
+
+  for (const link of [...root.querySelectorAll('a.link')]) {
+
+    if (!(link instanceof HTMLAnchorElement)) continue;
+
+    const label = link.textContent?.trim();
+
+    if (label !== 'English' && label !== 'Tiếng Việt') continue;
+
+    link.closest('li.VPMenuLink')?.remove() ?? link.remove();
+
+  }
+
+  const host = localeMenuLinkHost(root);
+
+  for (const item of items) {
+
+    const li = document.createElement('li');
+
+    li.className = 'VPMenuLink';
+
+    const link = document.createElement('a');
+
+    link.className = 'link';
+
+    li.appendChild(link);
+
+    host.appendChild(li);
+
+    applyPlaygroundLocaleMenuItem(link, item);
+
+  }
+
+}
+
+
+
+function patchHybridVpTranslationsMenu() {
+
+  if (typeof document === 'undefined' || !playgroundImmersive.value) return;
+
+  const items = playgroundLocaleMenuItems();
+
+  const current = items.find((item) => item.active) ?? items[0]!;
+
+  const triggerTitle = document.querySelector('.VPNavBarTranslations button .title');
+
+  if (triggerTitle) triggerTitle.textContent = current.label;
+
+  const roots = [
+
+    document.querySelector('.VPNavBarTranslations .VPMenu'),
+
+    document.querySelector('.VPNavBarExtra .group.translations'),
+
+    document.querySelector('.VPNavScreenTranslations'),
+
+  ].filter((el): el is Element => el instanceof Element);
+
+  for (const root of roots) syncPlaygroundLocaleLinksInRoot(root, items);
+
+}
+
+
+
 function syncLayoutChrome() {
 
   patchNavTitleLink();
+
+  patchHybridVpNavMenu();
+
+  patchHybridVpTranslationsMenu();
 
   patchNavHomeLink();
 
@@ -202,9 +359,73 @@ function syncLayoutChrome() {
 
   if (typeof document !== 'undefined') {
 
-    document.documentElement.lang = isVi.value ? 'vi' : 'en';
+    document.documentElement.lang = navIsVi.value ? 'vi' : 'en';
 
   }
+
+}
+
+
+
+function syncHybridNavFromUrl() {
+
+  if (!playgroundImmersive.value) {
+
+    hybridNavVi.value = null;
+
+    return;
+
+  }
+
+  if (typeof window === 'undefined') {
+
+    hybridNavVi.value = isVi.value;
+
+    return;
+
+  }
+
+  const locale = playgroundLocaleFromPath(window.location.pathname);
+
+  hybridNavVi.value = locale === 'vi';
+
+  syncPlaygroundStorageFromUrl(window.location.pathname);
+
+}
+
+
+
+function onPlaygroundLocaleEvent(event: Event) {
+
+  const detail = (event as CustomEvent<{ locale?: PlaygroundPortalLocale }>).detail;
+
+  if (!detail?.locale) return;
+
+  hybridNavVi.value = detail.locale === 'vi';
+
+  nextTick(syncLayoutChrome);
+
+}
+
+
+
+function onPlaygroundLangClick(event: MouseEvent) {
+
+  if (!playgroundImmersive.value) return;
+
+  const anchor = (event.target as Element | null)?.closest?.('a');
+
+  if (!(anchor instanceof HTMLAnchorElement)) return;
+
+  const to = `${anchor.pathname}${anchor.search}${anchor.hash}`;
+
+  if (!tryPlaygroundHybridLocaleSwitch(to, route.path)) return;
+
+  event.preventDefault();
+
+  event.stopPropagation();
+
+  nextTick(syncLayoutChrome);
 
 }
 
@@ -214,7 +435,23 @@ onMounted(() => {
 
   refreshSignedIn();
 
+  syncHybridNavFromUrl();
+
+  document.addEventListener('click', onPlaygroundLangClick, true);
+
+  window.addEventListener(PLAYGROUND_LOCALE_EVENT, onPlaygroundLocaleEvent);
+
   nextTick(syncLayoutChrome);
+
+});
+
+
+
+onUnmounted(() => {
+
+  document.removeEventListener('click', onPlaygroundLangClick, true);
+
+  window.removeEventListener(PLAYGROUND_LOCALE_EVENT, onPlaygroundLocaleEvent);
 
 });
 
@@ -235,6 +472,8 @@ watch(
   () => {
 
     refreshSignedIn();
+
+    syncHybridNavFromUrl();
 
     nextTick(syncLayoutChrome);
 
@@ -320,7 +559,7 @@ function signOut() {
 
           <button type="button" class="gw-nav-btn gw-nav-btn-ghost" @click="signOut">
 
-            {{ isVi ? 'Đăng xuất' : 'Sign out' }}
+            {{ navIsVi ? 'Đăng xuất' : 'Sign out' }}
 
           </button>
 
@@ -328,17 +567,13 @@ function signOut() {
 
         <template v-else>
 
-          <a :href="`${prefix}/login/`" class="gw-nav-link">{{
+          <a :href="`${prefix}/login/`" class="gw-nav-link">
+            {{ navIsVi ? 'Đăng nhập' : 'Sign in' }}
+          </a>
 
-            isVi ? 'Đăng nhập' : 'Sign in'
-
-          }}</a>
-
-          <a :href="`${prefix}/signup/`" class="gw-nav-btn gw-nav-btn-primary">{{
-
-            isVi ? 'Đăng ký' : 'Sign Up'
-
-          }}</a>
+          <a :href="`${prefix}/signup/`" class="gw-nav-btn gw-nav-btn-primary">
+            {{ navIsVi ? 'Đăng ký' : 'Sign Up' }}
+          </a>
 
         </template>
 

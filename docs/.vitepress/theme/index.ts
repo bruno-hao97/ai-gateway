@@ -9,6 +9,11 @@ import LegalPage from './components/LegalPage.vue';
 import AboutPage from './components/AboutPage.vue';
 import AppDashboard from './components/AppDashboard.vue';
 import ApiPlaygroundEmbed from './components/ApiPlaygroundEmbed.vue';
+import { isPlaygroundImmersivePath } from './models/docs-nav';
+import {
+  syncPlaygroundStorageFromUrl,
+  tryPlaygroundHybridLocaleSwitch,
+} from './models/playground-locale-bridge';
 import './brand.css';
 import './nav.css';
 import './scrollbars.css';
@@ -24,7 +29,14 @@ import './site-footer.css';
 export default {
   extends: DefaultTheme,
   Layout,
-  enhanceApp({ app }) {
+  enhanceApp({ app, router }) {
+    if (
+      typeof window !== 'undefined' &&
+      isPlaygroundImmersivePath(window.location.pathname)
+    ) {
+      syncPlaygroundStorageFromUrl();
+    }
+
     app.component('ModelsCatalog', ModelsCatalog);
     app.component('ModelsCompare', ModelsCompare);
     app.component('LandingPage', LandingPage);
@@ -33,5 +45,12 @@ export default {
     app.component('AboutPage', AboutPage);
     app.component('AppDashboard', AppDashboard);
     app.component('ApiPlaygroundEmbed', ApiPlaygroundEmbed);
+
+    const blockPlaygroundHybridNav = (to: string) => {
+      const from = router.route.path;
+      if (tryPlaygroundHybridLocaleSwitch(to, from)) return false;
+    };
+
+    router.onBeforeRouteChange = blockPlaygroundHybridNav;
   },
 } satisfies Theme;

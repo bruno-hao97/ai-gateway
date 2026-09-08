@@ -2,6 +2,7 @@ import {
   JOB_TYPES,
   STORAGE_BASE,
   STORAGE_DOMAIN,
+  appPlaygroundUrl,
   defaultBaseUrl,
   docsUrl,
   extractAccessToken,
@@ -30,6 +31,10 @@ let lastFetchAt = null;
 document.getElementById('docs-nav').href = docsUrl();
 const logoLink = document.getElementById('logo-link');
 if (logoLink) logoLink.href = docsUrl();
+const playgroundNav = document.getElementById('playground-nav');
+if (playgroundNav) playgroundNav.href = appPlaygroundUrl();
+const playgroundRun = document.getElementById('playground-run');
+if (playgroundRun) playgroundRun.href = appPlaygroundUrl();
 
 baseUrlEl.value = defaultBaseUrl();
 tokenEl.value = getStoredToken();
@@ -123,7 +128,7 @@ function renderGrid() {
     gridEl.innerHTML = `
       <div class="mc-empty">
         <p>${models.length ? 'No models match your search.' : 'Could not load catalog — check gateway is running.'}</p>
-        <p><a href="playground.html">Playground</a> · <a href="#" id="empty-docs">Docs — Models</a></p>
+        <p><a href="${appPlaygroundUrl()}">Playground</a> · <a href="#" id="empty-docs">Docs — Models</a></p>
       </div>`;
     const docs = docsUrl().replace(/\/$/, '');
     $('empty-docs').href = `${docs}/models/`;
@@ -147,7 +152,7 @@ function renderGrid() {
         ${tagRow('dur', m.durations)}
       </div>
       <div class="mc-card-actions">
-        <a href="playground.html">Try in Playground →</a>
+        <a href="${appPlaygroundUrl({ type: activeType, model: m.slug })}">Try in Playground →</a>
       </div>
     </article>`,
     )
