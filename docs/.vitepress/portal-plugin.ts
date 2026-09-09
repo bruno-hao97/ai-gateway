@@ -29,6 +29,22 @@ export function portalStaticPlugin(): Plugin {
           const params = new URLSearchParams(qIdx >= 0 ? raw.slice(qIdx) : '');
           if (params.get('embed') === '1') return next();
 
+          const referer = String(req.headers.referer || '');
+          const fromAppPlayground = /\/app\/playground\/?(\?|$)/.test(referer);
+          if (fromAppPlayground) {
+            params.set('embed', '1');
+            try {
+              params.set('parentOrigin', new URL(referer).origin);
+            } catch {
+              /* ignore */
+            }
+            const qs = params.toString();
+            res.statusCode = 302;
+            res.setHeader('Location', `/portal/playground.html?${qs}`);
+            res.end();
+            return;
+          }
+
           const dest = new URLSearchParams();
           for (const [k, v] of params) {
             if (k !== 'embed' && k !== 'parentOrigin') dest.set(k, v);

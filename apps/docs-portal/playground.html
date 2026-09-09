@@ -6,12 +6,20 @@
   <title>Playground — AI Gateway</title>
   <script>
     (function () {
-      if (new URLSearchParams(location.search).get('embed') === '1') return;
+      var p = new URLSearchParams(location.search);
+      var inFrame = window.self !== window.top;
+      var embedMode =
+        p.get('embed') === '1' ||
+        (inFrame && p.get('dev') !== '1' && p.get('embed') !== '0');
+      if (embedMode) {
+        document.documentElement.classList.add('pg-embed-root');
+        return;
+      }
+      if (inFrame) return;
       var docs = localStorage.getItem('portal_docs_url')
         || (location.port === '5173' ? location.origin : '');
       if (!docs) return;
       var dest = new URL('/app/playground/', docs.replace(/\/$/, '') + '/');
-      var p = new URLSearchParams(location.search);
       p.forEach(function (v, k) {
         if (k !== 'embed' && k !== 'parentOrigin') dest.searchParams.set(k, v);
       });
@@ -40,7 +48,18 @@
   <header class="pg-studio-bar" id="pgStudioBar" aria-label="API Playground">
     <div class="pg-studio-left">
       <span class="pg-crumb-root" data-i18n="embed.playground">Playground</span>
-      <div class="pg-worker-picker" id="embedWorkerPicker">
+      <div class="pg-type-segment" id="embedTypeSegment" role="tablist" aria-label="Media type">
+        <button type="button" class="pg-type-segment-btn active" data-worker-id="create-image" data-job-type="image" role="tab" aria-selected="true">
+          <span class="pg-type-segment-icon" aria-hidden="true"></span>
+          <span data-i18n="embed.segment.image">Image</span>
+        </button>
+        <button type="button" class="pg-type-segment-btn" data-worker-id="create-video" data-job-type="video" role="tab" aria-selected="false">
+          <span class="pg-type-segment-icon" aria-hidden="true"></span>
+          <span data-i18n="embed.segment.video">Video</span>
+        </button>
+        <button type="button" class="pg-type-segment-more" id="embedWorkerMore" aria-haspopup="listbox" aria-expanded="false" aria-controls="embedWorkerMenu" data-i18n-title="embed.moreWorkers" title="More workers">⋯</button>
+      </div>
+      <div class="pg-worker-picker" id="embedWorkerPicker" hidden>
         <button
           type="button"
           class="pg-worker-trigger"
@@ -307,7 +326,7 @@
           <button type="button" class="pg-type-chip" data-job-type="tts" role="tab">TTS</button>
         </div>
 
-        <div class="pg-model-meta" id="mediaModelMeta" hidden>
+        <div class="pg-model-meta pg-model-meta--hero" id="mediaModelMeta" data-worker="image" hidden>
           <div class="pg-model-meta-main">
             <strong id="mediaModelMetaName">—</strong>
             <code id="mediaModelMetaSlug" class="pg-model-meta-slug pg-field-advanced">—</code>
@@ -364,10 +383,20 @@
               data-i18n-placeholder="media.promptPlaceholder"
               placeholder="Enter your prompt…"
             ></textarea>
+            <div class="pg-prompt-foot">
+              <span class="pg-prompt-hint" data-i18n="media.promptShortcut">Ctrl+Enter to send</span>
+              <span class="pg-prompt-count" id="mediaPromptCount" aria-live="polite"></span>
+            </div>
           </div>
         </div>
 
-        <div class="pg-studio-block pg-studio-subject" id="mediaRefUrlWrap" hidden>
+        <div class="pg-studio-block pg-studio-media-inputs" id="mediaInputsCard" hidden>
+          <span class="pg-studio-label" id="mediaInputsTitle" data-i18n="media.mediaInputs">Media inputs</span>
+          <div class="pg-media-slots" id="mediaInputSlots"></div>
+          <p class="pg-studio-hint" id="mediaInputsHint" hidden></p>
+        </div>
+
+        <div class="pg-studio-block pg-studio-subject pg-field-advanced" id="mediaRefUrlWrap" hidden>
           <label class="pg-studio-label" for="mediaRefUrl" data-i18n="media.subject">Subject</label>
           <div class="pg-subject-row">
             <input
@@ -395,7 +424,7 @@
           </div>
           <div id="catalogFields" class="pg-catalog-fields pg-studio-params"></div>
           <footer class="pg-studio-params-foot">
-            <span class="pg-price-foot-label" id="mediaPriceFootLabel" hidden>
+            <span class="pg-price-foot-label" id="mediaPriceFootLabel" hidden role="button" tabindex="0">
               <span class="pg-price-foot-icon" aria-hidden="true">📋</span>
               <span data-i18n="media.priceList">Price list</span>
               <span id="mediaPriceFootCount">0</span>
@@ -419,8 +448,9 @@
           <div class="pg-send-bar">
             <button type="button" class="btn btn-primary pg-run pg-send-btn" id="btnMediaJob">
               <span class="pg-send-btn-main">
+                <span class="pg-send-btn-spinner" id="mediaSendSpinner" hidden aria-hidden="true"></span>
                 <span class="pg-send-btn-icon" id="mediaSendIcon" aria-hidden="true"></span>
-                <span data-i18n="media.send">Send request</span>
+                <span class="pg-send-btn-label" data-i18n="media.send">Send request</span>
               </span>
               <span class="pg-send-price" id="sendPriceLabel" hidden></span>
             </button>
@@ -860,7 +890,7 @@
 
         <div class="pg-response-pane" id="responsePaneEndpoints" data-response-pane="endpoints" role="tabpanel" hidden>
           <section class="pg-endpoints-base" aria-label="API gateway base URL">
-            <h3 class="pg-endpoints-base-title" data-i18n="endpoints.gatewayList">API gateway list</h3>
+            <h3 class="pg-endpoints-base-title" data-i18n="endpoints.gatewayList">API gateway catalog</h3>
             <div class="pg-endpoints-base-row">
               <span class="pg-endpoints-base-label" data-i18n="guide.baseUrl">Base URL</span>
               <code class="pg-endpoints-base-val" id="endpointsBaseUrl">—</code>
@@ -874,14 +904,14 @@
                 <tr>
                   <th data-i18n="endpoints.col.name">Name</th>
                   <th data-i18n="endpoints.col.method">Method</th>
-                  <th data-i18n="endpoints.col.url">URL</th>
-                  <th></th>
+                  <th data-i18n="endpoints.col.url">Endpoint</th>
+                  <th data-i18n="endpoints.col.action">Action</th>
                 </tr>
               </thead>
               <tbody id="endpointsTableBody"></tbody>
             </table>
           </div>
-          <aside class="pg-endpoints-notes" aria-label="Endpoint notes">
+          <aside class="pg-endpoints-notes" hidden aria-label="Endpoint notes">
             <h3 class="pg-endpoints-notes-title" data-i18n="endpoints.notes.title">Ghi nhớ</h3>
             <ul class="pg-endpoints-notes-list">
               <li data-i18n="endpoints.notes.auth">Luôn ưu tiên Authorization: Bearer &lt;token&gt;. Các nguồn token khác chỉ là fallback.</li>
@@ -995,7 +1025,9 @@
         </div>
         <button type="button" class="pg-price-modal-close" id="priceDetailClose" aria-label="Close">×</button>
       </header>
-      <nav class="pg-price-tabs" id="priceDetailTabs" role="tablist" aria-label="Price modes"></nav>
+      <nav class="pg-price-tabs-wrap" id="priceDetailTabsWrap" hidden>
+        <nav class="pg-price-tabs" id="priceDetailTabs" role="tablist" aria-label="Price modes"></nav>
+      </nav>
       <div class="pg-price-modal-body gw-scroll" id="priceDetailBody"></div>
       <footer class="pg-price-modal-foot">
         <span data-i18n="media.priceUnit">Unit: credits.</span>
@@ -1028,6 +1060,7 @@
     </div>
   </div>
 
+  <script src="js/portal-config.js"></script>
   <script src="js/portal-i18n.js"></script>
   <script src="js/json-highlight.js"></script>
   <script src="js/ai-guide-content.js"></script>

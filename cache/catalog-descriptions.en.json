@@ -2,32 +2,32 @@
   "seedream_4_0": {
     "hash": "5f85fff8ad74fbab",
     "en": "Best For Edit",
-    "updatedAt": "2026-08-26T06:05:17.854Z"
+    "updatedAt": "2026-09-09T01:41:24.671Z"
   },
   "google_image_gen_banana": {
     "hash": "3e91d592ec614ad8",
     "en": "Best For Fast Edit",
-    "updatedAt": "2026-08-26T06:05:17.854Z"
+    "updatedAt": "2026-09-09T01:41:24.672Z"
   },
   "google_image_gen_4_5": {
     "hash": "8a9a706fa6be3d9f",
     "en": "Smart & Fast",
-    "updatedAt": "2026-08-26T06:05:17.854Z"
+    "updatedAt": "2026-09-09T01:41:24.672Z"
   },
   "google_image_gen_3_5": {
     "hash": "94c123595ae0ef07",
     "en": "Best Quality",
-    "updatedAt": "2026-08-26T06:05:17.854Z"
+    "updatedAt": "2026-09-09T01:41:24.672Z"
   },
   "kling_video_2_6": {
     "hash": "519e54f4a37b26c9",
     "en": "See the Sound, Hear the Visual",
-    "updatedAt": "2026-08-26T06:05:19.024Z"
+    "updatedAt": "2026-09-09T01:41:25.781Z"
   },
   "kling_video_2_5": {
     "hash": "1f0dea719f68076a",
     "en": "Max Creativity with Exceptional Value",
-    "updatedAt": "2026-08-26T06:05:19.024Z"
+    "updatedAt": "2026-09-09T01:41:25.781Z"
   },
   "imagegen_2_0": {
     "hash": "7247c0f93a76d1a8",
@@ -258,5 +258,35 @@
     "hash": "0bdb43846eed9763",
     "en": "Stable version for high-quality music with clear melodies, solid harmonies, and natural vocals. Ideal for quick composition, demos, or basic commercial background music.",
     "updatedAt": "2026-08-26T06:06:29.808Z"
+  },
+  "topaz_image_upscale": {
+    "hash": "55f3f812815de12c",
+    "en": "Topaz Image Upscale Wonder 3.5 — enhances generative images and reconstructs natural details. Accepts 1 reference image, auto ratio.",
+    "updatedAt": "2026-09-09T01:41:45.938Z"
+  },
+  "midjourney_8_2": {
+    "hash": "ed149bc76b519e5d",
+    "en": "[4 images per run] MidJourney V8.2 is a new AI image generation version with superior quality, sharp details, realistic lighting, better prompt understanding, and diverse styles from art to photorealistic images.",
+    "updatedAt": "2026-09-09T01:41:45.938Z"
+  },
+  "minimax_h3_max": {
+    "hash": "094ef365b1dbb3af",
+    "en": "MiniMax H3 — MiniMax’s next-generation AI video model, supporting Text-to-Video, Image-to-Video, and Reference-to-Video. It combines reference images, videos, and audio to create realistic motion while maintaining character and scene consistency. Supports videos up to 15 seconds, resolutions up to 2K, and native stereo audio.",
+    "updatedAt": "2026-09-09T01:41:45.938Z"
+  },
+  "topaz_video_upscale": {
+    "hash": "6e1cd52ad2436e01",
+    "en": "Starlight Precise 2.6 is a diffusion model for video enhancement, focused on improving AI video realism by reducing plastic-looking, artificial details and clarifying faces, materials, and textures. Compared with Precise 2.5, version 2.6 adds 5 Sharpness levels for per-video sharpness control. Ideal for upscaling and enhancing AI footage or high-quality archival video.",
+    "updatedAt": "2026-09-09T01:41:45.938Z"
+  },
+  "gemini_omni_flash_1_1": {
+    "hash": "92b9b23f3f1ab1ef",
+    "en": "Production-ready AI video with keyframe control and scene extension. Turn text, images, and reference videos into dynamic content, seamlessly extend scenes up to 30 seconds, and upscale output videos up to 4K.",
+    "updatedAt": "2026-09-09T01:41:45.938Z"
+  },
+  "wan_3_0": {
+    "hash": "f95e09629d5ac0e7",
+    "en": "Wan 3.0 is a next-generation AI video generation model supporting Text-to-Video (T2V) and Image-to-Video (I2V). It excels at prompt understanding, natural motion, character and scene consistency, and supports diverse visual styles and camera movements. Wan 3.0 is ideal for ads, social media content, cinematic video, and storytelling.",
+    "updatedAt": "2026-09-09T01:41:45.938Z"
   }
 }

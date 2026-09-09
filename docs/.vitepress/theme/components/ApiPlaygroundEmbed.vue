@@ -140,6 +140,19 @@ function onIframeLoad() {
   syncIframeMessages();
 }
 
+function iframeLocationIsEmbed(iframe: HTMLIFrameElement): boolean {
+  try {
+    const win = iframe.contentWindow;
+    if (!win) return false;
+    const search = win.location.search || '';
+    if (search.includes('embed=1')) return true;
+    if (win.location.pathname.includes('/app/playground')) return false;
+    return win.self !== win.top;
+  } catch {
+    return true;
+  }
+}
+
 function mountIframe() {
   const container = containerRef.value;
   const src = buildEmbedSrc();
@@ -147,6 +160,15 @@ function mountIframe() {
 
   const existing = getEmbedStore();
   if (existing?.iframe && embedSrcKey(existing.src) === embedSrcKey(src)) {
+    if (!iframeLocationIsEmbed(existing.iframe)) {
+      container.appendChild(existing.iframe);
+      existing.iframe.src = src;
+      iframeRef.value = existing.iframe;
+      iframeReady.value = false;
+      showLoading.value = true;
+      setEmbedStore({ iframe: existing.iframe, src });
+      return;
+    }
     container.appendChild(existing.iframe);
     iframeRef.value = existing.iframe;
     iframeReady.value = true;

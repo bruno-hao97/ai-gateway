@@ -58,6 +58,13 @@
     return isVi() ? ep.name.vi || ep.name.en : ep.name.en;
   }
 
+  function epSummary(ep) {
+    if (!ep) return '';
+    if (ep.summary) return isVi() ? ep.summary.vi || ep.summary.en : ep.summary.en;
+    if (ep.overview) return isVi() ? ep.overview.vi || ep.overview.en : ep.overview.en;
+    return '';
+  }
+
   function tabLabel(id) {
     return pgT(`ep.tab.${id}`, id);
   }
@@ -901,6 +908,7 @@
       case 'create-video-job':
       case 'create-music-job':
       case 'create-tts-job':
+      case 'create-avatar-lipsync-job':
       case 'create-tool-job':
         if (ep.jobType) void global.openMediaJobPanel?.(ep.jobType, { autoFetch: false });
         $('btnMediaJob')?.click();
@@ -981,18 +989,7 @@
     if (baseEl) baseEl.textContent = base;
 
     const hintEl = $('endpointsContextHint');
-    if (hintEl) {
-      const jobType = ctx?.jobType || $('jobType')?.value || 'image';
-      const modelSlug = ctx?.modelSlug || $('mediaModelSelect')?.value || '';
-      const modelPart = modelSlug
-        ? (isVi() ? `, model=${modelSlug}` : `, model=${modelSlug}`)
-        : '';
-      const text = pgT('endpoints.contextHint', 'Resolved for type={type}{model}')
-        .replace('{type}', jobType)
-        .replace('{model}', modelPart);
-      hintEl.textContent = text;
-      hintEl.hidden = false;
-    }
+    if (hintEl) hintEl.hidden = true;
   }
 
   function copyEndpointsBase() {
@@ -1012,15 +1009,22 @@
 
     tbody.innerHTML = reg.ENDPOINTS.map((ep) => {
       const name = label(ep);
+      const sub = epSummary(ep);
       const m = ep.method.toLowerCase();
       const path = resolvePath(ep, ctx, 'gateway');
       const fullUrl = `${base}${path.startsWith('/') ? path : `/${path}`}`;
       return `<tr>
-        <td>${escapeHtml(name)}</td>
+        <td class="pg-endpoints-name-cell">
+          <div class="pg-endpoints-name">${escapeHtml(name)}</div>
+          ${sub ? `<div class="pg-endpoints-summary">${escapeHtml(sub)}</div>` : ''}
+        </td>
         <td><span class="pg-method ${m}">${ep.method}</span></td>
         <td><code class="pg-endpoints-full-url">${escapeHtml(fullUrl)}</code></td>
         <td class="pg-endpoints-actions">
-          <button type="button" class="btn btn-ghost btn-sm pg-endpoint-view" data-endpoint-id="${ep.id}">${pgT('ep.view')}</button>
+          <button type="button" class="btn btn-ghost btn-sm pg-endpoint-view" data-endpoint-id="${escapeHtml(ep.id)}" aria-label="${escapeHtml(pgT('ep.view', 'View'))} ${escapeHtml(name)}">
+            <span class="pg-endpoint-view-icon" aria-hidden="true">👁</span>
+            <span>${pgT('ep.view')}</span>
+          </button>
         </td>
       </tr>`;
     }).join('');

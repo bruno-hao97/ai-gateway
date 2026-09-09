@@ -28,14 +28,18 @@ function mpFormatCredits(n, locale = 'en') {
 function mpFormatRange(min, max, locale = 'en') {
   if (min == null || max == null) return '—';
   if (min === max) return mpFormatCredits(min, locale);
-  return `${mpFormatCredits(min, locale)}–${mpFormatCredits(max, locale)}`;
+  return `${mpFormatCredits(min, locale)}-${mpFormatCredits(max, locale)}`;
 }
 
 function mpFormatModeLabel(mode) {
   const s = mpStr(mode);
   if (!s || s === '__default__') return '';
   if (/^relax/i.test(s)) return s.toLowerCase().includes('ed') ? s : 'Relaxed';
-  return s.charAt(0).toUpperCase() + s.slice(1);
+  return s
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
 }
 
 function mpNormKey(v) {
@@ -163,6 +167,56 @@ function mpRowLabel(row) {
   );
 }
 
+/** Primary option column for a price table (resolution / ratio / duration). */
+function mpPrimaryRowDim(rows) {
+  if (!rows?.length) return 'resolution';
+  const counts = { resolution: 0, ratio: 0, duration: 0 };
+  for (const row of rows) {
+    if (mpStr(row.resolution)) counts.resolution += 1;
+    else if (mpStr(row.ratio)) counts.ratio += 1;
+    else if (mpStr(row.duration)) counts.duration += 1;
+  }
+  if (counts.resolution >= counts.ratio && counts.resolution >= counts.duration && counts.resolution > 0) {
+    return 'resolution';
+  }
+  if (counts.ratio >= counts.duration && counts.ratio > 0) return 'ratio';
+  if (counts.duration > 0) return 'duration';
+  return 'resolution';
+}
+
+function mpRowDimValue(row, dim) {
+  if (dim === 'ratio') return mpStr(row.ratio) || mpRowLabel(row);
+  if (dim === 'duration') return mpStr(row.duration) || mpRowLabel(row);
+  return mpStr(row.resolution) || mpRowLabel(row);
+}
+
+function mpBestRowSpecificity(rows, sel) {
+  let best = -1;
+  for (const row of rows) {
+    const score = mpRowSpecificity(row, sel);
+    if (score > best) best = score;
+  }
+  return best;
+}
+
+function mpRowIsHighlighted(row, rows, sel) {
+  const best = mpBestRowSpecificity(rows, sel);
+  if (best <= 0) return false;
+  return mpRowSpecificity(row, sel) === best;
+}
+
+function mpResolveInitialModeKey(rows, selections = {}) {
+  const groups = mpGroupByMode(rows);
+  const withMode = groups.filter((g) => g.mode);
+  if (!withMode.length) return groups[0]?.modeKey || '__default__';
+  const selMode = mpStr(selections.mode);
+  if (selMode) {
+    const hit = withMode.find((g) => mpDimEqual(g.mode, selMode));
+    if (hit) return hit.modeKey;
+  }
+  return withMode[0].modeKey;
+}
+
 function mpFallbackPrice(raw) {
   const n = mpNum(raw?.credit ?? raw?.credits ?? raw?.price ?? raw?.cost);
   return n;
@@ -177,5 +231,9 @@ globalThis.ModelPricing = {
   formatRange: mpFormatRange,
   formatModeLabel: mpFormatModeLabel,
   rowLabel: mpRowLabel,
+  primaryRowDim: mpPrimaryRowDim,
+  rowDimValue: mpRowDimValue,
+  rowIsHighlighted: mpRowIsHighlighted,
+  resolveInitialModeKey: mpResolveInitialModeKey,
   fallbackPrice: mpFallbackPrice,
 };

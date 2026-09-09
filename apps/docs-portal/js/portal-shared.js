@@ -51,11 +51,18 @@ export function appPlaygroundUrl(opts = {}) {
 }
 
 export function defaultBaseUrl() {
+  if (globalThis.PortalGatewayConfig?.resolveBaseUrl) {
+    return globalThis.PortalGatewayConfig.resolveBaseUrl();
+  }
   const saved = localStorage.getItem(STORAGE_BASE);
   if (saved) return saved.replace(/\/$/, '');
   const origin = window.location.origin.replace(/\/$/, '');
-  if (window.location.port === '3001') return origin;
-  return DEFAULT_API;
+  const port = window.location.port;
+  if (port === '5173' || port === '3001') return origin;
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return DEFAULT_API;
+  }
+  return origin;
 }
 
 export function getStoredToken() {

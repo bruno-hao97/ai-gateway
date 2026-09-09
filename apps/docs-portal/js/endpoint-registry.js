@@ -154,7 +154,7 @@
     return localizeParam(header, isVi);
   }
 
-  function createJobEndpoint(jobType, labels) {
+  function createJobEndpoint(jobType, labels, summary) {
     const pollMedia =
       jobType === 'music'
         ? 'music'
@@ -173,6 +173,7 @@
       async: true,
       contentTypes: ['application/json'],
       auth: true,
+      summary,
       overview: {
         en: `Create an asynchronous ${jobType} generation job via gateway REST. Model slug and catalog fields go in JSON body.`,
         vi: `Tạo job ${jobType} bất đồng bộ qua gateway REST. modelSlug và fields catalog nằm trong JSON body.`,
@@ -248,7 +249,7 @@
   const ENDPOINTS = [
     {
       id: 'list-models',
-      name: { en: 'List models', vi: 'Danh sách models' },
+      name: { en: 'Model catalog', vi: 'Catalog model' },
       method: 'GET',
       path: '/gateway/models?type={type}',
       upstreamPath: 'POST /v2/ai/models?type={type}',
@@ -256,6 +257,10 @@
       async: false,
       contentTypes: ['application/json'],
       auth: false,
+      summary: {
+        en: 'Browse models, prices, and capabilities for a job type.',
+        vi: 'Xem model, giá và capability theo loại job.',
+      },
       overview: {
         en: 'Public model catalog for a job type. Bearer optional when browsing.',
         vi: 'Catalog model theo loại job. Bearer tùy chọn khi browse.',
@@ -283,10 +288,46 @@
       workflow: ['Call before any create job.', 'Read slug, ratios, modes, prices from response.'],
       workflowVi: ['Gọi trước mọi create job.', 'Đọc slug, ratios, modes, prices từ response.'],
     },
-    createJobEndpoint('image', { en: 'Create image job', vi: 'Tạo hình ảnh AI' }),
-    createJobEndpoint('video', { en: 'Create video job', vi: 'Tạo video AI' }),
-    createJobEndpoint('music', { en: 'Create music job', vi: 'Tạo nhạc AI' }),
-    createJobEndpoint('tts', { en: 'Create TTS job', vi: 'Tạo TTS job' }),
+    createJobEndpoint(
+      'image',
+      { en: 'Create AI image', vi: 'Tạo ảnh AI' },
+      {
+        en: 'Create an AI image job through the gateway.',
+        vi: 'Tạo job ảnh AI qua gateway.',
+      },
+    ),
+    createJobEndpoint(
+      'video',
+      { en: 'Create AI video', vi: 'Tạo video AI' },
+      {
+        en: 'Create an AI video job through the gateway.',
+        vi: 'Tạo job video AI qua gateway.',
+      },
+    ),
+    createJobEndpoint(
+      'avatar-lipsync',
+      { en: 'Create face sync', vi: 'Tạo face sync' },
+      {
+        en: 'Create a face-sync / lipsync job through the gateway.',
+        vi: 'Tạo job face-sync / lipsync qua gateway.',
+      },
+    ),
+    createJobEndpoint(
+      'music',
+      { en: 'Create AI music', vi: 'Tạo nhạc AI' },
+      {
+        en: 'Create an AI music job through the gateway.',
+        vi: 'Tạo job nhạc AI qua gateway.',
+      },
+    ),
+    createJobEndpoint(
+      'tts',
+      { en: 'Create text-to-speech', vi: 'Tạo text-to-speech' },
+      {
+        en: 'Create a text-to-speech job through the gateway.',
+        vi: 'Tạo job text-to-speech qua gateway.',
+      },
+    ),
     {
       id: 'create-tool-job',
       jobType: 'image-upscale',
@@ -297,6 +338,10 @@
       async: true,
       contentTypes: ['application/json'],
       auth: true,
+      summary: {
+        en: 'Upscale, remove background, VFX, and other tool-type jobs.',
+        vi: 'Upscale, xóa nền, VFX và các tool job khác.',
+      },
       overview: {
         en: 'Upscale, remove-bg, video-vfx, avatar-lipsync, etc. Same body shape as media jobs.',
         vi: 'Upscale, remove-bg, video-vfx, avatar-lipsync, v.v. Cùng shape body với media jobs.',
@@ -312,7 +357,7 @@
     },
     {
       id: 'poll-job',
-      name: { en: 'Poll job', vi: 'Poll job' },
+      name: { en: 'Poll generic job', vi: 'Poll job' },
       method: 'GET',
       path: '/gateway/jobs/:id?media={media}',
       upstreamPath: 'POST /v2/ai/jobs/{id}?media={media}',
@@ -320,6 +365,10 @@
       async: false,
       contentTypes: ['application/json'],
       auth: true,
+      summary: {
+        en: 'Poll async job status until success or failure.',
+        vi: 'Poll trạng thái job async đến khi xong hoặc lỗi.',
+      },
       overview: {
         en: 'Poll async job status. Use id_base from create response, not internal task id.',
         vi: 'Poll trạng thái job async. Dùng id_base từ create, không dùng task id nội bộ.',
@@ -352,7 +401,6 @@
         'Poll mỗi 3.5s, tối đa 80 lần (~5 phút).',
         'Dừng khi có URL thành công hoặc thất bại terminal.',
       ],
-      auth: true,
     },
     {
       id: 'info-image',
@@ -500,7 +548,7 @@
     },
     {
       id: 'library-musics',
-      name: { en: 'Music library (album alias)', vi: 'Album nhạc (alias logic)' },
+      name: { en: 'Music library', vi: 'Thư viện nhạc' },
       method: 'POST',
       path: '/ai/library/musics',
       group: 'library',
@@ -536,7 +584,7 @@
     },
     {
       id: 'library-audios',
-      name: { en: 'Audio library (album alias)', vi: 'Album audio (alias logic)' },
+      name: { en: 'Audio library', vi: 'Thư viện audio' },
       method: 'POST',
       path: '/ai/library/audios',
       group: 'library',
