@@ -13,6 +13,12 @@
         (inFrame && p.get('dev') !== '1' && p.get('embed') !== '0');
       if (embedMode) {
         document.documentElement.classList.add('pg-embed-root');
+        document.addEventListener('DOMContentLoaded', function () {
+          var conn = document.getElementById('panel-connection');
+          var media = document.getElementById('panel-media-job');
+          if (conn) conn.classList.remove('active');
+          if (media) media.classList.add('active');
+        });
         return;
       }
       if (inFrame) return;
@@ -48,7 +54,7 @@
   <header class="pg-studio-bar" id="pgStudioBar" aria-label="API Playground">
     <div class="pg-studio-left">
       <span class="pg-crumb-root" data-i18n="embed.playground">Playground</span>
-      <div class="pg-type-segment" id="embedTypeSegment" role="tablist" aria-label="Media type">
+      <div class="pg-type-segment" id="embedTypeSegment" role="tablist" aria-label="Media type" hidden>
         <button type="button" class="pg-type-segment-btn active" data-worker-id="create-image" data-job-type="image" role="tab" aria-selected="true">
           <span class="pg-type-segment-icon" aria-hidden="true"></span>
           <span data-i18n="embed.segment.image">Image</span>
@@ -59,7 +65,7 @@
         </button>
         <button type="button" class="pg-type-segment-more" id="embedWorkerMore" aria-haspopup="listbox" aria-expanded="false" aria-controls="embedWorkerMenu" data-i18n-title="embed.moreWorkers" title="More workers">⋯</button>
       </div>
-      <div class="pg-worker-picker" id="embedWorkerPicker" hidden>
+      <div class="pg-worker-picker" id="embedWorkerPicker">
         <button
           type="button"
           class="pg-worker-trigger"
@@ -92,19 +98,19 @@
     </div>
     <div class="pg-studio-actions">
       <span class="pg-studio-credits" id="embedCreditsBadge" hidden title="Account credits">—</span>
-      <button type="button" class="pg-studio-btn" id="btnEmbedConnection" data-i18n="embed.connection">Connection</button>
-      <button type="button" class="pg-studio-btn pg-studio-btn--ghost" id="btnEmbedDev" data-i18n-title="embed.devTitle" title="Show endpoint sidebar" data-i18n="embed.dev">Dev</button>
+      <button type="button" class="pg-studio-btn" id="btnEmbedConnection" data-i18n="embed.connection" aria-expanded="false" aria-controls="panel-connection">Connection</button>
+      <button type="button" class="pg-studio-btn pg-studio-btn--ghost" id="btnEmbedDev" data-i18n-title="embed.devTitle" title="Show endpoint sidebar" data-i18n="embed.dev" aria-expanded="false" aria-controls="embedDevDrawer">Dev</button>
     </div>
   </header>
 
   <div class="pg-shell">
-    <aside class="pg-sidebar gw-scroll" aria-label="Endpoints">
+    <aside class="pg-sidebar gw-scroll" id="embedDevDrawer" aria-label="Endpoints">
       <div class="pg-sidebar-search">
         <input id="sidebarSearch" type="search" placeholder="Search endpoints…" autocomplete="off" aria-label="Search endpoints" />
       </div>
       <p class="pg-sidebar-label">Gateway REST</p>
       <nav class="pg-nav" data-nav-group="gateway">
-        <button type="button" class="pg-nav-item active" data-panel="connection" data-search="connection login auth token">
+        <button type="button" class="pg-nav-item" data-panel="connection" data-search="connection login auth token">
           <span class="pg-nav-method">—</span>
           Connection
         </button>
@@ -119,7 +125,7 @@
       </nav>
       <p class="pg-sidebar-label">Media jobs</p>
       <nav class="pg-nav" data-nav-group="media">
-        <button type="button" class="pg-nav-item" data-panel="media-job" data-job-type="image" data-search="image job create">
+        <button type="button" class="pg-nav-item active" data-panel="media-job" data-job-type="image" data-search="image job create">
           <span class="pg-nav-method post">POST</span>
           Image job
         </button>
@@ -208,10 +214,6 @@
       </nav>
       <p class="pg-sidebar-label">Platform</p>
       <nav class="pg-nav" data-nav-group="platform">
-        <button type="button" class="pg-nav-item" data-panel="chat" data-search="chat stream sse agent">
-          <span class="pg-nav-method post">POST</span>
-          Chat
-        </button>
         <button type="button" class="pg-nav-item" data-panel="upload" data-search="upload image video file">
           <span class="pg-nav-method post">POST</span>
           Upload
@@ -228,7 +230,7 @@
     </aside>
 
     <main class="pg-main gw-scroll">
-      <div class="pg-panel active" id="panel-connection" data-panel="connection">
+      <div class="pg-panel" id="panel-connection" data-panel="connection">
         <header class="pg-panel-head">
           <p class="pg-panel-kicker">Gateway REST</p>
           <h1>Connection</h1>
@@ -312,7 +314,7 @@
         <p class="hint">Pick <strong>music</strong> (or video/tts) above, then Fetch. Opens matching job panel in sidebar.</p>
       </div>
 
-      <div class="pg-panel" id="panel-media-job" data-panel="media-job">
+      <div class="pg-panel active" id="panel-media-job" data-panel="media-job">
         <header class="pg-panel-head">
           <p class="pg-panel-kicker">Media jobs</p>
           <h1 id="mediaJobTitle">Image job</h1>
@@ -326,11 +328,13 @@
           <button type="button" class="pg-type-chip" data-job-type="tts" role="tab">TTS</button>
         </div>
 
+        <div class="pg-studio-workspace" id="mediaStudioWorkspace">
         <div class="pg-model-meta pg-model-meta--hero" id="mediaModelMeta" data-worker="image" hidden>
           <div class="pg-model-meta-main">
             <strong id="mediaModelMetaName">—</strong>
             <code id="mediaModelMetaSlug" class="pg-model-meta-slug pg-field-advanced">—</code>
             <p class="pg-model-meta-desc" id="mediaModelMetaDesc" hidden></p>
+            <button type="button" class="pg-model-meta-more" id="btnModelMetaMore" hidden data-i18n="media.descMore">Show more</button>
             <button type="button" class="pg-price-list-link" id="btnOpenPriceList" hidden>
               <span data-i18n="media.priceList">Price list</span>
               (<span id="mediaPriceCount">0</span>) ›
@@ -376,7 +380,7 @@
 
         <div class="pg-studio-block pg-studio-prompt">
           <div class="field pg-field-prompt">
-            <label for="mediaPrompt" data-i18n="media.prompt">Prompt</label>
+            <label for="mediaPrompt" id="mediaPromptLabel" data-i18n="media.prompt">Prompt</label>
             <textarea
               id="mediaPrompt"
               rows="6"
@@ -387,7 +391,86 @@
               <span class="pg-prompt-hint" data-i18n="media.promptShortcut">Ctrl+Enter to send</span>
               <span class="pg-prompt-count" id="mediaPromptCount" aria-live="polite"></span>
             </div>
+            <div class="pg-prompt-history" id="mediaPromptHistory" hidden aria-label="Recent prompts"></div>
           </div>
+        </div>
+
+        <div class="pg-studio-block pg-studio-music-fields" id="mediaMusicFields" hidden>
+          <div class="field">
+            <label for="mediaMusicName" data-i18n="media.musicTitle">Title</label>
+            <input
+              id="mediaMusicName"
+              type="text"
+              data-i18n-placeholder="media.musicTitlePh"
+              placeholder="Track title"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+          <div class="field">
+            <label for="mediaMusicPrompt" data-i18n="media.musicPrompt">Prompt</label>
+            <input
+              id="mediaMusicPrompt"
+              type="text"
+              data-i18n-placeholder="media.musicPromptPh"
+              placeholder="Short style or theme description"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+          <div class="field">
+            <label for="mediaMusicGenre" data-i18n="media.musicTags">Style / tags</label>
+            <input
+              id="mediaMusicGenre"
+              type="text"
+              data-i18n-placeholder="media.musicTagsPh"
+              placeholder="lofi, hip hop, slow mix…"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+          <p class="pg-studio-hint" data-i18n="media.musicHint">Suno reads name (min 5 chars) and styles (min 3 chars). Sent as lyrics, prompt, tags, styles, name, title, and mode (custom when using lyrics).</p>
+        </div>
+
+        <div class="pg-studio-block pg-studio-tts-fields" id="mediaTtsFields" hidden>
+          <div class="field">
+            <label for="mediaTtsInputUrl" data-i18n="media.ttsInputUrl">Reference audio URL <span class="pg-optional" data-i18n="media.optional">optional</span></label>
+            <input
+              id="mediaTtsInputUrl"
+              type="url"
+              data-i18n-placeholder="media.ttsInputUrlPh"
+              placeholder="https://… (voice clone / reference)"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+          <div class="field">
+            <label for="mediaTtsStyle" data-i18n="media.ttsStyle">Style <span class="pg-optional" data-i18n="media.optional">optional</span></label>
+            <input
+              id="mediaTtsStyle"
+              type="text"
+              data-i18n-placeholder="media.ttsStylePh"
+              placeholder="Speaking style"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+          <div class="field">
+            <label for="mediaTtsVoiceId" data-i18n="media.ttsVoiceId">Voice ID <span class="pg-optional" data-i18n="media.optional">optional</span></label>
+            <input
+              id="mediaTtsVoiceId"
+              type="text"
+              data-i18n-placeholder="media.ttsVoiceIdPh"
+              placeholder="From catalog or voice list"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+          <label class="pg-check-label pg-wait-row pg-tts-self-row" for="mediaTtsSelf">
+            <input id="mediaTtsSelf" type="checkbox" checked />
+            <span data-i18n="media.ttsSelf">self=true (Omnivoice default)</span>
+          </label>
+          <p class="pg-studio-hint" data-i18n="media.ttsHint">Spoken text goes in the field above as text. TTS jobs usually return audio in the create response — enable Wait.</p>
         </div>
 
         <div class="pg-studio-block pg-studio-media-inputs" id="mediaInputsCard" hidden>
@@ -415,6 +498,19 @@
             <button type="button" class="pg-subject-clear" id="btnMediaRefClear" data-i18n="media.refClear">Remove</button>
           </div>
           <input id="mediaRefFile" type="file" accept="image/*" hidden />
+        </div>
+
+        <div class="pg-studio-block pg-studio-avatar-audio pg-field-advanced" id="mediaAvatarAudioWrap" hidden>
+          <label class="pg-studio-label" for="mediaAvatarAudioUrl" data-i18n="media.avatarAudio">Reference audio</label>
+          <input
+            id="mediaAvatarAudioUrl"
+            type="url"
+            data-i18n-placeholder="media.avatarAudioPh"
+            placeholder="https://… (mp3/wav for lip-sync)"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <p class="pg-studio-hint" data-i18n="media.avatarAudioHint">Required for avatar lip-sync. Paste URL or generate via TTS first.</p>
         </div>
 
         <div class="pg-studio-params-card" id="mediaParamsCard" hidden>
@@ -456,6 +552,16 @@
             </button>
           </div>
           <div class="pg-status-slot" id="mediaJobStatus" role="status" aria-live="polite"></div>
+        </div>
+
+        <div class="pg-studio-signin" id="mediaSigninOverlay" hidden>
+          <div class="pg-studio-signin-card">
+            <div class="pg-studio-signin-icon" aria-hidden="true">⬡</div>
+            <p class="pg-studio-signin-title" data-i18n="embed.signinTitle">Sign in to create</p>
+            <p class="pg-studio-signin-sub" data-i18n="embed.signinSub">Connect your account to load models and send jobs.</p>
+            <button type="button" class="pg-studio-btn" id="btnMediaSignin" data-i18n="embed.connection">Connection</button>
+          </div>
+        </div>
         </div>
         <p class="hint pg-hint-advanced">Catalog loads automatically when signed in. Uncheck wait → poll with job id.</p>
       </div>
@@ -690,6 +796,7 @@
         <div class="pg-status-slot" id="audioListsStatus" role="status" aria-live="polite"></div>
         <p class="hint">TTS generation history — pick <code>file_url</code> from RESPONSE to preview in browser.</p>
       </div>
+      <div class="pg-embed-connection-backdrop" id="embedConnectionBackdrop" hidden aria-hidden="true"></div>
     </main>
 
     <aside class="pg-response" aria-label="Output">
@@ -750,9 +857,15 @@
         </div>
 
         <div class="pg-response-pane active" id="responsePaneResult" data-response-pane="result" role="tabpanel">
+          <div class="pg-result-gallery" id="resultGallery" hidden>
+            <p class="pg-result-gallery-label" data-i18n="result.recent">Recent results</p>
+            <div class="pg-result-gallery-track gw-scroll" id="resultGalleryTrack" role="list"></div>
+          </div>
           <div class="pg-result-empty" id="resultEmpty">
-            <p class="pg-result-empty-title" data-i18n="result.emptyTitle">Result will appear here</p>
-            <p class="pg-result-empty-sub" data-i18n="result.emptySub">Choose a model, enter a prompt, then <strong>Send request</strong>.</p>
+            <div class="pg-result-empty-icon" id="resultEmptyIcon" hidden aria-hidden="true">⬡</div>
+            <p class="pg-result-empty-title" id="resultEmptyTitle" data-i18n="result.emptyTitle">Result will appear here</p>
+            <p class="pg-result-empty-sub" id="resultEmptySub" data-i18n="result.emptySub">Choose a model, enter a prompt, then <strong>Send request</strong>.</p>
+            <button type="button" class="pg-studio-btn pg-result-empty-cta" id="btnResultEmptySignin" hidden data-i18n="embed.connection">Connection</button>
           </div>
 
           <div class="pg-result-main" id="resultMain" data-phase="idle" hidden>
@@ -1015,6 +1128,8 @@
       </div>
     </aside>
   </div>
+
+  <div class="pg-embed-dev-backdrop" id="embedDevBackdrop" hidden aria-hidden="true"></div>
 
   <div id="priceDetailOverlay" class="pg-price-overlay" hidden>
     <div class="pg-price-modal" role="dialog" aria-modal="true" aria-labelledby="priceDetailTitle">

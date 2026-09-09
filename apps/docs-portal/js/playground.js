@@ -7,6 +7,11 @@ const STORAGE_CHAT_SESSION = 'portal_chat_session';
 const STORAGE_VOICES = 'portal_last_voices';
 const STORAGE_DEVICE_ID = 'gw_device_id';
 const STORAGE_LAST_MODEL = 'pg_last_model_';
+const STORAGE_FAVORITES = 'pg_favorite_models';
+const STORAGE_PROMPT_HISTORY = 'pg_prompt_history_';
+const STORAGE_RESULT_GALLERY = 'pg_result_gallery';
+const MAX_PROMPT_HISTORY = 8;
+const MAX_RESULT_GALLERY = 12;
 const STORAGE_RESPONSE_TAB = 'portal_response_tab';
 const PREFETCH_JOB_TYPES = { image: 'video', video: 'image' };
 const RESPONSE_TABS = new Set(['request', 'result', 'endpoints', 'guide', 'skill']);
@@ -86,8 +91,6 @@ if ($('chatSessionId')) {
   $('chatSessionId').value = sessionStorage.getItem(STORAGE_CHAT_SESSION) || '';
 }
 
-updateTokenBadge();
-
 function saveToken(value) {
   const t = (value ?? tokenEl.value).trim();
   tokenEl.value = t;
@@ -112,6 +115,116 @@ function updateTokenBadge() {
   } else {
     tokenBadge.textContent = pgT('token.none');
     tokenBadge.className = 'pg-token-badge';
+  }
+  syncMediaSigninOverlay();
+  syncResultEmptyState();
+}
+
+let modelMetaDescExpanded = false;
+let modelMetaFullDesc = '';
+
+function pulseCreditsBadge() {
+  const el = $('embedCreditsBadge');
+  if (!el || el.hidden) return;
+  el.classList.remove('pg-studio-credits--pulse');
+  void el.offsetWidth;
+  el.classList.add('pg-studio-credits--pulse');
+}
+
+async function refreshCreditsQuiet() {
+  if (!tokenEl?.value?.trim()) return;
+  try {
+    await fetchUserMe(null, { silent: true });
+  } catch {
+    /* optional */
+  }
+}
+
+function notifyJobComplete() {
+  pulseCreditsBadge();
+  void refreshCreditsQuiet();
+}
+
+function syncMediaSigninOverlay() {
+  const overlay = $('mediaSigninOverlay');
+  if (!overlay) return;
+  const onMedia = $('panel-media-job')?.classList.contains('active');
+  const hasToken = Boolean(tokenEl?.value?.trim());
+  overlay.hidden = !isEmbed || !onMedia || hasToken || embedView.connectionOpen;
+}
+
+function syncResultEmptyState() {
+  const hasToken = Boolean(tokenEl?.value?.trim());
+  const needAuth = isEmbed && !hasToken;
+  const icon = $('resultEmptyIcon');
+  const title = $('resultEmptyTitle');
+  const sub = $('resultEmptySub');
+  const cta = $('btnResultEmptySignin');
+  if (icon) icon.hidden = !needAuth;
+  if (cta) cta.hidden = !needAuth;
+  if (title) {
+    title.textContent = needAuth
+      ? pgT('embed.signinTitle', 'Sign in to create')
+      : pgT('result.emptyTitle', 'Result will appear here');
+  }
+  if (sub) {
+    sub.textContent = needAuth
+      ? pgT('embed.signinSub', 'Connect your account to load models and send jobs.')
+      : pgT('result.emptySub', 'Choose a model, enter a prompt, then Send request.');
+  }
+}
+
+function flashEmbedPanelTransition() {
+  if (!isEmbed) return;
+  const panel = document.querySelector('.pg-panel.active');
+  if (!panel) return;
+  panel.classList.remove('pg-panel--enter');
+  void panel.offsetWidth;
+  panel.classList.add('pg-panel--enter');
+}
+
+function renderModelMetaDesc(desc) {
+  const descEl = $('mediaModelMetaDesc');
+  const moreBtn = $('btnModelMetaMore');
+  if (!descEl) return;
+
+  modelMetaFullDesc = desc || '';
+  modelMetaDescExpanded = false;
+
+  if (!desc) {
+    descEl.textContent = '';
+    descEl.hidden = true;
+    if (moreBtn) moreBtn.hidden = true;
+    return;
+  }
+
+  const limit = 140;
+  const long = desc.length > limit;
+  descEl.hidden = false;
+  descEl.textContent = long ? `${desc.slice(0, limit).trim()}…` : desc;
+  descEl.classList.toggle('is-clamped', long);
+
+  if (moreBtn) {
+    moreBtn.hidden = !long;
+    moreBtn.textContent = pgT('media.descMore', 'Show more');
+  }
+}
+
+function toggleModelMetaDesc() {
+  const descEl = $('mediaModelMetaDesc');
+  const moreBtn = $('btnModelMetaMore');
+  if (!descEl || !modelMetaFullDesc) return;
+
+  modelMetaDescExpanded = !modelMetaDescExpanded;
+  if (modelMetaDescExpanded) {
+    descEl.textContent = modelMetaFullDesc;
+    descEl.classList.remove('is-clamped');
+    if (moreBtn) moreBtn.textContent = pgT('media.descLess', 'Show less');
+  } else {
+    const limit = 140;
+    descEl.textContent = `${modelMetaFullDesc.slice(0, limit).trim()}…`;
+    descEl.classList.add('is-clamped');
+    if (moreBtn) moreBtn.textContent = pgT('media.descMore', 'Show more');
   }
 }
 
@@ -156,7 +269,6 @@ function isAllowedEmbedParent(origin) {
   }
 }
 
-let pendingDeepLink = null;
 
 const EMBED_WORKER_SECTIONS = [
   {
@@ -167,17 +279,6 @@ const EMBED_WORKER_SECTIONS = [
       { id: 'create-tts', icon: 'mic', labelKey: 'worker.create.tts', kind: 'media-job', jobType: 'tts' },
       { id: 'create-music', icon: 'music', labelKey: 'worker.create.music', kind: 'media-job', jobType: 'music' },
       { id: 'create-avatar', icon: 'bot', labelKey: 'worker.create.avatar', kind: 'media-job', jobType: 'avatar-lipsync' },
-    ],
-  },
-  {
-    sectionKey: 'worker.section.tools',
-    items: [
-      { id: 'tool-image-upscale', icon: 'arrow-up', labelKey: 'worker.tool.image-upscale', kind: 'media-job', jobType: 'image-upscale' },
-      { id: 'tool-remove-bg', icon: 'scissors', labelKey: 'worker.tool.remove-bg', kind: 'media-job', jobType: 'remove-bg' },
-      { id: 'tool-video-upscale', icon: 'arrow-up', labelKey: 'worker.tool.video-upscale', kind: 'media-job', jobType: 'video-upscale' },
-      { id: 'tool-video-vfx', icon: 'sparkles', labelKey: 'worker.tool.video-vfx', kind: 'media-job', jobType: 'video-vfx' },
-      { id: 'tool-video-subtitle', icon: 'subtitles', labelKey: 'worker.tool.video-subtitle', kind: 'media-job', jobType: 'video-subtitle' },
-      { id: 'tool-video-cut', icon: 'scissors', labelKey: 'worker.tool.video-cut', kind: 'media-job', jobType: 'video-cut' },
     ],
   },
   {
@@ -196,16 +297,6 @@ const EMBED_WORKER_SECTIONS = [
     ],
   },
   {
-    sectionKey: 'worker.section.library',
-    items: [
-      { id: 'library-images', icon: 'image', labelKey: 'worker.library.images', kind: 'library', libraryKind: 'images' },
-      { id: 'library-videos', icon: 'video', labelKey: 'worker.library.videos', kind: 'library', libraryKind: 'videos' },
-      { id: 'library-musics', icon: 'music', labelKey: 'worker.library.musics', kind: 'library', libraryKind: 'musics' },
-      { id: 'library-audios', icon: 'mic', labelKey: 'worker.library.audios', kind: 'library', libraryKind: 'audios' },
-      { id: 'library-album-videos', icon: 'folder', labelKey: 'worker.library.albumVideos', kind: 'library', libraryKind: 'album-videos' },
-    ],
-  },
-  {
     sectionKey: 'worker.section.system',
     items: [
       { id: 'list-models', icon: 'server', labelKey: 'worker.system.models', kind: 'panel', panel: 'models' },
@@ -213,11 +304,13 @@ const EMBED_WORKER_SECTIONS = [
     ],
   },
   {
-    sectionKey: 'worker.section.platform',
+    sectionKey: 'worker.section.library',
     items: [
-      { id: 'chat', icon: 'message', labelKey: 'worker.platform.chat', kind: 'panel', panel: 'chat' },
-      { id: 'audio-tts', icon: 'volume', labelKey: 'worker.platform.audio', kind: 'panel', panel: 'audio' },
-      { id: 'audio-lists', icon: 'list', labelKey: 'worker.platform.audioLists', kind: 'panel', panel: 'audio-lists' },
+      { id: 'library-videos', icon: 'video', labelKey: 'worker.library.videos', kind: 'library', libraryKind: 'videos' },
+      { id: 'library-images', icon: 'image', labelKey: 'worker.library.images', kind: 'library', libraryKind: 'images' },
+      { id: 'library-musics', icon: 'music', labelKey: 'worker.library.musics', kind: 'library', libraryKind: 'musics' },
+      { id: 'library-audios', icon: 'mic', labelKey: 'worker.library.audios', kind: 'library', libraryKind: 'audios' },
+      { id: 'library-album-videos', icon: 'folder', labelKey: 'worker.library.albumVideos', kind: 'library', libraryKind: 'album-videos' },
     ],
   },
 ];
@@ -228,6 +321,17 @@ for (const section of EMBED_WORKER_SECTIONS) {
 }
 
 let activeEmbedWorkerId = 'create-image';
+
+/** Embed view — single source of truth (studio vs dev drawer). */
+const embedView = {
+  mode: 'studio',
+  workerId: 'create-image',
+  model: null,
+  connectionOpen: false,
+};
+
+let embedStudioBooted = false;
+
 let embedMenuOpen = null;
 let activeInfoKind = 'image';
 let activeLibraryKind = 'images';
@@ -430,22 +534,247 @@ function activateFocusedWorkerMenuItem() {
   void navigateEmbedWorker(btn.dataset.workerId);
 }
 
+function parseEmbedViewFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const panel = params.get('panel');
+  const worker = params.get('worker');
+  const model = params.get('model')?.trim() || null;
+  const type = params.get('type');
+  const typeToWorker = {
+    image: 'create-image',
+    video: 'create-video',
+    music: 'create-music',
+    tts: 'create-tts',
+  };
+
+  if (panel === 'connection') {
+    const workerId = worker && EMBED_WORKER_BY_ID.has(worker) ? worker : 'create-image';
+    return { mode: 'studio', workerId, model, connectionOpen: true };
+  }
+
+  if (worker && EMBED_WORKER_BY_ID.has(worker)) {
+    const item = EMBED_WORKER_BY_ID.get(worker);
+    return {
+      mode: item.kind === 'media-job' ? 'studio' : 'dev',
+      workerId: worker,
+      model: item.kind === 'media-job' ? model : null,
+      connectionOpen: false,
+    };
+  }
+
+  if (type && typeToWorker[type]) {
+    return {
+      mode: 'studio',
+      workerId: typeToWorker[type],
+      model,
+      connectionOpen: false,
+    };
+  }
+
+  return { mode: 'studio', workerId: 'create-image', model, connectionOpen: false };
+}
+
+function setConnectionDrawerOpen(open) {
+  if (!isEmbed) return;
+  embedView.connectionOpen = open;
+  document.body.classList.toggle('pg-connection-open', open);
+  $('embedConnectionBackdrop')?.toggleAttribute('hidden', !open);
+  $('btnEmbedConnection')?.classList.toggle('active', open);
+  $('btnEmbedConnection')?.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) {
+    requestAnimationFrame(() => $('loginEmail')?.focus());
+  }
+  syncMediaSigninOverlay();
+}
+
+function openEmbedConnection() {
+  if (!isEmbed) {
+    openPanelByIdRaw('connection');
+    return;
+  }
+  closeEmbedDev();
+  setConnectionDrawerOpen(true);
+  syncWorkerToUrl();
+}
+
+function closeEmbedConnection() {
+  if (!isEmbed) return;
+  setConnectionDrawerOpen(false);
+  syncWorkerToUrl();
+}
+
+function setDevDrawerOpen(open) {
+  if (!isEmbed) return;
+  document.body.classList.toggle('pg-dev-open', open);
+  $('embedDevBackdrop')?.toggleAttribute('hidden', !open);
+  $('btnEmbedDev')?.classList.toggle('active', open);
+  $('btnEmbedDev')?.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function openEmbedDev() {
+  if (!isEmbed) return;
+  closeEmbedConnection();
+  setDevDrawerOpen(true);
+}
+
+function closeEmbedDev() {
+  if (!isEmbed) return;
+  setDevDrawerOpen(false);
+}
+
+function resolveStudioModelSlug(explicitModel, jobType, { preferExplicit = false } = {}) {
+  const type = jobType || $('jobType')?.value || 'image';
+  const models = normalizeModels(getStoredModelsEnvelope(type));
+  if (!models.length) return explicitModel?.trim() || null;
+
+  const pickIfValid = (slug) => {
+    const s = slug?.trim();
+    return s && models.some((m) => m.slug === s) ? s : null;
+  };
+
+  const current = pickIfValid($('mediaModelSelect')?.value);
+  const explicit = pickIfValid(explicitModel);
+  const remembered = pickIfValid(embedView.model);
+  const last = pickIfValid(getLastModel(type));
+  const fallback = models[0]?.slug || null;
+
+  if (preferExplicit) {
+    return explicit || last || current || remembered || fallback;
+  }
+  return current || remembered || explicit || last || fallback;
+}
+
+async function selectEmbedModel(model) {
+  const sel = $('mediaModelSelect');
+  if (!sel || !model) return;
+  for (let i = 0; i < 50; i++) {
+    if ([...sel.options].some((o) => o.value === model)) break;
+    await sleep(100);
+  }
+  if ([...sel.options].some((o) => o.value === model)) {
+    sel.value = model;
+  } else {
+    sel.appendChild(new Option(model, model));
+    sel.value = model;
+  }
+  onMediaModelChange();
+}
+
+async function embedOpenStudioWorker(workerId, explicitModel, { forceModel = false } = {}) {
+  let item = EMBED_WORKER_BY_ID.get(workerId);
+  if (!item || item.kind !== 'media-job') {
+    workerId = 'create-image';
+    item = EMBED_WORKER_BY_ID.get(workerId);
+  }
+  embedView.mode = 'studio';
+  embedView.workerId = workerId;
+  activeEmbedWorkerId = workerId;
+
+  await openMediaJobPanel(item.jobType);
+  document.querySelectorAll('.pg-panel').forEach((p) => {
+    p.classList.toggle('active', p.dataset.panel === 'media-job');
+  });
+  activateNavForPanel('media-job', item.jobType);
+
+  const pickModel = resolveStudioModelSlug(explicitModel, item.jobType, {
+    preferExplicit: forceModel,
+  });
+  if (!pickModel) return;
+
+  embedView.model = pickModel;
+  const sel = $('mediaModelSelect');
+  if (sel?.value === pickModel) {
+    onMediaModelChange();
+    return;
+  }
+  await selectEmbedModel(pickModel);
+}
+
+async function embedOpenDevWorker(workerId) {
+  const item = EMBED_WORKER_BY_ID.get(workerId);
+  if (!item) return;
+  embedView.mode = 'dev';
+  embedView.workerId = workerId;
+  activeEmbedWorkerId = workerId;
+  workerMenuFilter = '';
+  modelMenuFilter = '';
+  closeEmbedMenus();
+  setConnectionDrawerOpen(false);
+
+  if (item.kind === 'info') {
+    openInfoPanel(item.infoKind);
+    return;
+  }
+  if (item.kind === 'library') {
+    openLibraryPanel(item.libraryKind);
+    return;
+  }
+  if (item.kind === 'upload') {
+    openPanelByIdRaw('upload');
+    document.querySelector(`.pg-tab[data-upload-tab="${item.uploadTab}"]`)?.click();
+    return;
+  }
+  if (item.kind === 'panel') {
+    if (item.panel === 'health') {
+      openHealthPanel();
+      return;
+    }
+    openPanelByIdRaw(item.panel);
+  }
+}
+
+async function applyEmbedView(next, { flash = false, forceModel = false } = {}) {
+  if (!isEmbed) return;
+
+  embedView.mode = next.mode === 'dev' ? 'dev' : 'studio';
+  embedView.workerId = next.workerId || 'create-image';
+  if (next.model != null) embedView.model = next.model;
+  activeEmbedWorkerId = embedView.workerId;
+
+  if (embedView.mode === 'studio') {
+    await embedOpenStudioWorker(embedView.workerId, next.model ?? null, {
+      forceModel: forceModel || !embedStudioBooted,
+    });
+  } else {
+    await embedOpenDevWorker(embedView.workerId);
+  }
+
+  syncEmbedViewModeClass();
+  setConnectionDrawerOpen(Boolean(next.connectionOpen));
+
+  if (flash) flashEmbedPanelTransition();
+  syncEmbedChromeFromState();
+  syncMediaSigninOverlay();
+  syncResultEmptyState();
+  syncWorkerToUrl();
+}
+
 function syncWorkerToUrl() {
   if (!isEmbed) return;
   const params = new URLSearchParams(window.location.search);
   params.set('embed', '1');
   params.delete('type');
-  params.delete('panel');
 
-  if (activeEmbedWorkerId) params.set('worker', activeEmbedWorkerId);
-  else params.delete('worker');
-
-  if (workerUsesModelPicker(activeEmbedWorkerId)) {
-    const model = $('mediaModelSelect')?.value?.trim();
-    if (model) params.set('model', model);
+  if (embedView.connectionOpen) {
+    params.set('panel', 'connection');
+    if (embedView.workerId) params.set('worker', embedView.workerId);
+    else params.delete('worker');
+    if (embedView.model) params.set('model', embedView.model);
     else params.delete('model');
   } else {
-    params.delete('model');
+    params.delete('panel');
+    if (embedView.workerId) params.set('worker', embedView.workerId);
+    else params.delete('worker');
+
+    if (embedView.mode === 'studio' && workerUsesModelPicker(embedView.workerId)) {
+      const model = $('mediaModelSelect')?.value?.trim() || embedView.model;
+      if (model) {
+        embedView.model = model;
+        params.set('model', model);
+      } else params.delete('model');
+    } else {
+      params.delete('model');
+    }
   }
 
   const parentOrigin = params.get('parentOrigin');
@@ -455,8 +784,9 @@ function syncWorkerToUrl() {
 
   const payload = {
     type: 'ai-gateway-playground-nav',
-    worker: activeEmbedWorkerId,
+    worker: embedView.connectionOpen ? embedView.workerId : embedView.workerId,
     model: params.get('model') || undefined,
+    panel: embedView.connectionOpen ? 'connection' : undefined,
   };
   for (const origin of EMBED_PARENT_ORIGINS) {
     try {
@@ -476,6 +806,7 @@ function syncWorkerToUrl() {
 
 
 function inferEmbedWorkerId() {
+  if (isEmbed && embedView.connectionOpen) return embedView.workerId;
   if ($('panel-connection')?.classList.contains('active')) return null;
 
   const activePanel = document.querySelector('.pg-panel.active')?.dataset.panel;
@@ -508,21 +839,18 @@ function inferEmbedWorkerId() {
 }
 
 function updateEmbedWorkerTrigger() {
-  const onConnection = $('panel-connection')?.classList.contains('active');
   const labelEl = $('embedWorkerLabel');
   const iconEl = $('embedWorkerIcon');
   const inferred = inferEmbedWorkerId();
   if (inferred) activeEmbedWorkerId = inferred;
 
-  const item = onConnection ? null : EMBED_WORKER_BY_ID.get(activeEmbedWorkerId);
+  const item = EMBED_WORKER_BY_ID.get(activeEmbedWorkerId);
   if (labelEl) {
-    labelEl.textContent = onConnection
-      ? pgT('embed.connection')
-      : item
-        ? workerItemLabel(item)
-        : MEDIA_JOB_SHORT[$('jobType')?.value] || 'Image';
+    labelEl.textContent = item
+      ? workerItemLabel(item)
+      : MEDIA_JOB_SHORT[$('jobType')?.value] || 'Image';
   }
-  if (iconEl) iconEl.innerHTML = onConnection ? workerIconHtml('settings') : workerIconHtml(item?.icon || 'box');
+  if (iconEl) iconEl.innerHTML = workerIconHtml(item?.icon || 'box');
 }
 
 function modelMenuPriceLabel(modelObj) {
@@ -553,12 +881,7 @@ function listEmbedModelOptions() {
       return hay.includes(filter);
     });
   }
-  models.sort((a, b) => {
-    const ca = a.credits ?? Number.MAX_SAFE_INTEGER;
-    const cb = b.credits ?? Number.MAX_SAFE_INTEGER;
-    return ca - cb;
-  });
-  return models;
+  return sortModelsForEmbedMenu(models, type);
 }
 
 function renderEmbedModelMenu() {
@@ -573,6 +896,7 @@ function renderEmbedModelMenu() {
 
   const models = listEmbedModelOptions();
   const current = $('mediaModelSelect')?.value || '';
+  const type = $('jobType')?.value || 'image';
 
   if (!models.length) {
     menu.innerHTML = `${searchHtml}<p class="pg-worker-menu-empty">${escapeHtml(pgT('embed.modelSearchEmpty', 'No matching models'))}</p>`;
@@ -580,19 +904,36 @@ function renderEmbedModelMenu() {
     return;
   }
 
-  menu.innerHTML =
-    searchHtml +
-    models
-      .map((m) => {
-        const active = m.slug === current;
-        const price = escapeHtml(modelMenuPriceLabel(m));
-        const priceHtml = price ? `<span class="pg-model-menu-price">${price}</span>` : '';
-        return `<button type="button" class="pg-worker-menu-item pg-model-menu-item${active ? ' active' : ''}" role="option" data-model-slug="${escapeHtml(m.slug)}" aria-selected="${active}">
+  const favSlugs = new Set(getFavoriteSlugs(type));
+  let lastWasFav = false;
+  const rows = models
+    .map((m, index) => {
+      const isFav = favSlugs.has(m.slug);
+      let heading = '';
+      if (isFav && !lastWasFav && index === 0) {
+        heading = `<p class="pg-worker-menu-heading">${escapeHtml(pgT('embed.favSection', 'Favorites'))}</p>`;
+      }
+      lastWasFav = isFav;
+
+      const active = m.slug === current;
+      const price = escapeHtml(modelMenuPriceLabel(m));
+      const priceHtml = price ? `<span class="pg-model-menu-price">${price}</span>` : '';
+      const favLabel = isFav
+        ? pgT('embed.favRemove', 'Remove from favorites')
+        : pgT('embed.favAdd', 'Add to favorites');
+      const favBtn = `<button type="button" class="pg-model-fav-btn${isFav ? ' is-fav' : ''}" data-fav-slug="${escapeHtml(m.slug)}" aria-label="${escapeHtml(favLabel)}" title="${escapeHtml(favLabel)}">${isFav ? '★' : '☆'}</button>`;
+      const row = `<div class="pg-model-menu-row">
+        ${favBtn}
+        <button type="button" class="pg-worker-menu-item pg-model-menu-item${active ? ' active' : ''}" role="option" data-model-slug="${escapeHtml(m.slug)}" aria-selected="${active}">
           <span class="pg-worker-menu-item-text">${escapeHtml(m.name)}</span>
           ${priceHtml}
-        </button>`;
-      })
-      .join('');
+        </button>
+      </div>`;
+      return `${heading}${row}`;
+    })
+    .join('');
+
+  menu.innerHTML = searchHtml + rows;
   wireModelMenuSearch();
 }
 
@@ -614,8 +955,7 @@ function syncEmbedModelPicker(model) {
   if (!wrap || !menu || !labelEl) return;
 
   const onMediaJob = $('panel-media-job')?.classList.contains('active');
-  const onConnection = $('panel-connection')?.classList.contains('active');
-  if (!onMediaJob || onConnection) {
+  if (!onMediaJob || embedView.connectionOpen) {
     wrap.hidden = true;
     return;
   }
@@ -628,31 +968,9 @@ function syncEmbedModelPicker(model) {
 
 function syncEmbedTypeSegment() {
   if (!isEmbed) return;
-  const seg = $('embedTypeSegment');
-  if (!seg) return;
-
-  const onConnection = $('panel-connection')?.classList.contains('active');
-  const onMedia = $('panel-media-job')?.classList.contains('active');
-  const jobType = $('jobType')?.value || '';
-  const showSegment = !onConnection && onMedia && (jobType === 'image' || jobType === 'video');
-
-  seg.hidden = !showSegment;
-
-  seg.querySelectorAll('[data-worker-id]').forEach((btn) => {
-    const active = btn.dataset.workerId === activeEmbedWorkerId;
-    btn.classList.toggle('active', active);
-    btn.setAttribute('aria-selected', active ? 'true' : 'false');
-  });
-
+  $('embedTypeSegment')?.setAttribute('hidden', '');
   const picker = $('embedWorkerPicker');
-  if (picker) picker.hidden = showSegment || onConnection;
-
-  seg.querySelectorAll('.pg-type-segment-icon').forEach((el) => {
-    const btn = el.closest('[data-worker-id]');
-    const id = btn?.dataset.workerId;
-    if (id === 'create-image') el.innerHTML = workerIconHtml('image');
-    else if (id === 'create-video') el.innerHTML = workerIconHtml('video');
-  });
+  if (picker) picker.hidden = false;
 }
 
 function lastModelStorageKey(type) {
@@ -675,6 +993,178 @@ function getLastModel(type) {
   } catch {
     return '';
   }
+}
+
+function readFavoriteMap() {
+  try {
+    const raw = localStorage.getItem(STORAGE_FAVORITES);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeFavoriteMap(map) {
+  try {
+    localStorage.setItem(STORAGE_FAVORITES, JSON.stringify(map));
+  } catch {
+    /* ignore */
+  }
+}
+
+function getFavoriteSlugs(type) {
+  if (!type) return [];
+  const map = readFavoriteMap();
+  const list = map[type];
+  return Array.isArray(list) ? list.filter((s) => typeof s === 'string' && s.trim()) : [];
+}
+
+function isFavoriteModel(type, slug) {
+  if (!type || !slug) return false;
+  return getFavoriteSlugs(type).includes(slug);
+}
+
+function toggleFavoriteModel(type, slug) {
+  if (!type || !slug) return false;
+  const map = readFavoriteMap();
+  const list = getFavoriteSlugs(type).filter((s) => s !== slug);
+  const wasFav = isFavoriteModel(type, slug);
+  if (!wasFav) list.unshift(slug);
+  map[type] = list.slice(0, 24);
+  writeFavoriteMap(map);
+  return !wasFav;
+}
+
+function sortModelsForEmbedMenu(models, type) {
+  const favSlugs = getFavoriteSlugs(type);
+  const favSet = new Set(favSlugs);
+  const bySlug = new Map(models.map((m) => [m.slug, m]));
+  const favModels = [];
+  for (const slug of favSlugs) {
+    const m = bySlug.get(slug);
+    if (m) favModels.push(m);
+  }
+  const rest = models.filter((m) => !favSet.has(m.slug));
+  rest.sort((a, b) => {
+    const ca = a.credits ?? Number.MAX_SAFE_INTEGER;
+    const cb = b.credits ?? Number.MAX_SAFE_INTEGER;
+    return ca - cb;
+  });
+  return [...favModels, ...rest];
+}
+
+function promptHistoryKey(type) {
+  return `${STORAGE_PROMPT_HISTORY}${type || 'image'}`;
+}
+
+function getPromptHistory(type) {
+  try {
+    const raw = localStorage.getItem(promptHistoryKey(type));
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list.filter((p) => typeof p === 'string' && p.trim()) : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePromptHistory(type, prompt) {
+  const trimmed = (prompt || '').trim();
+  if (!trimmed || trimmed.length < 2) return;
+  const list = getPromptHistory(type).filter((p) => p !== trimmed);
+  list.unshift(trimmed);
+  try {
+    localStorage.setItem(promptHistoryKey(type), JSON.stringify(list.slice(0, MAX_PROMPT_HISTORY)));
+  } catch {
+    /* ignore */
+  }
+  renderPromptHistory();
+}
+
+function renderPromptHistory() {
+  const wrap = $('mediaPromptHistory');
+  if (!wrap) return;
+  if (!isEmbed) {
+    wrap.hidden = true;
+    return;
+  }
+  const type = $('jobType')?.value || 'image';
+  const items = getPromptHistory(type);
+  if (!items.length) {
+    wrap.hidden = true;
+    wrap.innerHTML = '';
+    return;
+  }
+  wrap.hidden = false;
+  wrap.innerHTML = items
+    .map((prompt) => {
+      const label = prompt.length > 52 ? `${prompt.slice(0, 52).trim()}…` : prompt;
+      return `<button type="button" class="pg-prompt-history-chip" data-prompt="${escapeHtml(prompt)}" title="${escapeHtml(prompt)}">${escapeHtml(label)}</button>`;
+    })
+    .join('');
+}
+
+function readResultGallery() {
+  try {
+    const raw = localStorage.getItem(STORAGE_RESULT_GALLERY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeResultGallery(list) {
+  try {
+    localStorage.setItem(STORAGE_RESULT_GALLERY, JSON.stringify(list.slice(0, MAX_RESULT_GALLERY)));
+  } catch {
+    /* ignore */
+  }
+}
+
+function appendResultGalleryEntry(url, mediaHint, model) {
+  if (!isEmbed || !url) return;
+  const media = String(mediaHint || 'image').toLowerCase();
+  const entry = {
+    url,
+    media,
+    model: model || $('mediaModelSelect')?.value || '',
+    ts: Date.now(),
+  };
+  const list = readResultGallery().filter((item) => item?.url !== url);
+  list.unshift(entry);
+  writeResultGallery(list);
+}
+
+function renderResultGallery() {
+  const wrap = $('resultGallery');
+  const track = $('resultGalleryTrack');
+  if (!wrap || !track) return;
+  if (!isEmbed) {
+    wrap.hidden = true;
+    return;
+  }
+  const items = readResultGallery().filter((item) => item?.url);
+  if (!items.length) {
+    wrap.hidden = true;
+    track.innerHTML = '';
+    return;
+  }
+  wrap.hidden = false;
+  track.innerHTML = items
+    .map((item) => {
+      const url = escapeHtml(item.url);
+      const media = String(item.media || 'image').toLowerCase();
+      const title = escapeHtml(item.model || item.url);
+      if (media === 'audio' || media === 'music') {
+        return `<button type="button" class="pg-result-gallery-item pg-result-gallery-item--audio" role="listitem" data-gallery-url="${url}" data-gallery-media="${media}" title="${title}">♪</button>`;
+      }
+      if (media === 'video') {
+        return `<button type="button" class="pg-result-gallery-item" role="listitem" data-gallery-url="${url}" data-gallery-media="video" title="${title}"><video src="${url}" muted preload="metadata"></video></button>`;
+      }
+      return `<button type="button" class="pg-result-gallery-item" role="listitem" data-gallery-url="${url}" data-gallery-media="image" title="${title}"><img src="${url}" alt="" loading="lazy" /></button>`;
+    })
+    .join('');
 }
 
 function prefetchAdjacentCatalog(type) {
@@ -732,6 +1222,20 @@ function toggleEmbedMenu(which) {
 async function navigateEmbedWorker(workerId) {
   const item = EMBED_WORKER_BY_ID.get(workerId);
   if (!item) return;
+
+  if (isEmbed) {
+    await applyEmbedView(
+      {
+        mode: item.kind === 'media-job' ? 'studio' : 'dev',
+        workerId,
+        model: item.kind === 'media-job' ? embedView.model : null,
+        connectionOpen: false,
+      },
+      { flash: true },
+    );
+    return;
+  }
+
   activeEmbedWorkerId = workerId;
   workerMenuFilter = '';
   modelMenuFilter = '';
@@ -753,7 +1257,7 @@ async function navigateEmbedWorker(workerId) {
     return;
   }
   if (item.kind === 'upload') {
-    openPanelById('upload');
+    openPanelByIdRaw('upload');
     document.querySelector(`.pg-tab[data-upload-tab="${item.uploadTab}"]`)?.click();
     syncEmbedChromeFromState();
     syncWorkerToUrl();
@@ -765,7 +1269,7 @@ async function navigateEmbedWorker(workerId) {
       syncWorkerToUrl();
       return;
     }
-    openPanelById(item.panel);
+    openPanelByIdRaw(item.panel);
     syncEmbedChromeFromState();
     syncWorkerToUrl();
   }
@@ -781,13 +1285,20 @@ function syncEmbedChromeFromState(model) {
   syncEmbedModelPicker(model);
   updateModelMetaWorkerTheme($('jobType')?.value || 'image');
   const connBtn = $('btnEmbedConnection');
-  const onConnection = $('panel-connection')?.classList.contains('active');
-  connBtn?.classList.toggle('active', onConnection);
+  connBtn?.classList.toggle('active', embedView.connectionOpen);
+}
+
+function syncEmbedViewModeClass() {
+  if (!isEmbed) return;
+  const studio = embedView.mode === 'studio';
+  document.body.classList.toggle('pg-studio', studio);
+  document.body.classList.toggle('pg-dev', !studio);
 }
 
 function applyEmbedChrome() {
   if (!isEmbed) return;
-  document.body.classList.add('pg-embed', 'pg-studio');
+  document.body.classList.add('pg-embed');
+  syncEmbedViewModeClass();
 }
 
 function updateEmbedStudio(type, model) {
@@ -841,18 +1352,18 @@ function initMediaSendChrome() {
 function wireEmbedStudio() {
   if (!isEmbed) return;
   $('btnEmbedConnection')?.addEventListener('click', () => {
-    const onConnection = $('panel-connection')?.classList.contains('active');
-    if (onConnection) {
-      void navigateEmbedWorker(activeEmbedWorkerId || 'create-image');
-      return;
-    }
-    openPanelById('connection');
-    syncEmbedChromeFromState();
+    if (embedView.connectionOpen) closeEmbedConnection();
+    else openEmbedConnection();
   });
+  $('embedConnectionBackdrop')?.addEventListener('click', () => closeEmbedConnection());
+  $('btnMediaSignin')?.addEventListener('click', openEmbedConnection);
+  $('btnResultEmptySignin')?.addEventListener('click', openEmbedConnection);
+  $('btnModelMetaMore')?.addEventListener('click', toggleModelMetaDesc);
   $('btnEmbedDev')?.addEventListener('click', () => {
-    const open = document.body.classList.toggle('pg-sidebar-open');
-    $('btnEmbedDev')?.classList.toggle('active', open);
+    if (document.body.classList.contains('pg-dev-open')) closeEmbedDev();
+    else openEmbedDev();
   });
+  $('embedDevBackdrop')?.addEventListener('click', () => closeEmbedDev());
 
   $('embedWorkerTrigger')?.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -890,11 +1401,38 @@ function wireEmbedStudio() {
     }
   });
   $('embedModelMenu')?.addEventListener('click', (e) => {
+    const favBtn = e.target.closest('[data-fav-slug]');
+    if (favBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const type = $('jobType')?.value || 'image';
+      toggleFavoriteModel(type, favBtn.dataset.favSlug);
+      renderEmbedModelMenu();
+      return;
+    }
     const btn = e.target.closest('[data-model-slug]');
     if (!btn || !$('mediaModelSelect')) return;
-    $('mediaModelSelect').value = btn.dataset.modelSlug;
+    const slug = btn.dataset.modelSlug;
+    $('mediaModelSelect').value = slug;
+    embedView.model = slug;
     onMediaModelChange();
     closeEmbedMenus();
+  });
+
+  $('mediaPromptHistory')?.addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-prompt]');
+    if (!chip || !$('mediaPrompt')) return;
+    $('mediaPrompt').value = chip.dataset.prompt || '';
+    $('mediaPrompt').dataset.userEdited = '1';
+    autoGrowPrompt();
+    updatePromptCount();
+    refreshRequestPreview();
+  });
+
+  $('resultGalleryTrack')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-gallery-url]');
+    if (!btn) return;
+    showResultUrl(btn.dataset.galleryUrl, btn.dataset.galleryMedia || 'image');
   });
 
   document.addEventListener('click', (e) => {
@@ -909,11 +1447,47 @@ function wireEmbedStudio() {
     closeEmbedMenus();
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeEmbedMenus();
+    if (e.key === 'Escape') {
+      if (embedView.connectionOpen) {
+        closeEmbedConnection();
+        return;
+      }
+      if (document.body.classList.contains('pg-dev-open')) {
+        closeEmbedDev();
+        return;
+      }
+      closeEmbedMenus();
+      return;
+    }
+    if (!isEmbed || embedView.mode !== 'studio' || embedView.connectionOpen) return;
+    if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+    const tag = document.activeElement?.tagName?.toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+    e.preventDefault();
+    if (embedMenuOpen !== 'model') {
+      toggleEmbedMenu('model');
+    } else {
+      $('embedModelSearch')?.focus();
+    }
   });
   window.addEventListener('portal-locale-change', () => {
     syncEmbedChromeFromState();
   });
+}
+
+async function resetEmbedStudio() {
+  if (!isEmbed) return;
+  closeEmbedDev();
+  $('btnEmbedDev')?.classList.remove('active');
+  await applyEmbedView(
+    {
+      mode: 'studio',
+      workerId: embedView.workerId || 'create-image',
+      model: embedView.model,
+      connectionOpen: false,
+    },
+    { flash: false },
+  );
 }
 
 async function initEmbedStudio() {
@@ -922,12 +1496,9 @@ async function initEmbedStudio() {
   wireEmbedStudio();
   syncEmbedTypeSegment();
   renderEmbedWorkerMenu();
-  captureDeepLinkFromUrl();
-  if (pendingDeepLink) {
-    await runPendingDeepLink();
-  } else {
-    await openMediaJobPanel('image');
-  }
+
+  await applyEmbedView(parseEmbedViewFromUrl(), { flash: false, forceModel: true });
+
   if (tokenEl?.value?.trim()) {
     try {
       await fetchUserMe(null, { silent: true });
@@ -935,13 +1506,81 @@ async function initEmbedStudio() {
       /* credits optional */
     }
   }
+
+  if (embedView.mode === 'studio' && !$('panel-media-job')?.classList.contains('active')) {
+    await applyEmbedView(
+      {
+        mode: 'studio',
+        workerId: embedView.workerId || 'create-image',
+        model: embedView.model,
+        connectionOpen: false,
+      },
+      { flash: false, forceModel: false },
+    );
+  }
+
+  syncMediaSigninOverlay();
+  syncResultEmptyState();
   syncWorkerToUrl();
+  renderPromptHistory();
+  renderResultGallery();
+  embedStudioBooted = true;
 }
 
-function handleEmbedTokenMessage(event) {
+function embedViewFromMessage(data) {
+  if (data.type === 'ai-gateway-apply-view') {
+    const worker =
+      typeof data.worker === 'string' && EMBED_WORKER_BY_ID.has(data.worker)
+        ? data.worker
+        : 'create-image';
+    const item = EMBED_WORKER_BY_ID.get(worker);
+    let mode = 'studio';
+    if (data.mode === 'dev') mode = 'dev';
+    else if (data.mode === 'studio') mode = 'studio';
+    else if (item && item.kind !== 'media-job') mode = 'dev';
+    return {
+      mode,
+      workerId: worker,
+      model: typeof data.model === 'string' ? data.model.trim() || null : null,
+      connectionOpen: data.panel === 'connection',
+    };
+  }
+  if (data.type === 'ai-gateway-nav-worker') {
+    const worker = typeof data.worker === 'string' ? data.worker.trim() : '';
+    if (!worker || !EMBED_WORKER_BY_ID.has(worker)) return null;
+    const item = EMBED_WORKER_BY_ID.get(worker);
+    return {
+      mode: item.kind === 'media-job' ? 'studio' : 'dev',
+      workerId: worker,
+      model: typeof data.model === 'string' ? data.model.trim() || null : null,
+      connectionOpen: false,
+    };
+  }
+  if (data.type === 'ai-gateway-reset-studio') {
+    return parseEmbedViewFromUrl();
+  }
+  return null;
+}
+
+function handleEmbedParentMessage(event) {
   if (!isEmbed || !isAllowedEmbedParent(event.origin)) return;
   const data = event.data;
   if (!data || typeof data !== 'object') return;
+
+  const view = embedViewFromMessage(data);
+  if (view) {
+    if (data.type === 'ai-gateway-apply-view' && embedStudioBooted && view.mode === 'studio') {
+      const current = $('mediaModelSelect')?.value?.trim();
+      if (current) view.model = current;
+      void applyEmbedView(view, { flash: false, forceModel: false });
+    } else {
+      void applyEmbedView(view, {
+        flash: false,
+        forceModel: data.type === 'ai-gateway-apply-view' && Boolean(view.model),
+      });
+    }
+    return;
+  }
   if (data.type === 'ai-gateway-locale') {
     const locale = data.locale || data.lang;
     if (locale && globalThis.PortalI18n) {
@@ -966,12 +1605,16 @@ function handleEmbedTokenMessage(event) {
 
 async function afterEmbedAuth() {
   if (!isEmbed) return;
-  await runPendingDeepLink();
-  const onMedia = $('panel-media-job')?.classList.contains('active');
-  if (!onMedia) {
-    await navigateEmbedWorker(activeEmbedWorkerId || 'create-image');
-    return;
-  }
+  closeEmbedConnection();
+  await applyEmbedView(
+    {
+      mode: 'studio',
+      workerId: embedView.workerId || 'create-image',
+      model: embedView.model,
+      connectionOpen: false,
+    },
+    { flash: false },
+  );
   const type = $('jobType')?.value || 'image';
   await loadMediaJobForType(type, { autoFetch: true });
 }
@@ -980,8 +1623,10 @@ if (isEmbed) {
   document.documentElement.classList.add('pg-embed-root');
   applyEmbedChrome();
   document.body?.classList.add('pg-booting');
-  window.addEventListener('message', handleEmbedTokenMessage);
+  window.addEventListener('message', handleEmbedParentMessage);
 }
+
+updateTokenBadge();
 
 function getOrCreateDeviceId() {
   const existing = localStorage.getItem(STORAGE_DEVICE_ID)?.trim();
@@ -2025,7 +2670,65 @@ function modelNeedsRefInput(jobType, model) {
 }
 
 function promptRequired(jobType, model) {
+  if (jobType === 'music' || jobType === 'tts') return true;
   return !modelNeedsRefInput(jobType, model);
+}
+
+function promptRequiredMessage(jobType) {
+  if (jobType === 'music') return pgT('media.lyricsRequired', 'Lyrics required');
+  if (jobType === 'tts') return pgT('media.ttsContentRequired', 'Text content required');
+  return 'prompt required';
+}
+
+function syncJobTypeFormFields(jobType) {
+  const type = jobType || $('jobType')?.value || 'image';
+  const musicWrap = $('mediaMusicFields');
+  const ttsWrap = $('mediaTtsFields');
+  const promptLabel = $('mediaPromptLabel');
+  const promptEl = $('mediaPrompt');
+
+  if (musicWrap) musicWrap.hidden = type !== 'music';
+  if (ttsWrap) ttsWrap.hidden = type !== 'tts';
+
+  const refLabel = $('mediaRefUrlWrap')?.querySelector('label[for="mediaRefUrl"]');
+  if (refLabel) {
+    refLabel.textContent =
+      type === 'avatar-lipsync'
+        ? pgT('media.avatarImage', 'Avatar image')
+        : pgT('media.subject', 'Subject');
+  }
+
+  const paramsCard = $('mediaParamsCard');
+  if (paramsCard && isEmbed) {
+    paramsCard.classList.toggle('pg-studio-params-card--music', type === 'music');
+  }
+
+  if (promptLabel) {
+    if (type === 'music') {
+      promptLabel.textContent = pgT('media.lyrics', 'Lyrics');
+    } else if (type === 'tts') {
+      promptLabel.textContent = pgT('media.ttsContent', 'Text to speak');
+    } else {
+      promptLabel.textContent = pgT('media.prompt', 'Prompt');
+    }
+  }
+
+  if (promptEl) {
+    if (type === 'music') {
+      promptEl.placeholder = pgT('media.promptPlaceholderMusic', 'Lofi hip hop beats and chill vibe…');
+    } else if (type === 'tts') {
+      promptEl.placeholder = pgT('media.promptPlaceholderTts', 'Enter the text to convert to speech…');
+    } else if (type === 'video') {
+      promptEl.placeholder = pgT('media.promptPlaceholderVideo', 'Describe the video scene, motion, and style…');
+    } else if (type === 'image') {
+      promptEl.placeholder = pgT(
+        'media.promptPlaceholderImage',
+        'Describe the image you want to create…',
+      );
+    } else {
+      promptEl.placeholder = pgT('media.promptPlaceholder', 'Enter your prompt…');
+    }
+  }
 }
 
 function jobTypeNeedsPrompt(jobType, model) {
@@ -2128,6 +2831,27 @@ function getMediaInputSpec(jobType, model) {
     return spec;
   }
 
+  if (jobType === 'avatar-lipsync') {
+    spec.show = true;
+    spec.fields = [
+      {
+        id: 'avatar_image',
+        type: 'image',
+        labelKey: 'media.avatarImage',
+        payloadKey: 'image',
+        required: true,
+      },
+      {
+        id: 'avatar_audio',
+        type: 'audio',
+        labelKey: 'media.avatarAudio',
+        payloadKey: 'reference_audio',
+        required: true,
+      },
+    ];
+    return spec;
+  }
+
   if (modelNeedsRefInput(jobType, model)) {
     spec.show = true;
     spec.fields = [
@@ -2144,8 +2868,25 @@ function getMediaInputSpec(jobType, model) {
   return spec;
 }
 
+function applyAvatarLipsyncImage(fields, url) {
+  if (!url) return;
+  fields.image = url;
+  fields.image_url = url;
+}
+
+function applyAvatarLipsyncAudio(fields, url) {
+  if (!url) return;
+  fields.reference_audio = url;
+  fields.audio_file = url;
+}
+
 function getMediaSlotValue(slotId) {
   return mediaInputValues.get(slotId)?.trim() || '';
+}
+
+function syncMediaSlotChrome(slotEl, url) {
+  if (!slotEl) return;
+  slotEl.classList.toggle('has-value', Boolean(url));
 }
 
 function setMediaSlotValue(slotId, url) {
@@ -2156,6 +2897,58 @@ function setMediaSlotValue(slotId, url) {
   const input = slot.querySelector('.pg-media-slot-url');
   if (input) input.value = url || '';
   updateMediaSlotPreview(slot, url);
+  syncMediaSlotChrome(slot, url);
+}
+
+function getActiveMediaModel() {
+  const jobType = $('jobType')?.value || 'image';
+  const slug = $('mediaModelSelect')?.value;
+  const envelope = slug ? getStoredModelsEnvelope(jobType) : null;
+  return envelope && slug
+    ? normalizeModels(envelope).find((m) => m.slug === slug)
+    : activeCatalogModel;
+}
+
+/** Push upload URL into the active media-job ref slot (embed slots or legacy fields). */
+function applyUploadToActiveMediaSlot(url, kind) {
+  if (!url || !kind) return false;
+  const jobType = $('jobType')?.value || 'image';
+  const model = getActiveMediaModel();
+
+  if (isEmbed) {
+    const spec = getMediaInputSpec(jobType, model);
+    if (!spec.show) return false;
+    const field = spec.fields.find((f) => f.type === kind);
+    if (!field) return false;
+    setMediaSlotValue(field.id, url);
+    refreshRequestPreview();
+    return true;
+  }
+
+  if (kind === 'image') {
+    const refWrap = $('mediaRefUrlWrap');
+    if (refWrap && !refWrap.hidden) {
+      const refEl = $('mediaRefUrl');
+      if (refEl) {
+        refEl.value = url;
+        updateRefPreview();
+        refreshRequestPreview();
+        return true;
+      }
+    }
+  }
+  if (kind === 'audio') {
+    const audioWrap = $('mediaAvatarAudioWrap');
+    if (audioWrap && !audioWrap.hidden) {
+      const el = $('mediaAvatarAudioUrl');
+      if (el) {
+        el.value = url;
+        refreshRequestPreview();
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 function updateMediaSlotPreview(slotEl, url) {
@@ -2175,6 +2968,12 @@ function updateMediaSlotPreview(slotEl, url) {
     vid.playsInline = true;
     vid.preload = 'metadata';
     preview.appendChild(vid);
+  } else if (type === 'audio') {
+    const aud = document.createElement('audio');
+    aud.src = url;
+    aud.controls = true;
+    aud.preload = 'metadata';
+    preview.appendChild(aud);
   } else {
     const img = document.createElement('img');
     img.src = url;
@@ -2192,24 +2991,73 @@ function updateMediaSlotPreview(slotEl, url) {
   preview.appendChild(clear);
 }
 
+function extractUploadUrl(body) {
+  if (!body || typeof body !== 'object') return null;
+  const data = body.data && typeof body.data === 'object' ? body.data : {};
+  const raw = body.raw && typeof body.raw === 'object' ? body.raw : {};
+  const audioInfo = data.audioInfo || raw.audioInfo || {};
+  const imageInfo = data.imageInfo || raw.imageInfo || {};
+  const videoInfo = data.videoInfo || raw.videoInfo || {};
+  const candidates = [
+    data.url,
+    data.file_url,
+    data.fileUrl,
+    data.result_url,
+    data.audio_url,
+    data.video_url,
+    body.url,
+    body.fileUrl,
+    audioInfo.url,
+    audioInfo.file_url,
+    audioInfo.result_url,
+    imageInfo.url,
+    videoInfo.url,
+  ];
+  for (const c of candidates) {
+    if (typeof c === 'string' && /^https?:\/\//i.test(c)) return c.trim();
+  }
+  return null;
+}
+
+function uploadErrorMessage(body, status) {
+  if (body && typeof body === 'object') {
+    if (typeof body.message === 'string' && body.message.trim()) return body.message.trim();
+    if (typeof body.error === 'string' && body.error.trim()) return body.error.trim();
+  }
+  return `HTTP ${status}`;
+}
+
 async function uploadMediaFile(file, kind) {
   getToken();
   const form = new FormData();
-  form.append('file', file);
-  const path = kind === 'video' ? '/gateway/upload/video' : '/gateway/upload/image';
+  const path =
+    kind === 'video'
+      ? '/gateway/upload/video'
+      : kind === 'audio'
+        ? '/gateway/upload/audio'
+        : '/gateway/upload/image';
+  if (kind === 'video') form.append('video_file', file);
+  else if (kind === 'audio') form.append('audio_file', file);
+  else form.append('file', file);
+
   const res = await fetch(`${baseUrl()}${path}`, {
     method: 'POST',
     headers: authHeaders(false),
     body: form,
   });
-  const body = await res.json();
-  const url =
-    body?.data?.url ||
-    body?.data?.file_url ||
-    body?.url ||
-    body?.data?.imageInfo?.url ||
-    body?.data?.videoInfo?.url;
-  if (!url) throw new Error('No URL in upload response');
+  let body;
+  try {
+    body = await res.json();
+  } catch {
+    throw new Error(uploadErrorMessage(null, res.status));
+  }
+  if (!res.ok || body?.success === false) {
+    throw new Error(uploadErrorMessage(body, res.status));
+  }
+  const url = extractUploadUrl(body);
+  if (!url) {
+    throw new Error(uploadErrorMessage(body, res.status) || 'No URL in upload response');
+  }
   return url;
 }
 
@@ -2245,6 +3093,7 @@ function wireMediaSlot(slotEl, field) {
 }
 
 async function handleMediaSlotFile(field, file) {
+  setMediaSlotValue(field.id, '');
   const status = $('mediaJobStatus');
   setStatus(status, pgT('media.uploading', 'Uploading…'), 'running');
   try {
@@ -2293,11 +3142,17 @@ function renderMediaInputSlots(jobType, model) {
     slot.dataset.slotId = field.id;
     slot.dataset.slotType = field.type;
 
-    const accept = field.type === 'video' ? 'video/*' : 'image/*';
+    const accept =
+      field.type === 'video'
+        ? 'video/*'
+        : field.type === 'audio'
+          ? 'audio/*'
+          : 'image/*';
+    const slotIcon = field.type === 'video' ? '▶' : field.type === 'audio' ? '♪' : '🖼';
     slot.innerHTML = `
       <label class="pg-media-slot-label">${escapeHtml(pgT(field.labelKey, field.labelKey))}${field.optional ? ` <span class="pg-optional">${pgT('media.optional', 'optional')}</span>` : ''}</label>
       <div class="pg-media-dropzone" tabindex="0" role="button">
-        <span class="pg-media-dropzone-icon">${field.type === 'video' ? '▶' : '🖼'}</span>
+        <span class="pg-media-dropzone-icon">${slotIcon}</span>
         <span class="pg-media-dropzone-text">${escapeHtml(pgT('media.dropHint', 'Drop file or paste URL'))}</span>
       </div>
       <input type="url" class="pg-media-slot-url" placeholder="https://…" autocomplete="off" spellcheck="false" />
@@ -2311,7 +3166,13 @@ function renderMediaInputSlots(jobType, model) {
   }
 
   if (hintEl) {
-    hintEl.textContent = pgT('media.refHint', 'Upload or paste URL.');
+    hintEl.textContent =
+      jobType === 'avatar-lipsync'
+        ? pgT(
+            'media.avatarHint',
+            'Avatar image + reference audio (mp3/wav URL). Upload or paste URL in each slot.',
+          )
+        : pgT('media.refHint', 'Upload or paste URL.');
     hintEl.hidden = false;
   }
 }
@@ -2331,6 +3192,8 @@ function readMediaInputFields() {
       const val = getMediaSlotValue(field.id);
       if (!val) continue;
       if (field.payloadKey === 'video_url') out.video_url = val;
+      else if (field.payloadKey === 'image') applyAvatarLipsyncImage(out, val);
+      else if (field.payloadKey === 'reference_audio') applyAvatarLipsyncAudio(out, val);
       else if (field.payloadKey === 'images') {
         const idx = field.index ?? 0;
         images[idx] = { url: val };
@@ -2341,13 +3204,43 @@ function readMediaInputFields() {
     return out;
   }
 
+  if (jobType === 'avatar-lipsync') {
+    applyAvatarLipsyncImage(out, $('mediaRefUrl')?.value?.trim());
+    applyAvatarLipsyncAudio(out, $('mediaAvatarAudioUrl')?.value?.trim());
+    return out;
+  }
+
   const ref = $('mediaRefUrl')?.value?.trim();
   if (ref) return { images: [{ url: ref }] };
   return {};
 }
 
+function validateAvatarLipsyncFields() {
+  if (($('jobType')?.value || '') !== 'avatar-lipsync') return null;
+  if (isEmbed) {
+    if (!getMediaSlotValue('avatar_image')) {
+      return pgT('media.avatarImageRequired', 'Avatar image required');
+    }
+    if (!getMediaSlotValue('avatar_audio')) {
+      return pgT('media.avatarAudioRequired', 'Reference audio required');
+    }
+    return null;
+  }
+  if (!$('mediaRefUrl')?.value?.trim()) {
+    return pgT('media.avatarImageRequired', 'Avatar image required');
+  }
+  if (!$('mediaAvatarAudioUrl')?.value?.trim()) {
+    return pgT('media.avatarAudioRequired', 'Reference audio required');
+  }
+  return null;
+}
+
 function validateMediaInputs(jobType, model) {
+  const avatarErr = validateAvatarLipsyncFields();
+  if (avatarErr) return avatarErr;
+
   if (!isEmbed) {
+    if (jobType === 'avatar-lipsync') return null;
     const ref = $('mediaRefUrl')?.value?.trim();
     if (modelNeedsRefInput(jobType, model) && !ref) {
       return pgT('media.refRequired', 'Reference media required');
@@ -2367,10 +3260,14 @@ function validateMediaInputs(jobType, model) {
 
 function updateStudioFieldVisibility(jobType, model) {
   activeCatalogModel = model || null;
+  syncJobTypeFormFields(jobType);
   renderMediaInputSlots(jobType, model);
   if (!isEmbed) {
     const refWrap = $('mediaRefUrlWrap');
-    if (refWrap) refWrap.hidden = !modelNeedsRefInput(jobType, model);
+    const avatarAudioWrap = $('mediaAvatarAudioWrap');
+    const isAvatar = jobType === 'avatar-lipsync';
+    if (refWrap) refWrap.hidden = isAvatar ? false : !modelNeedsRefInput(jobType, model);
+    if (avatarAudioWrap) avatarAudioWrap.hidden = !isAvatar;
     updateRefPreview();
   }
 }
@@ -2386,19 +3283,16 @@ function updateRefUrlFieldVisibility(jobType) {
 
 function applyMediaPromptDefaults(type) {
   const promptEl = $('mediaPrompt');
-  if (!promptEl || promptEl.dataset.userEdited) return;
+  if (!promptEl || promptEl.dataset.userEdited) {
+    syncJobTypeFormFields(type);
+    return;
+  }
   if (isEmbed) {
     promptEl.value = '';
-    if (type === 'video') {
-      promptEl.placeholder = pgT('media.promptPlaceholderVideo', 'Describe the video…');
-    } else if (type === 'image') {
-      promptEl.placeholder = pgT('media.promptPlaceholderImage', 'Describe the image…');
-    } else {
-      promptEl.placeholder = pgT('media.promptPlaceholder', 'Enter your prompt…');
-    }
   } else if (DEFAULT_PROMPTS[type]) {
     promptEl.value = DEFAULT_PROMPTS[type];
   }
+  syncJobTypeFormFields(type);
   autoGrowPrompt();
   updatePromptCount();
 }
@@ -2434,14 +3328,56 @@ function setSendButtonLoading(loading) {
 function updateModelMetaWorkerTheme(jobType) {
   const bar = $('mediaModelMeta');
   if (!bar) return;
-  bar.dataset.worker = jobType === 'video' ? 'video' : 'image';
+  const theme =
+    jobType === 'video'
+      ? 'video'
+      : jobType === 'music'
+        ? 'music'
+        : jobType === 'tts'
+          ? 'tts'
+          : 'image';
+  bar.dataset.worker = theme;
 }
 
 function readJobFields(prompt) {
+  const jobType = $('jobType')?.value || 'image';
   const fields = { ...readCatalogFieldValues(), ...readMediaInputFields() };
-  if (prompt) fields.prompt = prompt;
   const projectId = $('mediaProjectId')?.value?.trim();
   if (projectId) fields.project_id = projectId;
+
+  const text = (prompt ?? $('mediaPrompt')?.value ?? '').trim();
+
+  if (jobType === 'music') {
+    if (text) fields.lyrics = text;
+    const musicPrompt = $('mediaMusicPrompt')?.value?.trim();
+    if (musicPrompt) fields.prompt = musicPrompt;
+    const tags = $('mediaMusicGenre')?.value?.trim();
+    if (tags) {
+      fields.tags = tags;
+      fields.styles = tags;
+    }
+    const title = $('mediaMusicName')?.value?.trim();
+    if (title) {
+      fields.name = title;
+      fields.title = title;
+    }
+    if (fields.lyrics && !fields.mode) fields.mode = 'custom';
+    return fields;
+  }
+
+  if (jobType === 'tts') {
+    if (text) fields.text = text;
+    if ($('mediaTtsSelf')?.checked !== false) fields.self = true;
+    const inputUrl = $('mediaTtsInputUrl')?.value?.trim();
+    if (inputUrl) fields.input_url = inputUrl;
+    const style = $('mediaTtsStyle')?.value?.trim();
+    if (style) fields.style = style;
+    const voiceId = $('mediaTtsVoiceId')?.value?.trim();
+    if (voiceId) fields.voice_id = voiceId;
+    return fields;
+  }
+
+  if (text) fields.prompt = text;
   return fields;
 }
 
@@ -2471,6 +3407,8 @@ function hidePreviewMedia() {
 
 function showResultUrl(url, mediaHint = '') {
   if (!url) return;
+  appendResultGalleryEntry(url, mediaHint);
+  renderResultGallery();
   showJobResultLayout();
   if (resultEmpty) resultEmpty.hidden = true;
   const preview = $('resultPreview');
@@ -2619,6 +3557,7 @@ function abortActiveJobRequest() {
 
 function pollMediaForJobType(jobType) {
   if (jobType === 'music') return 'music';
+  if (jobType === 'tts') return null;
   if (
     jobType === 'video' ||
     jobType === 'avatar-lipsync' ||
@@ -2833,14 +3772,22 @@ const modelsFetchInflight = new Map();
 
 function setMediaModelSelectLoading(loading) {
   const sel = $('mediaModelSelect');
+  const meta = $('mediaModelMeta');
   if (!sel) return;
   if (loading) {
     sel.innerHTML = `<option value="">${pgT('media.modelsLoading', 'Loading models…')}</option>`;
     sel.disabled = true;
     renderCatalogFields(null);
+    if (meta && isEmbed) {
+      meta.hidden = false;
+      meta.classList.add('pg-model-meta--loading');
+      const nameEl = $('mediaModelMetaName');
+      if (nameEl) nameEl.textContent = pgT('media.modelsLoading', 'Loading models…');
+    }
     return;
   }
   sel.disabled = false;
+  meta?.classList.remove('pg-model-meta--loading');
 }
 
 function populateMediaModelSelect(models) {
@@ -2940,8 +3887,17 @@ function ratioChipInner(ratio) {
   return `<span class="pg-ratio-icon" style="width:${bw}px;height:${bh}px" aria-hidden="true"></span><span class="pg-param-chip-text">${escapeHtml(r)}</span>`;
 }
 
+function pickDefaultCatalogOption(field, list, jobType) {
+  if (jobType === 'music' && field === 'mode') {
+    const custom = list.find((m) => String(m).toLowerCase() === 'custom');
+    if (custom) return custom;
+  }
+  return list[0];
+}
+
 function appendCatalogChipGroup(container, def, list, model) {
   const jobType = $('jobType')?.value || 'image';
+  const defaultVal = pickDefaultCatalogOption(def.field, list, jobType);
   const wrap = document.createElement('div');
   wrap.className = 'field pg-studio-param pg-param-chips';
   const label = document.createElement('span');
@@ -2957,10 +3913,10 @@ function appendCatalogChipGroup(container, def, list, model) {
   list.forEach((opt, i) => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = `pg-param-chip${i === 0 ? ' active' : ''}`;
+    btn.className = `pg-param-chip${opt === defaultVal ? ' active' : ''}`;
     btn.dataset.value = opt;
     btn.setAttribute('role', 'option');
-    btn.setAttribute('aria-selected', i === 0 ? 'true' : 'false');
+    btn.setAttribute('aria-selected', opt === defaultVal ? 'true' : 'false');
     if (def.field === 'ratio') btn.innerHTML = ratioChipInner(opt);
     else btn.textContent = opt;
     btn.addEventListener('click', () => {
@@ -3004,7 +3960,16 @@ function renderCatalogFields(model) {
     if (!list?.length) continue;
     defs.push({ def, list });
   }
-  if (!defs.length) return;
+  if (!defs.length) {
+    if (isEmbed && ($('jobType')?.value || '') === 'music') {
+      const card = $('mediaParamsCard');
+      if (card) card.hidden = true;
+    }
+    return;
+  }
+
+  const paramsCard = $('mediaParamsCard');
+  if (paramsCard && isEmbed) paramsCard.hidden = false;
 
   const useChips = isEmbed;
   container.className = useChips
@@ -3039,6 +4004,8 @@ function renderCatalogFields(model) {
     for (const opt of list) {
       sel.appendChild(new Option(opt, opt));
     }
+    const defaultVal = pickDefaultCatalogOption(def.field, list, $('jobType')?.value || 'image');
+    sel.value = defaultVal;
     wrap.appendChild(label);
     wrap.appendChild(sel);
     container.appendChild(wrap);
@@ -3050,6 +4017,7 @@ function renderCatalogFields(model) {
 function onMediaModelChange() {
   const type = $('jobType')?.value || 'image';
   const slug = $('mediaModelSelect')?.value;
+  if (slug) embedView.model = slug.trim();
   const envelope = getStoredModelsEnvelope(type);
   if (!envelope || !slug) {
     renderCatalogFields(null);
@@ -3080,6 +4048,7 @@ function updateModelMetaBar(model) {
   if (!bar) return;
   if (!model) {
     bar.hidden = true;
+    bar.classList.remove('pg-model-meta--loading');
     return;
   }
   bar.hidden = false;
@@ -3088,20 +4057,12 @@ function updateModelMetaBar(model) {
   const slugEl = $('mediaModelMetaSlug');
   if (nameEl) nameEl.textContent = model.name;
   if (slugEl) slugEl.textContent = model.slug;
-  const descEl = $('mediaModelMetaDesc');
   const desc =
     pgLocale() === 'vi'
       ? model.descriptionVi || model.descriptionEn || model.description
       : model.descriptionEn || model.descriptionVi || model.description || '';
-  if (descEl) {
-    if (desc) {
-      descEl.textContent = desc;
-      descEl.hidden = false;
-    } else {
-      descEl.textContent = '';
-      descEl.hidden = true;
-    }
-  }
+  renderModelMetaDesc(desc);
+  bar.classList.remove('pg-model-meta--loading');
   refreshRequestPreview();
 }
 
@@ -3110,6 +4071,7 @@ function updateMediaJobChrome(type, model) {
   const endpoint = $('mediaJobEndpoint');
   if (title) title.textContent = model?.name || MEDIA_JOB_LABELS[type] || 'Media job';
   if (endpoint) endpoint.textContent = `POST /gateway/jobs/${type}`;
+  syncJobTypeFormFields(type);
   updateEmbedStudio(type, model);
   updateSendPriceLabel(model);
 }
@@ -3131,6 +4093,7 @@ async function openMediaJobPanel(type, { autoFetch = true } = {}) {
     p.classList.toggle('active', p.dataset.panel === 'media-job');
   });
   activateNavForPanel('media-job', type);
+  renderPromptHistory();
   await loadMediaJobForType(type, { autoFetch });
 }
 
@@ -3200,9 +4163,35 @@ function validateCatalogFields(model) {
             : model.durations;
     if (list?.length) {
       const val = readCatalogFieldValue(def.field);
-      if (!val) return `Select ${def.label} from catalog — never guess`;
+      if (!val) {
+        const label = pgT(def.i18n, def.label);
+        if (($('jobType')?.value || '') === 'music' && def.field === 'mode') {
+          return pgT('media.musicModeRequired', 'Select mode from Model options (e.g. custom)');
+        }
+        return pgT('media.catalogRequired', 'Select {label} from catalog — never guess').replace(
+          '{label}',
+          label,
+        );
+      }
     }
   }
+  return null;
+}
+
+function validateMusicJobFields() {
+  if (($('jobType')?.value || '') !== 'music') return null;
+  const title = $('mediaMusicName')?.value?.trim();
+  if (!title) return pgT('media.musicTitleRequired', 'Title required');
+  if (title.length < 5) {
+    return pgT('media.musicTitleMinLength', 'Track name must be at least 5 characters');
+  }
+  const tags = $('mediaMusicGenre')?.value?.trim();
+  if (!tags) return pgT('media.musicTagsRequired', 'Style / tags required');
+  if (tags.length < 3) {
+    return pgT('media.musicStylesMinLength', 'Style must be at least 3 characters');
+  }
+  const musicPrompt = $('mediaMusicPrompt')?.value?.trim();
+  if (!musicPrompt) return pgT('media.musicPromptRequired', 'Prompt required');
   return null;
 }
 
@@ -3326,6 +4315,9 @@ function logUsageEvent(partial) {
     resultUrl: partial.resultUrl,
     source: 'playground',
   };
+  if (record.status === 'success' && record.prompt) {
+    savePromptHistory(record.jobType, record.prompt);
+  }
   appendUsageLocal(record);
   notifyUsageParent(record);
 }
@@ -3559,6 +4551,7 @@ async function runMediaJobPollLoop(jobId, media, jobMeta, gen) {
           jobId,
           resultUrl: resultUrl || undefined,
         });
+        notifyJobComplete();
         return { success: true, data, resultUrl, elapsedMs: elapsed };
       }
       if (isPollFailed(data)) {
@@ -3729,6 +4722,21 @@ $('mediaPrompt')?.addEventListener('input', () => {
   refreshRequestPreview();
 });
 
+for (const id of [
+  'mediaMusicName',
+  'mediaMusicPrompt',
+  'mediaMusicGenre',
+  'mediaTtsInputUrl',
+  'mediaTtsStyle',
+  'mediaTtsVoiceId',
+  'mediaTtsSelf',
+  'mediaProjectId',
+  'mediaAvatarAudioUrl',
+]) {
+  $(id)?.addEventListener('input', () => refreshRequestPreview());
+  $(id)?.addEventListener('change', () => refreshRequestPreview());
+}
+
 $('mediaPrompt')?.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     e.preventDefault();
@@ -3748,7 +4756,26 @@ document.querySelectorAll('.pg-nav-item:not([disabled])').forEach((btn) => {
     const jobType = btn.dataset.jobType;
     const infoKind = btn.dataset.infoKind;
     const libraryKind = btn.dataset.libraryKind;
+    if (isEmbed) closeEmbedDev();
+    if (panel === 'connection' && isEmbed) {
+      openEmbedConnection();
+      return;
+    }
     if (panel === 'media-job' && jobType) {
+      if (isEmbed) {
+        const workerMap = {
+          image: 'create-image',
+          video: 'create-video',
+          music: 'create-music',
+          tts: 'create-tts',
+        };
+        const workerId = workerMap[jobType] || activeEmbedWorkerId;
+        void applyEmbedView(
+          { mode: 'studio', workerId, model: embedView.model, connectionOpen: false },
+          { flash: true },
+        );
+        return;
+      }
       void openMediaJobPanel(jobType);
       return;
     }
@@ -3790,6 +4817,13 @@ document.querySelectorAll('.pg-tab[data-upload-tab]').forEach((tab) => {
     });
     $('upload-image').classList.toggle('active', id === 'image');
     $('upload-video').classList.toggle('active', id === 'video');
+    if (id === 'image') {
+      const videoInput = $('uploadVideoFile');
+      if (videoInput) videoInput.value = '';
+    } else {
+      const imageInput = $('uploadImageFile');
+      if (imageInput) imageInput.value = '';
+    }
     if (isEmbed) syncEmbedChromeFromState();
   });
 });
@@ -3969,7 +5003,18 @@ $('btnLogin').addEventListener('click', async () => {
       /* credits optional */
     }
     if (isEmbed) {
-      await navigateEmbedWorker(activeEmbedWorkerId || 'create-image');
+      closeEmbedConnection();
+      await applyEmbedView(
+        {
+          mode: 'studio',
+          workerId: embedView.workerId || 'create-image',
+          model: embedView.model,
+          connectionOpen: false,
+        },
+        { flash: false },
+      );
+      const type = $('jobType')?.value || 'image';
+      await loadMediaJobForType(type, { autoFetch: true });
     }
   } catch (err) {
     setStatus(status, err.message, false);
@@ -4021,12 +5066,18 @@ $('btnMediaJob')?.addEventListener('click', async () => {
   const envelope = getStoredModelsEnvelope(jobType);
   const model = normalizeModels(envelope).find((m) => m.slug === modelSlugVal);
   if (promptRequired(jobType, model) && !prompt) {
-    setStatus(status, 'prompt required', false);
+    setStatus(status, promptRequiredMessage(jobType), false);
     return;
   }
   const mediaErr = validateMediaInputs(jobType, model);
   if (mediaErr) {
     setStatus(status, mediaErr, false);
+    return;
+  }
+
+  const musicErr = validateMusicJobFields();
+  if (musicErr) {
+    setStatus(status, musicErr, false);
     return;
   }
 
@@ -4116,6 +5167,7 @@ $('btnMediaJob')?.addEventListener('click', async () => {
         jobId: jobId || undefined,
         resultUrl: url || undefined,
       });
+      notifyJobComplete();
       setStatus(status, url ? '' : pgT('result.done', 'Completed'), url ? 'preview' : 'ok');
       return;
     }
@@ -4127,11 +5179,35 @@ $('btnMediaJob')?.addEventListener('click', async () => {
     displayPollJson({ message: pgT('result.polling', 'Polling…'), status: 'pending' });
 
     if ($('pollJobId') && jobId) $('pollJobId').value = jobId;
-    if ($('pollMedia')) $('pollMedia').value = media;
+    if ($('pollMedia') && media) $('pollMedia').value = media;
 
     if (!jobId) {
       finishResultJob({ failed: true, errorStep: 'create', elapsedMs: performance.now() - jobStart });
       setStatus(status, 'No job id in create response', false);
+      return;
+    }
+
+    if (!media) {
+      const url = extractJobResultUrl(data, jobType);
+      const elapsed = performance.now() - jobStart;
+      finishResultJob({ elapsedMs: elapsed });
+      updateResultHeader({ ...jobMeta, elapsedMs: elapsed, jobId, status: url ? 'success' : 'running' });
+      displayPollJson(
+        url
+          ? { message: pgT('result.done', 'Completed'), status: 'success', resultUrl: url }
+          : {
+              message: pgT('media.ttsNoPoll', 'TTS jobs do not use poll — enable Wait or check Create JSON for result URL.'),
+              status: 'pending',
+            },
+      );
+      if (url) {
+        showResultUrl(url, 'audio');
+        responseMeta.textContent = `${pgT('result.done', 'Completed')} · ${formatElapsed(elapsed)}`;
+        setStatus(status, '', 'preview');
+      } else {
+        responseMeta.textContent = pgT('media.ttsNoPollShort', 'No poll for TTS — check create response');
+        setStatus(status, pgT('media.ttsNoPollShort', 'No poll for TTS — check create response'), 'ok');
+      }
       return;
     }
 
@@ -4184,32 +5260,16 @@ $('mediaRefUrl')?.addEventListener('input', () => {
 $('mediaRefFile')?.addEventListener('change', async (e) => {
   const file = e.target.files?.[0];
   if (!file) return;
+  const refEl = $('mediaRefUrl');
+  if (refEl) refEl.value = '';
+  updateRefPreview();
   const status = $('mediaJobStatus');
   setStatus(status, 'Uploading reference…', 'running');
   try {
-    getToken();
-  } catch (err) {
-    setStatus(status, err.message, false);
-    return;
-  }
-  const form = new FormData();
-  form.append('file', file);
-  try {
-    const res = await fetch(`${baseUrl()}/gateway/upload/image`, {
-      method: 'POST',
-      headers: authHeaders(false),
-      body: form,
-    });
-    const body = await res.json();
-    const url =
-      body?.data?.url ||
-      body?.data?.file_url ||
-      body?.url ||
-      body?.data?.imageInfo?.url;
-    if (!url) throw new Error('No URL in upload response');
-    const refEl = $('mediaRefUrl');
+    const url = await uploadMediaFile(file, 'image');
     if (refEl) refEl.value = url;
     updateRefPreview();
+    refreshRequestPreview();
     setStatus(status, 'Reference uploaded', 'ok');
   } catch (err) {
     setStatus(status, err.message, false);
@@ -4370,17 +5430,15 @@ $('btnUpload')?.addEventListener('click', async () => {
     return;
   }
 
-  const form = new FormData();
-  if (isVideo) {
-    form.append('video_file', file);
-  } else {
-    form.append('file', file);
-  }
-  const fileName = $('uploadFileName').value.trim();
-  if (fileName) form.append('fileName', fileName);
-
+  const kind = isVideo ? 'video' : 'image';
   const path = isVideo ? '/gateway/upload/video' : '/gateway/upload/image';
   const label = isVideo ? 'POST /gateway/upload/video' : 'POST /gateway/upload/image';
+
+  const form = new FormData();
+  if (isVideo) form.append('video_file', file);
+  else form.append('file', file);
+  const fileName = $('uploadFileName')?.value?.trim();
+  if (fileName) form.append('fileName', fileName);
 
   try {
     const start = performance.now();
@@ -4404,7 +5462,9 @@ $('btnUpload')?.addEventListener('click', async () => {
     }
 
     const url = extractUploadUrl(body);
-    showResultUrl(url, isVideo ? 'video' : 'image');
+    applyUploadToActiveMediaSlot(url, kind);
+    showResultUrl(url, kind);
+    if (fileInput) fileInput.value = '';
     setStatus(status, url ? '' : 'Upload finished — check RESPONSE', url ? 'preview' : 'ok');
   } catch (err) {
     setStatus(status, err.message, false);
@@ -4535,7 +5595,7 @@ if (sessionStorage.getItem(STORAGE_VOICES)) {
   }
 }
 
-function openPanelById(panelId) {
+function openPanelByIdRaw(panelId) {
   const btn = document.querySelector(`.pg-nav-item[data-panel="${panelId}"]:not([disabled])`);
   if (btn) {
     btn.click();
@@ -4551,69 +5611,13 @@ function openPanelById(panelId) {
   if (isEmbed) syncEmbedChromeFromState();
 }
 
-async function runPendingDeepLink() {
-  if (!pendingDeepLink) return;
-  const { type, model, panel, worker } = pendingDeepLink;
-  pendingDeepLink = null;
-
-  if (worker && EMBED_WORKER_BY_ID.has(worker)) {
-    await navigateEmbedWorker(worker);
-    if (model && $('mediaModelSelect')) {
-      const sel = $('mediaModelSelect');
-      for (let i = 0; i < 50; i++) {
-        if ([...sel.options].some((o) => o.value === model)) break;
-        await sleep(100);
-      }
-      if ([...sel.options].some((o) => o.value === model)) {
-        sel.value = model;
-        onMediaModelChange();
-      } else {
-        sel.appendChild(new Option(model, model));
-        sel.value = model;
-        onMediaModelChange();
-      }
-    }
+function openPanelById(panelId) {
+  if (isEmbed && panelId === 'connection') {
+    openEmbedConnection();
     return;
   }
-
-  if (panel && panel !== 'media-job') {
-    openPanelById(panel);
-    return;
-  }
-
-  if (!type) return;
-
-  await openMediaJobPanel(type);
-  if (model && $('mediaModelSelect')) {
-    const sel = $('mediaModelSelect');
-    const has = [...sel.options].some((o) => o.value === model);
-    if (!has) {
-      sel.appendChild(new Option(model, model));
-    }
-    sel.value = model;
-    onMediaModelChange();
-  }
-  syncWorkerToUrl();
+  openPanelByIdRaw(panelId);
 }
-
-function captureDeepLinkFromUrl() {
-  const worker = urlParams.get('worker');
-  const model = urlParams.get('model');
-  if (worker && EMBED_WORKER_BY_ID.has(worker)) {
-    pendingDeepLink = { worker, model: model || undefined };
-    if (isEmbed && (worker === 'health' || tokenEl.value.trim())) void runPendingDeepLink();
-    return;
-  }
-
-  if (!isEmbed) return;
-  const type = urlParams.get('type');
-  const panel = urlParams.get('panel');
-  if (!type && !model && !panel) return;
-  pendingDeepLink = { type, model, panel };
-  if (tokenEl.value.trim()) void runPendingDeepLink();
-}
-
-captureDeepLinkFromUrl();
 
 globalThis.baseUrl = baseUrl;
 globalThis.normalizeModels = normalizeModels;

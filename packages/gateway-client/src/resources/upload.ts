@@ -32,4 +32,18 @@ export class UploadResource {
       headers: {},
     });
   }
+
+  /** POST /gateway/upload/audio — multipart field `audio_file`. */
+  async audio(input: UploadFileInput): Promise<GatewayEnvelope<{ url: string }>> {
+    ensureAccessToken(this.ctx);
+    const form = new FormData();
+    const blob = toBlob(input);
+    form.append('audio_file', blob, input.fileName);
+
+    return requestJson(this.ctx, '/gateway/upload/audio', {
+      method: 'POST',
+      body: form,
+      headers: {},
+    });
+  }
 }

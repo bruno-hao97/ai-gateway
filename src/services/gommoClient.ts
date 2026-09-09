@@ -6,6 +6,40 @@ import { gommoDeviceFields } from './gommoDevice.js';
 /** Upstream V2 base — tương đương proxy mount `/v2` trên gateway. */
 export const BASE_URL = config.gommo.baseUrl.replace(/\/$/, '');
 
+const AUDIO_UPLOAD_URLS = [
+  `${BASE_URL}/ai/upload/audio`,
+  `${config.gommo.authBaseUrl.replace(/\/$/, '')}/ai/upload/audio`,
+];
+
+function pickUploadUrl(envelope: GommoEnvelope, extraKeys: string[] = []): string | null {
+  const data = envelope.data;
+  const payload =
+    data && typeof data === 'object' && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : {};
+  const raw = envelope.raw && typeof envelope.raw === 'object' ? envelope.raw : {};
+  const audioInfo =
+    (payload.audioInfo as Record<string, unknown> | undefined)
+    || (raw.audioInfo as Record<string, unknown> | undefined)
+    || {};
+  const candidates: unknown[] = [
+    payload.url,
+    payload.result_url,
+    payload.file_url,
+    payload.audio_url,
+    payload.image_url,
+    payload.video_url,
+    audioInfo.url,
+    audioInfo.file_url,
+    audioInfo.result_url,
+    ...extraKeys.map((k) => payload[k]),
+  ];
+  for (const c of candidates) {
+    if (typeof c === 'string' && /^https?:\/\//i.test(c)) return c.trim();
+  }
+  return null;
+}
+
 export interface GommoClientOptions {
   accessToken: string;
   domain?: string;
@@ -180,8 +214,7 @@ export class GommoClient {
         envelope,
       });
     }
-    const payload = envelope.data as Record<string, string> | undefined;
-    const url = payload?.url || payload?.result_url || payload?.image_url;
+    const url = pickUploadUrl(envelope, ['image_url']);
     if (!url) throw new GommoApiError('Upload thành công nhưng không có URL', { envelope });
     return { url, envelope };
   }
@@ -210,10 +243,51 @@ export class GommoClient {
         envelope,
       });
     }
-    const payload = envelope.data as Record<string, string> | undefined;
-    const url = payload?.url || payload?.result_url || payload?.video_url;
+    const url = pickUploadUrl(envelope, ['video_url']);
     if (!url) throw new GommoApiError('Upload video thành công nhưng không có URL', { envelope });
     return { url, envelope };
+  }
+
+  async uploadAudio(
+    data: Buffer | Uint8Array,
+    fileName = 'audio.mp3',
+    mimeType = 'audio/mpeg',
+  ): Promise<{ url: string; envelope: GommoEnvelope }> {
+    if (!this.accessToken) throw new GommoApiError('Chưa có access token');
+    let lastErr: GommoApiError | null = null;
+
+    for (const uploadUrl of AUDIO_UPLOAD_URLS) {
+      const form = new FormData();
+      form.append('access_token', this.accessToken);
+      form.append('domain', this.domain);
+      form.append('project_id', this.projectId);
+      form.append('audio_file', new Blob([data], { type: mimeType }), fileName);
+
+      try {
+        const res = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${this.accessToken}` },
+          body: form,
+        });
+        const envelope = await this.parseResponse(res);
+        if (!res.ok || envelope.success === false) {
+          throw new GommoApiError(envelope.message || `Upload HTTP ${res.status}`, {
+            status: res.status,
+            envelope,
+          });
+        }
+        const url = pickUploadUrl(envelope, ['audio_url', 'video_url']);
+        if (!url) {
+          throw new GommoApiError('Upload audio thành công nhưng không có URL', { envelope });
+        }
+        return { url, envelope };
+      } catch (err) {
+        lastErr = err instanceof GommoApiError ? err : new GommoApiError(String(err));
+        if (lastErr.status === 404) continue;
+      }
+    }
+
+    throw lastErr ?? new GommoApiError('Không upload được audio');
   }
 
   async fetchModels(type: JobType): Promise<GommoEnvelope> {

@@ -60,4 +60,33 @@ router.post(
   },
 );
 
+/** POST /gateway/upload/audio — multipart field `audio_file` hoặc `file` */
+router.post(
+  '/upload/audio',
+  upload.fields([
+    { name: 'audio_file', maxCount: 1 },
+    { name: 'file', maxCount: 1 },
+  ]),
+  async (req, res) => {
+    try {
+      const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+      const file = files?.audio_file?.[0] || files?.file?.[0];
+      if (!file?.buffer?.length) {
+        sendError(res, 400, 'Multipart field `audio_file` hoặc `file` bắt buộc', 'VALIDATION_ERROR');
+        return;
+      }
+      const fileName = file.originalname || 'audio.mp3';
+      const client = clientFromReq(req);
+      const result = await client.uploadAudio(
+        file.buffer,
+        fileName,
+        file.mimetype || 'audio/mpeg',
+      );
+      res.json({ success: true, data: { url: result.url }, ...result.envelope });
+    } catch (err) {
+      sendGommoError(res, err);
+    }
+  },
+);
+
 export default router;

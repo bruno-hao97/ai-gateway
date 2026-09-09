@@ -19,6 +19,7 @@ const hasToken = ref(false);
 
 const EMBED_STORE_KEY = '__gwApiPlaygroundEmbed';
 const HOLD_ID = 'gw-api-playground-embed-hold';
+let initialViewPosted = false;
 
 type EmbedStore = { iframe: HTMLIFrameElement; src: string };
 
@@ -38,13 +39,14 @@ function readEmbedQuery(): {
   };
 }
 
-function syncParentPlaygroundUrl(opts: { worker?: string; model?: string }) {
+function syncParentPlaygroundUrl(opts: { worker?: string; model?: string; panel?: string }) {
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
+  if (opts.panel) url.searchParams.set('panel', opts.panel);
+  else url.searchParams.delete('panel');
   if (opts.worker) url.searchParams.set('worker', opts.worker);
   else url.searchParams.delete('worker');
   url.searchParams.delete('type');
-  url.searchParams.delete('panel');
   if (opts.model) url.searchParams.set('model', opts.model);
   else url.searchParams.delete('model');
   const next = url.pathname + url.search + url.hash;
@@ -62,6 +64,7 @@ function onPlaygroundMessage(event: MessageEvent) {
     syncParentPlaygroundUrl({
       worker: typeof data.worker === 'string' ? data.worker : undefined,
       model: typeof data.model === 'string' ? data.model : undefined,
+      panel: typeof data.panel === 'string' ? data.panel : undefined,
     });
   }
 }
@@ -83,6 +86,7 @@ function buildEmbedSrc() {
     parentOrigin: window.location.origin,
     lang: props.locale,
     ...q,
+    worker: q.worker || (q.panel ? undefined : 'create-image'),
   });
 }
 
@@ -134,10 +138,30 @@ function syncIframeMessages() {
   postAuthToIframe();
 }
 
+function postStudioStateToIframe() {
+  if (initialViewPosted) return;
+  const frame = iframeRef.value?.contentWindow;
+  const targetOrigin = playgroundOrigin();
+  if (!frame || !targetOrigin || !iframeReady.value) return;
+  const q = readEmbedQuery();
+  frame.postMessage(
+    {
+      type: 'ai-gateway-apply-view',
+      mode: 'studio',
+      worker: q.worker || 'create-image',
+      model: q.model,
+      panel: q.panel,
+    },
+    targetOrigin,
+  );
+  initialViewPosted = true;
+}
+
 function onIframeLoad() {
   iframeReady.value = true;
   showLoading.value = false;
   syncIframeMessages();
+  postStudioStateToIframe();
 }
 
 function iframeLocationIsEmbed(iframe: HTMLIFrameElement): boolean {
@@ -194,6 +218,10 @@ function onStorage() {
 
 onMounted(() => {
   refreshTokenState();
+  const q = readEmbedQuery();
+  if (!q.worker && !q.panel) {
+    syncParentPlaygroundUrl({ worker: 'create-image' });
+  }
   mountIframe();
   window.addEventListener('storage', onStorage);
   window.addEventListener('message', onPlaygroundMessage);

@@ -182,6 +182,7 @@
       if (ep.id?.startsWith('create-')) return `/v2/ai/jobs/${jt}/${slug}`;
       if (ep.id === 'upload-image') return `/v2/ai/upload/image`;
       if (ep.id === 'upload-video') return `/v2/ai/upload/video`;
+      if (ep.id === 'upload-audio') return `/v2/ai/upload/audio`;
       if (ep.id === 'me-credits') return `/api/apps/go-mmo/ai/me`;
     }
 
@@ -318,7 +319,12 @@
     const tokenMask = token ? `${token.slice(0, 12)}…` : 'YOUR_ACCESS_TOKEN';
 
     if (payloadVariant === 'multipart' || ep.contentTypes?.includes('multipart/form-data') && payloadVariant !== 'json') {
-      const field = ep.id === 'upload-video' ? 'video_file' : 'file';
+      const field =
+        ep.id === 'upload-video'
+          ? 'video_file'
+          : ep.id === 'upload-audio'
+            ? 'audio_file'
+            : 'file';
       return `curl -X ${ep.method} '${url}' \\\n  -H 'Authorization: Bearer ${tokenMask}' \\\n  -F '${field}=@reference.jpg'`;
     }
     if (ep.contentTypes?.includes('application/x-www-form-urlencoded') && ep.id === 'me-credits') {
@@ -571,7 +577,7 @@
   }
 
   function renderSandbox(ep, ctx) {
-    if (ep.id === 'upload-image' || ep.id === 'upload-video') {
+    if (ep.id === 'upload-image' || ep.id === 'upload-video' || ep.id === 'upload-audio') {
       return `<p class="pg-ep-detail-note">${pgT('ep.sandbox.uploadHint')}</p>`;
     }
 
@@ -623,7 +629,7 @@
 
   async function runSandbox() {
     const ep = global.GatewayEndpointRegistry?.getById(activeEndpointId);
-    if (!ep || ep.id === 'upload-image' || ep.id === 'upload-video') return;
+    if (!ep || ep.id === 'upload-image' || ep.id === 'upload-video' || ep.id === 'upload-audio') return;
 
     const ctx = readPlaygroundContext(ep);
     const pathInput = $('epSandboxPath');
