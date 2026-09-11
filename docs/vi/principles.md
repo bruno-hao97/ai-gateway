@@ -5,7 +5,20 @@ description: Nguyên tắc thiết kế cốt lõi của AI Gateway
 
 # Nguyên tắc
 
-Nguyên tắc cốt lõi khi xây dựng trên AI Gateway — nền tảng **API** kiểu OpenRouter trên [Gommo](https://gommo.net).
+Nguyên tắc cốt lõi khi xây dựng trên AI Gateway — nền tảng **API** kiểu OpenRouter trên [Gommo](https://gommo.net). Đọc trước khi chọn [integration mode](./routing/integration-modes.md).
+
+## Luồng request
+
+```
+App của bạn
+  │
+  ├─ Mode A (direct) ──► v2.api.gommo.net  (jobs · models · upload)
+  │                   └─► api.gommo.net    (login · chat · audio)
+  │
+  └─ Mode B/C ──► AI Gateway (tùy chọn)
+                    ├─► v2.api.gommo.net
+                    └─► api.gommo.net
+```
 
 ## Vì sao AI Gateway?
 

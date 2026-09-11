@@ -5,7 +5,16 @@ description: User token, Bearer auth, admin key và kiểm tra session
 
 # Authentication
 
-User đăng nhập **Gommo** → nhận **`access_token`**. Gateway không lưu session server-side — client/browser giữ token và gửi kèm mỗi request.
+User đăng nhập **Gommo** → nhận **`access_token`**. Client/browser giữ token và gửi kèm mỗi request.
+
+## Gommo public API (khuyến nghị)
+
+| Thao tác | URL |
+|----------|-----|
+| Login | `POST https://api.gommo.net/api/apps/go-mmo/auth/login` |
+| Me / credits | `POST https://api.gommo.net/ai/me` |
+
+→ [Gommo public API](./reference/gommo-public-api.md) · [Quickstart](./quickstart.md)
 
 ## Đăng nhập trên site docs
 

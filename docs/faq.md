@@ -7,13 +7,17 @@ description: Frequently asked questions about AI Gateway
 
 Common questions about AI Gateway and Gommo upstream.
 
+::: info Upstream status
+Catalog, jobs, and login call **Gommo public API**. If `v2.api.gommo.net` or `api.gommo.net` is down, `/models/` and Playground **Send** will fail — docs and UI still load. Retry when upstream recovers.
+:::
+
 ## Getting started
 
 <details>
 <summary>What is AI Gateway vs calling Gommo directly?</summary>
 
-**Direct (Mode A):** your backend calls `v2.api.gommo.net` and `api.gommo.net`.  
-**Gateway:** one base URL — REST `/gateway/*` (Mode B) or path proxy (Mode C). Hides upstream URLs, centralizes env, optional `wait: true` polling, Gommo VietQR billing.
+**Public Gommo API (recommended):** call `https://v2.api.gommo.net` and `https://api.gommo.net` directly — see [Gommo public API](./reference/gommo-public-api.md).
+**AI Gateway (optional dev):** one local base — REST `/gateway/*` (Mode B) or path proxy (Mode C). Optional `wait: true` polling, Gommo VietQR billing.
 
 </details>
 

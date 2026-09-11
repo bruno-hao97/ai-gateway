@@ -5,23 +5,27 @@ description: Công thức theo từng task — copy, chạy, ship
 
 # Cookbook
 
-Các công thức từng bước cho **Mode B** (`/gateway/*`). Mỗi trang là một task hoàn chỉnh với curl + PowerShell.
+Các công thức từng bước cho **[Gommo public API](../reference/gommo-public-api.md)** (`v2.api.gommo.net` + `api.gommo.net`).
+
+::: tip Gateway tùy chọn (dev)
+Recipe có thể dùng **AI Gateway** (`/gateway/*`, JSON) khi dev local. Production nên gọi thẳng Gommo — [Gommo public API](../reference/gommo-public-api.md).
+:::
 
 ::: tip Thử trên trình duyệt trước
-[Playground](/vi/app/playground/) — nhúng trên docs; cần đăng nhập để chạy job.
+[Playground](/vi/app/playground/) — tab **Request** hiện URL public; **Try/Send** có thể proxy qua gateway local.
 :::
 
 ## Chuẩn bị (mọi recipe)
 
 | Mục | Giá trị |
 |-----|---------|
-| Gateway | `npm run dev` → `http://localhost:3001` |
+| Public API | `https://v2.api.gommo.net` (jobs) · `https://api.gommo.net` (auth/chat) |
 | Token | Gommo user `access_token` — [Authentication](../authentication.md) |
 | Catalog | Không đoán `ratio` / `mode` / `resolution` / `duration` — [Models](../models/) |
 
 ```powershell
 $env:TOKEN = "<access_token>"
-$h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/json' }
+$h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/x-www-form-urlencoded' }
 ```
 
 ## Recipes

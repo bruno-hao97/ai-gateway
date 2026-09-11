@@ -21,6 +21,18 @@ const EMBED_STORE_KEY = '__gwApiPlaygroundEmbed';
 const HOLD_ID = 'gw-api-playground-embed-hold';
 let initialViewPosted = false;
 
+const EMBED_STUDIO_WORKERS = new Set([
+  'create-image',
+  'create-video',
+  'create-tts',
+  'create-music',
+  'create-avatar',
+]);
+
+function embedModeForWorker(worker?: string): 'studio' | 'dev' {
+  return worker && EMBED_STUDIO_WORKERS.has(worker) ? 'studio' : 'dev';
+}
+
 type EmbedStore = { iframe: HTMLIFrameElement; src: string };
 
 function readEmbedQuery(): {
@@ -144,11 +156,12 @@ function postStudioStateToIframe() {
   const targetOrigin = playgroundOrigin();
   if (!frame || !targetOrigin || !iframeReady.value) return;
   const q = readEmbedQuery();
+  const worker = q.worker || 'create-image';
   frame.postMessage(
     {
       type: 'ai-gateway-apply-view',
-      mode: 'studio',
-      worker: q.worker || 'create-image',
+      mode: embedModeForWorker(worker),
+      worker,
       model: q.model,
       panel: q.panel,
     },

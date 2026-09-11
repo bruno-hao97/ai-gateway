@@ -52,6 +52,8 @@ function readSavedResponseTab() {
 }
 
 let activeResponseTab = readSavedResponseTab();
+/** When true, poll/create updates must not switch away from the tab the user picked. */
+let userPinnedResponseTab = false;
 let playgroundBooting = true;
 const resultLink = $('resultLink');
 const resultImage = $('resultImage');
@@ -99,11 +101,67 @@ function saveToken(value) {
   updateTokenBadge();
 }
 
-tokenEl.addEventListener('input', () => saveToken());
-
-$('loginDomain').addEventListener('change', () => {
-  localStorage.setItem(STORAGE_DOMAIN, $('loginDomain').value.trim());
+tokenEl?.addEventListener('input', () => {
+  saveToken();
+  refreshRequestPreview();
 });
+
+$('loginDomain')?.addEventListener('change', () => {
+  localStorage.setItem(STORAGE_DOMAIN, $('loginDomain').value.trim());
+  refreshRequestPreview();
+});
+
+function connectionTokenLabel() {
+  const t = tokenEl?.value?.trim() || '';
+  if (!t) return '';
+  return t.length > 8 ? `···${t.slice(-6)}` : '••••';
+}
+
+function syncConnectionModalUi() {
+  if (!isEmbed) return;
+  const hasToken = Boolean(tokenEl?.value?.trim());
+  const showConnected = hasToken && !connectionForceAuthForm;
+  const connected = $('connectionConnected');
+  const auth = $('connectionAuth');
+  const title = $('connectionModalTitle');
+  const sub = $('connectionModalSub');
+  const foot = $('connectionFoot');
+
+  if (connected) connected.hidden = !showConnected;
+  if (auth) auth.hidden = showConnected;
+
+  if (title) {
+    title.textContent = showConnected
+      ? pgT('conn.titleConnected', 'Connected')
+      : pgT('conn.title', 'Sign in');
+  }
+  if (sub) {
+    sub.textContent = showConnected
+      ? pgT('conn.subtitleConnected', 'You can send requests from the playground')
+      : pgT('conn.subtitle', 'Connect your account to send requests');
+  }
+  if (foot) foot.hidden = showConnected;
+
+  const account = $('connectionAccountLabel');
+  if (account) {
+    const email = $('loginEmail')?.value?.trim();
+    account.textContent = email || connectionTokenLabel() || pgT('conn.accountReady', 'Account connected');
+  }
+
+  const credits = $('connectionCreditsLabel');
+  const embedCredits = $('embedCreditsBadge');
+  if (credits) {
+    if (embedCredits && !embedCredits.hidden && embedCredits.textContent) {
+      credits.textContent = embedCredits.textContent;
+    } else {
+      const raw = $('creditsBadge')?.textContent?.trim();
+      const match = raw?.match(/([\d,]+)/);
+      credits.textContent = match
+        ? `${match[1]} credits`
+        : pgT('conn.creditsLoading', 'Loading credits…');
+    }
+  }
+}
 
 function updateTokenBadge() {
   const t = tokenEl.value.trim();
@@ -116,6 +174,7 @@ function updateTokenBadge() {
     tokenBadge.textContent = pgT('token.none');
     tokenBadge.className = 'pg-token-badge';
   }
+  syncConnectionModalUi();
   syncMediaSigninOverlay();
   syncResultEmptyState();
 }
@@ -306,10 +365,9 @@ const EMBED_WORKER_SECTIONS = [
   {
     sectionKey: 'worker.section.library',
     items: [
-      { id: 'library-videos', icon: 'video', labelKey: 'worker.library.videos', kind: 'library', libraryKind: 'videos' },
-      { id: 'library-images', icon: 'image', labelKey: 'worker.library.images', kind: 'library', libraryKind: 'images' },
       { id: 'library-musics', icon: 'music', labelKey: 'worker.library.musics', kind: 'library', libraryKind: 'musics' },
       { id: 'library-audios', icon: 'mic', labelKey: 'worker.library.audios', kind: 'library', libraryKind: 'audios' },
+      { id: 'library-album-images', icon: 'folder', labelKey: 'worker.library.albumImages', kind: 'library', libraryKind: 'album-images' },
       { id: 'library-album-videos', icon: 'folder', labelKey: 'worker.library.albumVideos', kind: 'library', libraryKind: 'album-videos' },
     ],
   },
@@ -331,10 +389,276 @@ const embedView = {
 };
 
 let embedStudioBooted = false;
+let connectionForceAuthForm = false;
 
 let embedMenuOpen = null;
 let activeInfoKind = 'image';
-let activeLibraryKind = 'images';
+let activeLibraryKind = 'album-images';
+const libraryListState = { items: [], media: 'image', view: 'list', selectedIndex: 0, active: false };
+/** @type {Map<string, object>} */
+const panelResultCache = new Map();
+let activeResultWorkerKey = null;
+
+function getLibraryWorkerKey(kind) {
+  return `library:${kind || activeLibraryKind}`;
+}
+
+function libraryUsesRecentGallery(kind) {
+  return !libraryUsesListWorkerSidebar(kind);
+}
+
+function libraryUsesListWorkerSidebar(kind) {
+  const k = kind || activeLibraryKind;
+  return k === 'musics' || k === 'audios' || k === 'album-images' || k === 'album-videos';
+}
+
+function libraryUsesAudioTable(kind) {
+  const k = kind || activeLibraryKind;
+  return k === 'audios';
+}
+
+function libraryUsesMusicTable(kind) {
+  const k = kind || activeLibraryKind;
+  return k === 'musics';
+}
+
+/** Music + audio list layouts hide preview and use compact Result list (79ai). */
+function libraryUsesCompactListTable(kind) {
+  return libraryUsesMusicTable(kind) || libraryUsesAudioTable(kind);
+}
+
+function getMediaWorkerKey(type) {
+  return `media:${type || $('jobType')?.value || 'image'}`;
+}
+
+function getInfoWorkerKey(kind) {
+  return `info:${kind || activeInfoKind}`;
+}
+
+function getHealthWorkerKey() {
+  return 'health';
+}
+
+function getPanelWorkerKey(panel, btn) {
+  if (!panel) return null;
+  if (panel === 'library') return getLibraryWorkerKey(btn?.dataset?.libraryKind || activeLibraryKind);
+  if (panel === 'info-job') return getInfoWorkerKey(btn?.dataset?.infoKind || activeInfoKind);
+  if (panel === 'media-job') return getMediaWorkerKey(btn?.dataset?.jobType || $('jobType')?.value);
+  if (panel === 'health') return getHealthWorkerKey();
+  return panel;
+}
+
+function readJsonPre(el) {
+  if (!el) return null;
+  const raw = GwJsonHighlight?.getRawText(el) || el.textContent || '';
+  const text = String(raw).trim();
+  if (!text || text === '—') return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function hideAllResultViews() {
+  const libraryWrap = $('resultLibraryList');
+  if (libraryWrap) libraryWrap.hidden = true;
+  if ($('resultMain')) $('resultMain').hidden = true;
+  const legacy = $('resultLegacyJsonWrap');
+  if (legacy) {
+    legacy.hidden = true;
+    legacy.classList.remove('pg-result-json-wrap--library');
+  }
+  const gallery = $('resultGallery');
+  if (gallery) gallery.hidden = true;
+  if (resultEmpty) resultEmpty.hidden = true;
+}
+
+function showResultEmptyState() {
+  hideAllResultViews();
+  libraryListState.active = false;
+  if (resultEmpty) resultEmpty.hidden = false;
+}
+
+function touchWorkerResponseBody(body) {
+  if (!activeResultWorkerKey) return;
+  const prev = panelResultCache.get(activeResultWorkerKey) || { type: 'json', gallery: [] };
+  if (prev.type === 'library' || prev.type === 'job') {
+    panelResultCache.set(activeResultWorkerKey, { ...prev, responseBody: body });
+    return;
+  }
+  panelResultCache.set(activeResultWorkerKey, {
+    type: 'json',
+    responseBody: body,
+    gallery: prev.gallery || [],
+    responseMeta: responseMeta?.textContent || prev.responseMeta || '',
+  });
+}
+
+function restoreJsonResultEntry(entry) {
+  if (resultEmpty) resultEmpty.hidden = true;
+  const main = $('resultMain');
+  if (main) main.hidden = true;
+  const libraryWrap = $('resultLibraryList');
+  if (libraryWrap) libraryWrap.hidden = true;
+  libraryListState.active = false;
+  if (entry.responseBody != null && responseOutput) {
+    GwJsonHighlight?.displayInPre(responseOutput, entry.responseBody);
+  }
+  const legacy = $('resultLegacyJsonWrap');
+  if (legacy) {
+    legacy.hidden = false;
+    legacy.classList.remove('pg-result-json-wrap--library');
+  }
+  if (entry.responseMeta && responseMeta) responseMeta.textContent = entry.responseMeta;
+  renderResultGallery(entry.gallery || []);
+}
+
+function renderMainResultPreview(url, mediaHint = '') {
+  if (!url) return;
+  if (resultEmpty) resultEmpty.hidden = true;
+  const preview = $('resultPreview');
+  if (preview) preview.hidden = false;
+  if (resultLink) {
+    resultLink.href = url;
+    resultLink.title = url;
+    resultLink.textContent = pgT('result.openTab', 'Open in new tab ↗');
+  }
+  clearPreviewPlayers();
+  const hint = String(mediaHint || '').toLowerCase();
+  const looksImage = /\.(png|jpe?g|webp|gif|bmp|svg)(\?|$)/i.test(url);
+  const looksVideo = /\.(mp4|webm|mov)(\?|$)/i.test(url);
+  const looksAudio =
+    /\.(mp3|wav|ogg|m4a|aac|flac)(\?|$)/i.test(url) || /\/audio/i.test(url);
+  if (hint === 'image' || looksImage) {
+    resultImage.src = url;
+    resultImage.hidden = false;
+    return;
+  }
+  if ((hint === 'video' || looksVideo) && resultVideo) {
+    resultVideo.src = url;
+    resultVideo.hidden = false;
+    return;
+  }
+  if ((hint === 'music' || hint === 'audio' || looksAudio) && resultAudio) {
+    resultAudio.src = url;
+    resultAudio.hidden = false;
+    return;
+  }
+  resultImage.src = url;
+  resultImage.hidden = false;
+}
+
+function restoreJobResultEntry(entry) {
+  showJobResultLayout({ focusTab: true });
+  const main = $('resultMain');
+  if (main && entry.phase) main.dataset.phase = entry.phase;
+  if (entry.createJson != null) displayCreateJson(entry.createJson);
+  if (entry.pollJson != null) displayPollJson(entry.pollJson);
+  if (entry.header) {
+    updateResultHeader({
+      model: entry.header.model,
+      domain: entry.header.domain,
+      type: entry.header.type,
+      elapsedMs: entry.header.elapsedMs,
+      jobId: entry.header.jobId === '—' ? null : entry.header.jobId,
+      status: entry.header.statusPill,
+      modelObj: entry.header.modelObj,
+    });
+    if (entry.header.statusPill) setResultStatusPill(entry.header.statusPill);
+  }
+  if (entry.stepper) updateResultStepper(entry.stepper, entry.stepperOpts || {});
+  if (entry.previewUrl) renderMainResultPreview(entry.previewUrl, entry.mediaHint);
+  else if (resultPreview) resultPreview.hidden = true;
+  if (entry.responseMeta && responseMeta) responseMeta.textContent = entry.responseMeta;
+  renderResultGallery(entry.gallery || []);
+}
+
+function restoreLibraryResultEntry(entry) {
+  libraryListState.items = entry.items || [];
+  libraryListState.media = entry.media || 'image';
+  libraryListState.selectedIndex = entry.selectedIndex ?? 0;
+  libraryListState.view = entry.view || 'response';
+  libraryListState.active = true;
+  syncLibraryTableHead(activeLibraryKind);
+  showLibraryListLayout();
+  renderLibraryListTable();
+  setLibraryListView(libraryListState.view);
+  if (entry.responseBody != null && responseOutput) {
+    GwJsonHighlight?.displayInPre(responseOutput, entry.responseBody);
+  }
+  renderResultGallery([]);
+}
+
+function saveJobResultCache(key, patch = {}) {
+  const main = $('resultMain');
+  const pill = $('resultStatusPill');
+  const prev = panelResultCache.get(key) || { type: 'job', gallery: [] };
+  const previewUrl =
+    patch.previewUrl ||
+    (resultVideo?.src && !resultVideo.hidden ? resultVideo.src : '') ||
+    (resultImage?.src && !resultImage.hidden ? resultImage.src : '') ||
+    (resultAudio?.src && !resultAudio.hidden ? resultAudio.src : '') ||
+    prev.previewUrl ||
+    '';
+  const entry = {
+    type: 'job',
+    previewUrl,
+    mediaHint: patch.mediaHint ?? prev.mediaHint ?? 'image',
+    createJson: patch.createJson ?? readJsonPre($('resultCreateJson')),
+    pollJson: patch.pollJson ?? readJsonPre($('resultPollJson')),
+    header: patch.header ?? {
+      model: $('resultHdrModel')?.textContent || '—',
+      domain: $('resultHdrDomain')?.textContent || '—',
+      type: $('resultHdrType')?.textContent || '—',
+      elapsedMs: patch.elapsedMs ?? prev.header?.elapsedMs ?? null,
+      jobId: $('resultHdrJobId')?.textContent || null,
+      statusPill: pill?.dataset.status || prev.header?.statusPill || '',
+      modelObj: patch.modelObj ?? prev.header?.modelObj,
+    },
+    phase: patch.phase ?? main?.dataset.phase ?? prev.phase ?? 'idle',
+    stepper: patch.stepper ?? prev.stepper,
+    stepperOpts: patch.stepperOpts ?? prev.stepperOpts,
+    responseMeta: patch.responseMeta ?? responseMeta?.textContent ?? prev.responseMeta ?? '',
+    gallery: patch.gallery ?? prev.gallery ?? [],
+    responseBody: patch.responseBody ?? prev.responseBody,
+  };
+  panelResultCache.set(key, entry);
+}
+
+function persistActiveJobResult(patch = {}) {
+  if (!activeResultWorkerKey?.startsWith('media:')) return;
+  saveJobResultCache(activeResultWorkerKey, patch);
+}
+
+function activateWorkerResultContext(key) {
+  activeResultWorkerKey = key;
+  hideAllResultViews();
+  const entry = panelResultCache.get(key);
+  if (!entry) {
+    showResultEmptyState();
+    return;
+  }
+  if (entry.type === 'library') {
+    if (!entry.items?.length) {
+      if (entry.responseBody != null) restoreJsonResultEntry(entry);
+      else showResultEmptyState();
+      return;
+    }
+    restoreLibraryResultEntry(entry);
+    return;
+  }
+  if (entry.type === 'job') {
+    restoreJobResultEntry(entry);
+    return;
+  }
+  if (entry.type === 'json') {
+    restoreJsonResultEntry(entry);
+    return;
+  }
+  showResultEmptyState();
+}
+
 let workerMenuFilter = '';
 let workerMenuFocusIndex = -1;
 let modelMenuFilter = '';
@@ -405,13 +729,25 @@ const LIBRARY_CONFIGS = {
     showSource: false,
     showProject: false,
   },
+  'album-images': {
+    titleKey: 'worker.library.albumImages',
+    path: '/ai/library/album-images',
+    showModel: false,
+    showCategory: false,
+    showSource: false,
+    showProject: true,
+    showAlbumFields: true,
+    albumHintKey: 'proxy.library.albumImagesListHint',
+  },
   'album-videos': {
     titleKey: 'worker.library.albumVideos',
     path: '/ai/library/album-videos',
-    showModel: true,
+    showModel: false,
     showCategory: false,
     showSource: false,
-    showProject: false,
+    showProject: true,
+    showAlbumFields: true,
+    albumHintKey: 'proxy.library.albumVideosListHint',
   },
 };
 
@@ -422,6 +758,22 @@ function workerItemLabel(item) {
 function workerUsesModelPicker(workerId) {
   const item = EMBED_WORKER_BY_ID.get(workerId);
   return item?.kind === 'media-job';
+}
+
+function embedViewModeForWorker(workerId) {
+  const item = EMBED_WORKER_BY_ID.get(workerId);
+  if (!item) return 'studio';
+  return item.kind === 'media-job' ? 'studio' : 'dev';
+}
+
+function syncEmbedDevWorker(workerId) {
+  if (!isEmbed || !workerId || !EMBED_WORKER_BY_ID.has(workerId)) return;
+  embedView.mode = 'dev';
+  embedView.workerId = workerId;
+  activeEmbedWorkerId = workerId;
+  syncEmbedViewModeClass();
+  syncWorkerToUrl();
+  updateEmbedWorkerTrigger();
 }
 
 function listWorkerMenuItems() {
@@ -479,6 +831,14 @@ function renderEmbedWorkerMenu() {
   focusWorkerMenuItem(workerMenuFocusIndex);
 }
 
+function focusMenuSearchInput(id) {
+  const el = $(id);
+  if (!el) return;
+  el.focus();
+  const len = el.value.length;
+  el.setSelectionRange(len, len);
+}
+
 function wireWorkerMenuSearch() {
   const input = $('embedWorkerSearch');
   if (!input || input.dataset.wired) return;
@@ -487,7 +847,7 @@ function wireWorkerMenuSearch() {
     workerMenuFilter = input.value;
     workerMenuFocusIndex = 0;
     renderEmbedWorkerMenu();
-    $('embedWorkerSearch')?.focus();
+    focusMenuSearchInput('embedWorkerSearch');
   });
   input.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowDown') {
@@ -582,7 +942,12 @@ function setConnectionDrawerOpen(open) {
   $('btnEmbedConnection')?.classList.toggle('active', open);
   $('btnEmbedConnection')?.setAttribute('aria-expanded', open ? 'true' : 'false');
   if (open) {
-    requestAnimationFrame(() => $('loginEmail')?.focus());
+    syncConnectionModalUi();
+    if (tokenEl?.value?.trim()) {
+      void fetchUserMe(null, { silent: true });
+    } else {
+      requestAnimationFrame(() => $('loginEmail')?.focus());
+    }
   }
   syncMediaSigninOverlay();
 }
@@ -592,6 +957,7 @@ function openEmbedConnection() {
     openPanelByIdRaw('connection');
     return;
   }
+  connectionForceAuthForm = false;
   closeEmbedDev();
   setConnectionDrawerOpen(true);
   syncWorkerToUrl();
@@ -599,6 +965,7 @@ function openEmbedConnection() {
 
 function closeEmbedConnection() {
   if (!isEmbed) return;
+  connectionForceAuthForm = false;
   setConnectionDrawerOpen(false);
   syncWorkerToUrl();
 }
@@ -620,6 +987,12 @@ function openEmbedDev() {
 function closeEmbedDev() {
   if (!isEmbed) return;
   setDevDrawerOpen(false);
+}
+
+/** Model slug for request preview — embed picker + hidden select + URL param. */
+function resolveMediaModelSlug() {
+  const jobType = $('jobType')?.value || 'image';
+  return resolveStudioModelSlug(embedView.model, jobType) || '';
 }
 
 function resolveStudioModelSlug(explicitModel, jobType, { preferExplicit = false } = {}) {
@@ -663,17 +1036,19 @@ async function selectEmbedModel(model) {
 async function embedOpenStudioWorker(workerId, explicitModel, { forceModel = false } = {}) {
   let item = EMBED_WORKER_BY_ID.get(workerId);
   if (!item || item.kind !== 'media-job') {
+    if (item && item.kind !== 'media-job') {
+      await embedOpenDevWorker(workerId);
+      return;
+    }
     workerId = 'create-image';
     item = EMBED_WORKER_BY_ID.get(workerId);
   }
   embedView.mode = 'studio';
   embedView.workerId = workerId;
   activeEmbedWorkerId = workerId;
+  syncEmbedViewModeClass();
 
   await openMediaJobPanel(item.jobType);
-  document.querySelectorAll('.pg-panel').forEach((p) => {
-    p.classList.toggle('active', p.dataset.panel === 'media-job');
-  });
   activateNavForPanel('media-job', item.jobType);
 
   const pickModel = resolveStudioModelSlug(explicitModel, item.jobType, {
@@ -699,6 +1074,7 @@ async function embedOpenDevWorker(workerId) {
   workerMenuFilter = '';
   modelMenuFilter = '';
   closeEmbedMenus();
+  closeEmbedDev();
   setConnectionDrawerOpen(false);
 
   if (item.kind === 'info') {
@@ -712,6 +1088,7 @@ async function embedOpenDevWorker(workerId) {
   if (item.kind === 'upload') {
     openPanelByIdRaw('upload');
     document.querySelector(`.pg-tab[data-upload-tab="${item.uploadTab}"]`)?.click();
+    activateWorkerResultContext('upload');
     return;
   }
   if (item.kind === 'panel') {
@@ -720,16 +1097,19 @@ async function embedOpenDevWorker(workerId) {
       return;
     }
     openPanelByIdRaw(item.panel);
+    activateWorkerResultContext(getPanelWorkerKey(item.panel));
   }
 }
 
 async function applyEmbedView(next, { flash = false, forceModel = false } = {}) {
   if (!isEmbed) return;
 
-  embedView.mode = next.mode === 'dev' ? 'dev' : 'studio';
-  embedView.workerId = next.workerId || 'create-image';
+  const workerId = next.workerId || 'create-image';
+  embedView.mode = embedViewModeForWorker(workerId);
+  embedView.workerId = workerId;
   if (next.model != null) embedView.model = next.model;
   activeEmbedWorkerId = embedView.workerId;
+  syncEmbedViewModeClass();
 
   if (embedView.mode === 'studio') {
     await embedOpenStudioWorker(embedView.workerId, next.model ?? null, {
@@ -739,7 +1119,6 @@ async function applyEmbedView(next, { flash = false, forceModel = false } = {}) 
     await embedOpenDevWorker(embedView.workerId);
   }
 
-  syncEmbedViewModeClass();
   setConnectionDrawerOpen(Boolean(next.connectionOpen));
 
   if (flash) flashEmbedPanelTransition();
@@ -747,6 +1126,7 @@ async function applyEmbedView(next, { flash = false, forceModel = false } = {}) 
   syncMediaSigninOverlay();
   syncResultEmptyState();
   syncWorkerToUrl();
+  refreshRequestPreview();
 }
 
 function syncWorkerToUrl() {
@@ -838,11 +1218,19 @@ function inferEmbedWorkerId() {
   return panelMap[activePanel] || activeEmbedWorkerId;
 }
 
+function resolveActiveEmbedWorkerId() {
+  if (isEmbed && embedView.workerId && !embedView.connectionOpen) {
+    if (EMBED_WORKER_BY_ID.has(embedView.workerId)) return embedView.workerId;
+  }
+  const inferred = inferEmbedWorkerId();
+  if (inferred) return inferred;
+  return activeEmbedWorkerId || 'create-image';
+}
+
 function updateEmbedWorkerTrigger() {
   const labelEl = $('embedWorkerLabel');
   const iconEl = $('embedWorkerIcon');
-  const inferred = inferEmbedWorkerId();
-  if (inferred) activeEmbedWorkerId = inferred;
+  activeEmbedWorkerId = resolveActiveEmbedWorkerId();
 
   const item = EMBED_WORKER_BY_ID.get(activeEmbedWorkerId);
   if (labelEl) {
@@ -944,7 +1332,7 @@ function wireModelMenuSearch() {
   input.addEventListener('input', () => {
     modelMenuFilter = input.value;
     renderEmbedModelMenu();
-    $('embedModelSearch')?.focus();
+    focusMenuSearchInput('embedModelSearch');
   });
 }
 
@@ -1123,7 +1511,7 @@ function writeResultGallery(list) {
 }
 
 function appendResultGalleryEntry(url, mediaHint, model) {
-  if (!isEmbed || !url) return;
+  if (!url || !activeResultWorkerKey) return;
   const media = String(mediaHint || 'image').toLowerCase();
   const entry = {
     url,
@@ -1131,27 +1519,35 @@ function appendResultGalleryEntry(url, mediaHint, model) {
     model: model || $('mediaModelSelect')?.value || '',
     ts: Date.now(),
   };
-  const list = readResultGallery().filter((item) => item?.url !== url);
-  list.unshift(entry);
-  writeResultGallery(list);
+  const prev = panelResultCache.get(activeResultWorkerKey) || { type: 'empty', gallery: [] };
+  const gallery = Array.isArray(prev.gallery) ? prev.gallery.filter((item) => item?.url !== url) : [];
+  gallery.unshift(entry);
+  const nextGallery = gallery.slice(0, MAX_RESULT_GALLERY);
+  panelResultCache.set(activeResultWorkerKey, {
+    ...prev,
+    gallery: nextGallery,
+  });
+  if (isEmbed) renderResultGallery(nextGallery);
 }
 
-function renderResultGallery() {
+function renderResultGallery(items) {
   const wrap = $('resultGallery');
   const track = $('resultGalleryTrack');
   if (!wrap || !track) return;
-  if (!isEmbed) {
+  if (!isEmbed || libraryListState.active || libraryUsesListWorkerSidebar(activeLibraryKind)) {
     wrap.hidden = true;
+    track.innerHTML = '';
     return;
   }
-  const items = readResultGallery().filter((item) => item?.url);
-  if (!items.length) {
+  const list = (Array.isArray(items) ? items : panelResultCache.get(activeResultWorkerKey)?.gallery || [])
+    .filter((item) => item?.url);
+  if (!list.length) {
     wrap.hidden = true;
     track.innerHTML = '';
     return;
   }
   wrap.hidden = false;
-  track.innerHTML = items
+  track.innerHTML = list
     .map((item) => {
       const url = escapeHtml(item.url);
       const media = String(item.media || 'image').toLowerCase();
@@ -1203,6 +1599,7 @@ function toggleEmbedMenu(which) {
   closeEmbedMenus();
   embedMenuOpen = which;
   if (which === 'worker') {
+    updateEmbedWorkerTrigger();
     renderEmbedWorkerMenu();
     workerMenuFocusIndex = 0;
     workerMenu.hidden = false;
@@ -1233,6 +1630,7 @@ async function navigateEmbedWorker(workerId) {
       },
       { flash: true },
     );
+    closeEmbedMenus();
     return;
   }
 
@@ -1259,6 +1657,7 @@ async function navigateEmbedWorker(workerId) {
   if (item.kind === 'upload') {
     openPanelByIdRaw('upload');
     document.querySelector(`.pg-tab[data-upload-tab="${item.uploadTab}"]`)?.click();
+    activateWorkerResultContext('upload');
     syncEmbedChromeFromState();
     syncWorkerToUrl();
     return;
@@ -1270,6 +1669,7 @@ async function navigateEmbedWorker(workerId) {
       return;
     }
     openPanelByIdRaw(item.panel);
+    activateWorkerResultContext(getPanelWorkerKey(item.panel));
     syncEmbedChromeFromState();
     syncWorkerToUrl();
   }
@@ -1293,6 +1693,51 @@ function syncEmbedViewModeClass() {
   const studio = embedView.mode === 'studio';
   document.body.classList.toggle('pg-studio', studio);
   document.body.classList.toggle('pg-dev', !studio);
+}
+
+/** Exactly one left panel visible — prevents studio + library stacking. */
+function activatePlaygroundPanel(panelKey) {
+  document.querySelectorAll('.pg-panel').forEach((p) => {
+    p.classList.toggle('active', p.dataset.panel === panelKey);
+  });
+}
+
+function panelKeyFromEmbedWorkerId(workerId) {
+  const item = EMBED_WORKER_BY_ID.get(workerId);
+  if (!item) return null;
+  if (item.kind === 'library') return 'library';
+  if (item.kind === 'info') return 'info-job';
+  if (item.kind === 'media-job') return 'media-job';
+  if (item.kind === 'upload') return 'upload';
+  if (item.kind === 'panel' && item.panel) return item.panel;
+  return null;
+}
+
+function syncProxyPanelStateFromEmbedWorker() {
+  if (!isEmbed || !embedView.workerId) return;
+  const item = EMBED_WORKER_BY_ID.get(embedView.workerId);
+  if (!item) return;
+  if (item.kind === 'library' && LIBRARY_CONFIGS[item.libraryKind]) {
+    activeLibraryKind = item.libraryKind;
+  }
+  if (item.kind === 'info' && INFO_CONFIGS[item.infoKind]) {
+    activeInfoKind = item.infoKind;
+  }
+}
+
+function getActivePlaygroundPanelKey() {
+  syncProxyPanelStateFromEmbedWorker();
+  if (isEmbed && embedView.workerId) {
+    const fromWorker = panelKeyFromEmbedWorkerId(embedView.workerId);
+    if (fromWorker) return fromWorker;
+  }
+  const panels = [...document.querySelectorAll('.pg-panel.active')];
+  if (panels.length === 1) return panels[0].dataset.panel;
+  if (panels.length > 1) {
+    const nonMedia = panels.find((p) => p.dataset.panel && p.dataset.panel !== 'media-job');
+    if (nonMedia) return nonMedia.dataset.panel;
+  }
+  return panels[0]?.dataset.panel;
 }
 
 function applyEmbedChrome() {
@@ -1355,7 +1800,21 @@ function wireEmbedStudio() {
     if (embedView.connectionOpen) closeEmbedConnection();
     else openEmbedConnection();
   });
+  $('btnConnectionClose')?.addEventListener('click', () => closeEmbedConnection());
   $('embedConnectionBackdrop')?.addEventListener('click', () => closeEmbedConnection());
+  $('btnConnectionSignOut')?.addEventListener('click', () => {
+    connectionForceAuthForm = false;
+    saveToken('');
+    showCredits(null);
+    syncConnectionModalUi();
+    refreshRequestPreview();
+    requestAnimationFrame(() => $('loginEmail')?.focus());
+  });
+  $('btnConnectionSwitch')?.addEventListener('click', () => {
+    connectionForceAuthForm = true;
+    syncConnectionModalUi();
+    requestAnimationFrame(() => $('loginEmail')?.focus());
+  });
   $('btnMediaSignin')?.addEventListener('click', openEmbedConnection);
   $('btnResultEmptySignin')?.addEventListener('click', openEmbedConnection);
   $('btnModelMetaMore')?.addEventListener('click', toggleModelMetaDesc);
@@ -1432,7 +1891,32 @@ function wireEmbedStudio() {
   $('resultGalleryTrack')?.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-gallery-url]');
     if (!btn) return;
-    showResultUrl(btn.dataset.galleryUrl, btn.dataset.galleryMedia || 'image');
+    showResultUrl(btn.dataset.galleryUrl, btn.dataset.galleryMedia || 'image', { focusTab: true });
+  });
+
+  $('btnLibraryViewResponse')?.addEventListener('click', () => setLibraryListView('response'));
+  $('btnLibraryViewList')?.addEventListener('click', () => setLibraryListView('list'));
+  $('btnLibraryViewPreview')?.addEventListener('click', () => {
+    setLibraryListView('preview');
+    showLibraryListPreview(libraryListState.selectedIndex);
+  });
+  $('resultLibraryTableBody')?.addEventListener('click', (e) => {
+    const row = e.target.closest('[data-library-index]');
+    if (!row) return;
+    const index = Number(row.dataset.libraryIndex);
+    if (!Number.isFinite(index)) return;
+    selectLibraryListRow(index);
+    if (!libraryUsesCompactListTable(activeLibraryKind)) setLibraryListView('preview');
+  });
+  $('resultLibraryTableBody')?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const row = e.target.closest('[data-library-index]');
+    if (!row) return;
+    e.preventDefault();
+    const index = Number(row.dataset.libraryIndex);
+    if (!Number.isFinite(index)) return;
+    selectLibraryListRow(index);
+    if (!libraryUsesCompactListTable(activeLibraryKind)) setLibraryListView('preview');
   });
 
   document.addEventListener('click', (e) => {
@@ -1472,6 +1956,7 @@ function wireEmbedStudio() {
   });
   window.addEventListener('portal-locale-change', () => {
     syncEmbedChromeFromState();
+    syncConnectionModalUi();
   });
 }
 
@@ -1481,7 +1966,6 @@ async function resetEmbedStudio() {
   $('btnEmbedDev')?.classList.remove('active');
   await applyEmbedView(
     {
-      mode: 'studio',
       workerId: embedView.workerId || 'create-image',
       model: embedView.model,
       connectionOpen: false,
@@ -1510,7 +1994,6 @@ async function initEmbedStudio() {
   if (embedView.mode === 'studio' && !$('panel-media-job')?.classList.contains('active')) {
     await applyEmbedView(
       {
-        mode: 'studio',
         workerId: embedView.workerId || 'create-image',
         model: embedView.model,
         connectionOpen: false,
@@ -1534,14 +2017,13 @@ function embedViewFromMessage(data) {
         ? data.worker
         : 'create-image';
     const item = EMBED_WORKER_BY_ID.get(worker);
-    let mode = 'studio';
-    if (data.mode === 'dev') mode = 'dev';
-    else if (data.mode === 'studio') mode = 'studio';
-    else if (item && item.kind !== 'media-job') mode = 'dev';
     return {
-      mode,
+      mode: embedViewModeForWorker(worker),
       workerId: worker,
-      model: typeof data.model === 'string' ? data.model.trim() || null : null,
+      model:
+        item?.kind === 'media-job' && typeof data.model === 'string'
+          ? data.model.trim() || null
+          : null,
       connectionOpen: data.panel === 'connection',
     };
   }
@@ -1608,13 +2090,13 @@ async function afterEmbedAuth() {
   closeEmbedConnection();
   await applyEmbedView(
     {
-      mode: 'studio',
       workerId: embedView.workerId || 'create-image',
       model: embedView.model,
       connectionOpen: false,
     },
     { flash: false },
   );
+  if (embedView.mode !== 'studio') return;
   const type = $('jobType')?.value || 'image';
   await loadMediaJobForType(type, { autoFetch: true });
 }
@@ -1715,6 +2197,14 @@ function authHeaders(json = true) {
   return headers;
 }
 
+function optionalAuthHeaders(json = true) {
+  const headers = {};
+  const token = tokenEl?.value?.trim();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (json) headers['Content-Type'] = 'application/json';
+  return headers;
+}
+
 function buildGommoFormBody(fields = {}, { forPreview = false } = {}) {
   const body = new URLSearchParams();
   const token = tokenEl?.value?.trim();
@@ -1732,12 +2222,17 @@ function buildGommoFormBody(fields = {}, { forPreview = false } = {}) {
   return body;
 }
 
-async function apiFormPost(path, fields, label) {
-  return apiFetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: buildGommoFormBody(fields).toString(),
-  }, label);
+async function apiFormPost(path, fields, label, opts = {}) {
+  return apiFetch(
+    path,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: buildGommoFormBody(fields).toString(),
+    },
+    label,
+    opts,
+  );
 }
 
 function activateProxyNav(panel, matchFn) {
@@ -1763,53 +2258,98 @@ function configureInfoPanelUi(kind) {
 
 function openInfoPanel(kind) {
   activeInfoKind = kind;
-  document.querySelectorAll('.pg-panel').forEach((p) => {
-    p.classList.toggle('active', p.dataset.panel === 'info-job');
-  });
+  syncEmbedDevWorker(`info-${kind}`);
+  activatePlaygroundPanel('info-job');
   activateProxyNav('info-job', (b) => b.dataset.infoKind === kind);
   configureInfoPanelUi(kind);
-  refreshProxyPanelPreview();
+  refreshRequestPreview();
   syncEmbedChromeFromState();
+  activateWorkerResultContext(getInfoWorkerKey(kind));
 }
 
 function configureLibraryPanelUi(kind) {
   const cfg = LIBRARY_CONFIGS[kind];
   if (!cfg) return;
+  const listSidebar = libraryUsesListWorkerSidebar(kind);
+  const embedList = isEmbed && listSidebar;
   const title = $('libraryTitle');
   const endpoint = $('libraryEndpoint');
+  const panelHead = $('libraryPanelHead');
+  const workspace = $('libraryWorkspace');
+  const infoCard = $('libInfoCard');
+  const infoEndpoint = $('libInfoEndpoint');
+  const formPanel = $('libraryFormPanel');
+  const btnLibrary = $('btnLibrary');
+  const limitWrap = $('libLimitWrap');
   if (title) title.textContent = pgT(cfg.titleKey);
   if (endpoint) endpoint.textContent = `POST ${cfg.path}`;
+  if (infoEndpoint) infoEndpoint.textContent = `POST ${cfg.path}`;
+  workspace?.classList.toggle('pg-library-workspace--list', embedList);
+  $('panel-library')?.classList.toggle('pg-library-list-mode', embedList);
+  if (infoCard) infoCard.hidden = !embedList;
+  if (panelHead) panelHead.hidden = embedList;
+  if (formPanel) formPanel.hidden = embedList && libraryUsesCompactListTable(kind);
+  if (btnLibrary) {
+    btnLibrary.textContent = embedList
+      ? pgT('proxy.library.fetchList', 'Fetch list')
+      : pgT('proxy.send', 'Send request');
+  }
+  const isAlbumList = Boolean(cfg.showAlbumFields);
+  const albumFieldsWrap = $('libAlbumFieldsWrap');
+  const afterIdWrap = $('libAfterIdWrap');
+  const hintList = $('libHintList');
+  const hintAlbum = $('libHintAlbum');
+  if (albumFieldsWrap) albumFieldsWrap.hidden = !isAlbumList;
+  if (limitWrap) limitWrap.hidden = embedList && libraryUsesCompactListTable(kind);
+  if (afterIdWrap) afterIdWrap.hidden = isAlbumList || libraryUsesCompactListTable(kind) || embedList;
+  const btnPreview = $('btnLibraryViewPreview');
+  if (btnPreview) btnPreview.hidden = libraryUsesCompactListTable(kind);
+  syncLibraryTableHead(kind);
+  if (hintList) hintList.hidden = isAlbumList || embedList;
+  if (hintAlbum) {
+    hintAlbum.hidden = !isAlbumList || embedList;
+    if (isAlbumList && cfg.albumHintKey) {
+      hintAlbum.textContent = pgT(cfg.albumHintKey);
+    }
+  }
   const modelWrap = $('libModelWrap');
   const categoryWrap = $('libCategoryWrap');
   const sourceWrap = $('libSourceWrap');
   const projectWrap = $('libProjectWrap');
-  if (modelWrap) modelWrap.hidden = !cfg.showModel;
+  const projectInput = $('libProjectId');
+  if (modelWrap) modelWrap.hidden = !cfg.showModel || isAlbumList || embedList;
   if (categoryWrap) categoryWrap.hidden = !cfg.showCategory;
   if (sourceWrap) sourceWrap.hidden = !cfg.showSource;
   if (projectWrap) projectWrap.hidden = !cfg.showProject;
+  if (projectInput && cfg.showProject && isAlbumList) projectInput.value = 'default';
 }
 
 function openLibraryPanel(kind) {
   activeLibraryKind = kind;
-  document.querySelectorAll('.pg-panel').forEach((p) => {
-    p.classList.toggle('active', p.dataset.panel === 'library');
-  });
+  if (isEmbed) {
+    closeEmbedDev();
+    closeEmbedConnection();
+  }
+  syncEmbedDevWorker(`library-${kind}`);
+  activatePlaygroundPanel('library');
   activateProxyNav('library', (b) => b.dataset.libraryKind === kind);
   configureLibraryPanelUi(kind);
-  refreshProxyPanelPreview();
+  refreshRequestPreview();
   syncEmbedChromeFromState();
+  activateWorkerResultContext(getLibraryWorkerKey(kind));
 }
 
 function openHealthPanel() {
-  document.querySelectorAll('.pg-panel').forEach((p) => {
-    p.classList.toggle('active', p.dataset.panel === 'health');
-  });
+  syncEmbedDevWorker('health');
+  activatePlaygroundPanel('health');
   activateProxyNav('health', () => true);
-  refreshProxyPanelPreview();
+  refreshRequestPreview();
   syncEmbedChromeFromState();
+  activateWorkerResultContext(getHealthWorkerKey());
 }
 
 function readLibraryFormFields() {
+  const cfg = LIBRARY_CONFIGS[activeLibraryKind] || {};
   const fields = {};
   const limit = $('libLimit')?.value?.trim();
   const afterId = $('libAfterId')?.value?.trim();
@@ -1818,32 +2358,589 @@ function readLibraryFormFields() {
   const source = $('libSource')?.value?.trim();
   const projectId = $('libProjectId')?.value?.trim();
   if (limit) fields.limit = limit;
-  if (afterId) fields.after_id = afterId;
-  if (model) fields.model = model;
+  if (!cfg.showAlbumFields && afterId) fields.after_id = afterId;
+  if (model && !cfg.showAlbumFields) fields.model = model;
   if (category) fields.category = category;
   if (source) fields.source = source;
   if (projectId) fields.project_id = projectId;
+  else if (cfg.showProject) fields.project_id = 'default';
+  if (cfg.showAlbumFields) {
+    const orderBy = $('libOrderBy')?.value?.trim();
+    const sortBy = $('libSortBy')?.value?.trim();
+    if (orderBy) fields.order_by = orderBy;
+    if (sortBy) fields.sort_by = sortBy;
+    if (!fields.limit) fields.limit = '30';
+    if (!fields.order_by) fields.order_by = 'index';
+    if (!fields.sort_by) fields.sort_by = 'desc';
+  }
   return fields;
+}
+
+function maskTokenInValue(key, value) {
+  if (key === 'access_token' && typeof value === 'string' && value.length > 16) {
+    return `${value.slice(0, 12)}…`;
+  }
+  return value;
+}
+
+function parseUrlEncodedBodyRows(body) {
+  if (!body || typeof body !== 'string') return [];
+  try {
+    const params = new URLSearchParams(body);
+    const rows = [];
+    for (const [key, val] of params.entries()) {
+      rows.push([key, maskTokenInValue(key, val)]);
+    }
+    return rows;
+  } catch {
+    return [];
+  }
+}
+
+function formFieldsToJsonObject(fields = {}, { forPreview = true } = {}) {
+  const token = tokenEl?.value?.trim();
+  const tokenMask = token ? `${token.slice(0, 12)}…` : '<ACCESS_TOKEN>';
+  const out = {
+    access_token: forPreview ? tokenMask : token || '<ACCESS_TOKEN>',
+    domain: $('loginDomain')?.value?.trim() || '79ai.net',
+  };
+  for (const [key, value] of Object.entries(fields)) {
+    if (value == null) continue;
+    const text = String(value).trim();
+    if (text) out[key] = value;
+  }
+  return out;
+}
+
+function urlEncodedRowsToJsonObject(rows) {
+  const out = {};
+  for (const [key, val] of rows || []) {
+    if (key) out[key] = val;
+  }
+  return out;
+}
+
+function formatResponseStructureDisplay(struct) {
+  if (!struct) return '';
+  const parts = [];
+  if (struct.success != null) {
+    parts.push(`// Success\n${JSON.stringify(struct.success, null, 2)}`);
+  }
+  if (struct.error != null) {
+    parts.push(`// Error\n${JSON.stringify(struct.error, null, 2)}`);
+  }
+  return parts.join('\n\n');
+}
+
+function buildCreateJobResponseStructure(jobType) {
+  const mediaKey =
+    jobType === 'video' ? 'videoInfo' : jobType === 'music' ? 'musicInfo' : 'imageInfo';
+  return {
+    success: {
+      success: true,
+      data: {
+        id_base: '{id_base}',
+        status: 'PENDING',
+        [mediaKey]: { id_base: '{id_base}', status: 'PENDING_ACTIVE' },
+      },
+    },
+    error: {
+      success: false,
+      message: 'Insufficient credits',
+      code: 'INSUFFICIENT_CREDITS',
+    },
+  };
+}
+
+function buildPollJobResponseStructure(media = 'image') {
+  const mediaKey =
+    media === 'video' ? 'videoInfo' : media === 'music' ? 'musicInfo' : 'imageInfo';
+  return {
+    success: {
+      success: true,
+      data: {
+        id_base: '{id_base}',
+        status: 'SUCCESS',
+        url: 'https://…',
+        [mediaKey]: { id_base: '{id_base}', status: 'SUCCESS', url: 'https://…' },
+      },
+    },
+    error: {
+      success: false,
+      message: 'Job not found',
+      code: 'NOT_FOUND',
+    },
+  };
+}
+
+function buildLibraryListResponseStructure() {
+  return {
+    success: {
+      success: true,
+      data: {
+        items: [{ id_base: '{id_base}', name: '…', url: 'https://…' }],
+        total: 1,
+      },
+    },
+    error: {
+      success: false,
+      message: 'Unauthorized',
+      code: 'UNAUTHORIZED',
+    },
+  };
+}
+
+function buildInfoJobResponseStructure(kind = 'image') {
+  const mediaKey =
+    kind === 'video' ? 'videoInfo' : kind === 'music' ? 'musicInfo' : 'imageInfo';
+  return {
+    success: {
+      success: true,
+      data: {
+        id_base: '{id_base}',
+        [mediaKey]: { id_base: '{id_base}', status: 'SUCCESS', url: 'https://…' },
+      },
+    },
+    error: {
+      success: false,
+      message: 'Not found',
+      code: 'NOT_FOUND',
+    },
+  };
+}
+
+function buildHealthResponseStructure() {
+  return {
+    success: { ok: true, service: 'ai-gateway' },
+    error: { ok: false, message: 'Service unavailable' },
+  };
+}
+
+function extractLibraryListArrays(data) {
+  const root = data?.data;
+  if (Array.isArray(root)) return root;
+  if (root && typeof root === 'object') {
+    for (const key of ['data', 'items', 'images', 'videos', 'musics', 'audios', 'album_images', 'album_videos']) {
+      if (Array.isArray(root[key])) return root[key];
+    }
+  }
+  return [];
 }
 
 function extractFirstListMediaUrl(data) {
   const direct = pickUrlFromRaw(data) || pickUrlFromRaw(data?.data);
   if (direct) return direct;
-  const root = data?.data;
-  const lists = [];
-  if (Array.isArray(root)) lists.push(root);
-  else if (root && typeof root === 'object') {
-    for (const key of ['items', 'data', 'images', 'videos', 'musics', 'audios', 'album_videos']) {
-      if (Array.isArray(root[key])) lists.push(root[key]);
-    }
-  }
-  for (const list of lists) {
-    for (const item of list) {
-      const url = pickUrlFromMediaInfo(item);
-      if (url) return url;
-    }
+  for (const item of extractLibraryListArrays(data)) {
+    const url = pickUrlFromMediaInfo(item);
+    if (url) return url;
   }
   return null;
+}
+
+function normalizeLibraryListItem(item, kind = activeLibraryKind) {
+  const empty = {
+    id_base: '',
+    title: '',
+    status: '',
+    model: '',
+    text: '',
+    prompt: '',
+    created: '',
+    thumbnailUrl: null,
+    mediaUrl: null,
+  };
+  if (!item || typeof item !== 'object') return empty;
+
+  const modelInfo = item.modelInfo && typeof item.modelInfo === 'object' ? item.modelInfo : null;
+  const audioInfo =
+    item.audioInfo && typeof item.audioInfo === 'object' ? item.audioInfo : null;
+  const ttsInfo = item.ttsInfo && typeof item.ttsInfo === 'object' ? item.ttsInfo : null;
+  const title = String(item.title || item.name || audioInfo?.title || '').trim();
+  const model = String(
+    item.model ||
+      item.model_id ||
+      item.model_name ||
+      modelInfo?.model ||
+      modelInfo?.name ||
+      modelInfo?.slug ||
+      audioInfo?.model ||
+      ttsInfo?.model ||
+      '',
+  ).trim();
+  const fileUrl = pickHttpUrl(
+    item.file_url,
+    item.download_url,
+    item.audio_url,
+    item.url,
+    audioInfo?.file_url,
+    audioInfo?.download_url,
+    audioInfo?.url,
+    ttsInfo?.file_url,
+    ttsInfo?.url,
+    pickUrlFromMediaInfo(item),
+  );
+
+  if (libraryUsesAudioTable(kind)) {
+    const text = String(
+      item.text ||
+        item.content ||
+        item.prompt ||
+        audioInfo?.text ||
+        ttsInfo?.text ||
+        '',
+    ).trim();
+    return {
+      id_base: String(item.id_base || item.id || audioInfo?.id_base || '').trim(),
+      title,
+      status: String(item.status || audioInfo?.status || ttsInfo?.status || '').trim(),
+      model,
+      text,
+      prompt: text,
+      created: item.created_time ?? item.created_at ?? item.updated_time ?? '',
+      thumbnailUrl: null,
+      mediaUrl: fileUrl,
+    };
+  }
+
+  const prompt = String(item.prompt || item.content || item.tags || '').trim();
+  return {
+    id_base: String(item.id_base || item.id || '').trim(),
+    title,
+    status: String(item.status || '').trim(),
+    model,
+    text: prompt || title,
+    prompt: prompt || title,
+    created: item.created_time ?? item.created_at ?? item.updated_time ?? '',
+    thumbnailUrl: pickHttpUrl(
+      item.cover_url,
+      item.thumbnail_url,
+      item.url_preview,
+      item.thumbnail,
+      item.coverUrl,
+    ),
+    mediaUrl: fileUrl || pickUrlFromMediaInfo(item),
+  };
+}
+
+function libraryFileOpenCell(mediaUrl) {
+  if (!mediaUrl) return '—';
+  const label = escapeHtml(pgT('result.library.open', 'Open'));
+  return `<a class="pg-result-library-file-link" href="${escapeHtml(mediaUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${label}</a>`;
+}
+
+function syncLibraryTableHead(kind) {
+  const head = $('resultLibraryTableHead');
+  if (!head) return;
+  if (libraryUsesAudioTable(kind)) {
+    head.innerHTML = `<tr>
+        <th scope="col">#</th>
+        <th scope="col">id_base</th>
+        <th scope="col">${escapeHtml(pgT('result.library.status', 'Status'))}</th>
+        <th scope="col">${escapeHtml(pgT('result.library.model', 'Model'))}</th>
+        <th scope="col">${escapeHtml(pgT('result.library.text', 'Text'))}</th>
+        <th scope="col">${escapeHtml(pgT('result.library.file', 'File'))}</th>
+      </tr>`;
+    return;
+  }
+  if (libraryUsesMusicTable(kind)) {
+    head.innerHTML = `<tr>
+        <th scope="col">#</th>
+        <th scope="col">${escapeHtml(pgT('result.library.cover', 'Cover'))}</th>
+        <th scope="col">id_base</th>
+        <th scope="col">${escapeHtml(pgT('result.library.title', 'Title'))}</th>
+        <th scope="col">${escapeHtml(pgT('result.library.status', 'Status'))}</th>
+        <th scope="col">${escapeHtml(pgT('result.library.prompt', 'Prompt'))}</th>
+      </tr>`;
+    return;
+  }
+  head.innerHTML = `<tr>
+        <th scope="col">#</th>
+        <th scope="col">${escapeHtml(pgT('result.library.cover', 'Cover'))}</th>
+        <th scope="col">id_base</th>
+        <th scope="col">${escapeHtml(pgT('result.library.status', 'Status'))}</th>
+        <th scope="col">${escapeHtml(pgT('result.library.model', 'Model'))}</th>
+        <th scope="col">${escapeHtml(pgT('result.library.prompt', 'Prompt'))}</th>
+        <th scope="col">${escapeHtml(pgT('result.library.created', 'Created'))}</th>
+      </tr>`;
+}
+
+function formatLibraryCreated(ts) {
+  if (ts == null || ts === '') return '—';
+  const n = Number(ts);
+  if (!Number.isFinite(n) || n <= 0) return String(ts);
+  const ms = n < 1e12 ? n * 1000 : n;
+  try {
+    return new Date(ms).toLocaleString();
+  } catch {
+    return String(ts);
+  }
+}
+
+function libraryStatusClass(status) {
+  const s = String(status || '').toUpperCase();
+  if (s.includes('ERROR') || s.includes('FAIL')) return 'error';
+  if (s.includes('SUCCESS') || s.includes('FINISH') || s.includes('DONE') || s.includes('COMPLETE')) {
+    return 'success';
+  }
+  return 'pending';
+}
+
+function truncateLibraryText(text, max = 72) {
+  const s = String(text || '').trim();
+  if (!s) return '—';
+  if (s.length <= max) return s;
+  return `${s.slice(0, max - 1)}…`;
+}
+
+function clearLibraryPreviewPlayers() {
+  const img = $('resultLibraryPreviewImage');
+  const video = $('resultLibraryPreviewVideo');
+  const audio = $('resultLibraryPreviewAudio');
+  if (img) {
+    img.removeAttribute('src');
+    img.hidden = true;
+  }
+  if (video) {
+    video.pause?.();
+    video.removeAttribute('src');
+    video.hidden = true;
+  }
+  if (audio) {
+    audio.pause?.();
+    audio.removeAttribute('src');
+    audio.hidden = true;
+  }
+}
+
+function hideLibraryListResult() {
+  const wrap = $('resultLibraryList');
+  if (wrap) wrap.hidden = true;
+  libraryListState.items = [];
+  libraryListState.selectedIndex = 0;
+  libraryListState.active = false;
+  const body = $('resultLibraryTableBody');
+  if (body) body.innerHTML = '';
+  clearLibraryPreviewPlayers();
+  const legacy = $('resultLegacyJsonWrap');
+  if (legacy) {
+    legacy.hidden = true;
+    legacy.classList.remove('pg-result-json-wrap--library');
+  }
+}
+
+function setLibraryListView(view) {
+  let effectiveView = view === 'response' || view === 'preview' ? view : 'list';
+  const hidePreview = libraryUsesCompactListTable(activeLibraryKind);
+  if (hidePreview && effectiveView === 'preview') effectiveView = 'list';
+  libraryListState.view = effectiveView;
+  const listPane = $('resultLibraryListPane');
+  const previewPane = $('resultLibraryPreviewPane');
+  const legacy = $('resultLegacyJsonWrap');
+  const libraryWrap = $('resultLibraryList');
+  const btnResponse = $('btnLibraryViewResponse');
+  const btnList = $('btnLibraryViewList');
+  const btnPreview = $('btnLibraryViewPreview');
+  const isResponse = effectiveView === 'response';
+  const isList = effectiveView === 'list';
+  const isPreview = effectiveView === 'preview';
+  if (listPane) listPane.hidden = !isList;
+  if (previewPane) previewPane.hidden = !isPreview;
+  if (legacy) {
+    legacy.hidden = !isResponse;
+    legacy.classList.toggle(
+      'pg-result-json-wrap--library',
+      isResponse && Boolean(libraryWrap && !libraryWrap.hidden),
+    );
+  }
+  if (btnResponse) {
+    btnResponse.classList.toggle('active', isResponse);
+    btnResponse.setAttribute('aria-selected', isResponse ? 'true' : 'false');
+  }
+  if (btnList) {
+    btnList.classList.toggle('active', isList);
+    btnList.setAttribute('aria-selected', isList ? 'true' : 'false');
+  }
+  if (btnPreview) {
+    btnPreview.hidden = hidePreview;
+    btnPreview.classList.toggle('active', isPreview);
+    btnPreview.setAttribute('aria-selected', isPreview ? 'true' : 'false');
+  }
+  if (libraryWrap) libraryWrap.classList.toggle('pg-result-library--compact', isResponse);
+  syncLibraryResultCacheView();
+}
+
+function syncLibraryResultCacheView() {
+  const key = getLibraryWorkerKey(activeLibraryKind);
+  const prev = panelResultCache.get(key);
+  if (prev?.type !== 'library') return;
+  panelResultCache.set(key, {
+    ...prev,
+    view: libraryListState.view,
+    selectedIndex: libraryListState.selectedIndex,
+    items: libraryListState.items,
+    media: libraryListState.media,
+  });
+}
+
+function showLibraryListPreview(index) {
+  const items = libraryListState.items;
+  if (!items.length) return;
+  const idx = Math.max(0, Math.min(index, items.length - 1));
+  libraryListState.selectedIndex = idx;
+  const item = items[idx];
+  const media = libraryListState.media;
+  const url = item.mediaUrl || item.thumbnailUrl;
+  const link = $('resultLibraryOpenLink');
+  clearLibraryPreviewPlayers();
+  if (link) {
+    if (url) {
+      link.href = url;
+      link.hidden = false;
+    } else {
+      link.href = '#';
+      link.hidden = true;
+    }
+  }
+  const img = $('resultLibraryPreviewImage');
+  const video = $('resultLibraryPreviewVideo');
+  const audio = $('resultLibraryPreviewAudio');
+  if (url) {
+    const hint = String(media || '').toLowerCase();
+    const looksImage = /\.(png|jpe?g|webp|gif|bmp|svg)(\?|$)/i.test(url);
+    const looksVideo = /\.(mp4|webm|mov)(\?|$)/i.test(url);
+    const looksAudio = /\.(mp3|wav|ogg|m4a|aac|flac)(\?|$)/i.test(url) || /\/audio/i.test(url);
+    if (hint === 'image' || looksImage) {
+      if (img) {
+        img.src = url;
+        img.hidden = false;
+      }
+    } else if ((hint === 'video' || looksVideo) && video) {
+      video.src = url;
+      video.hidden = false;
+    } else if ((hint === 'music' || hint === 'audio' || looksAudio) && audio) {
+      audio.src = url;
+      audio.hidden = false;
+    } else if (img) {
+      img.src = url;
+      img.hidden = false;
+    }
+  }
+  document.querySelectorAll('#resultLibraryTableBody tr').forEach((row, rowIdx) => {
+    row.classList.toggle('selected', rowIdx === idx);
+  });
+}
+
+function selectLibraryListRow(index) {
+  const items = libraryListState.items;
+  if (!items.length) return;
+  libraryListState.selectedIndex = Math.max(0, Math.min(index, items.length - 1));
+  document.querySelectorAll('#resultLibraryTableBody tr').forEach((row, rowIdx) => {
+    row.classList.toggle('selected', rowIdx === libraryListState.selectedIndex);
+  });
+  if (!libraryUsesCompactListTable(activeLibraryKind)) showLibraryListPreview(libraryListState.selectedIndex);
+  syncLibraryResultCacheView();
+}
+
+function renderLibraryListTable() {
+  const body = $('resultLibraryTableBody');
+  const countEl = $('resultLibraryCount');
+  const items = libraryListState.items;
+  const compact = libraryUsesCompactListTable(activeLibraryKind);
+  const audio = libraryUsesAudioTable(activeLibraryKind);
+  const music = libraryUsesMusicTable(activeLibraryKind);
+  if (!body) return;
+  if (countEl) {
+    countEl.textContent = items.length
+      ? compact
+        ? `Total: ${items.length}`
+        : pgT('result.library.count', '{count} items').replace('{count}', String(items.length))
+      : pgT('result.library.empty', 'No items in response');
+  }
+  if (!items.length) {
+    body.innerHTML = '';
+    return;
+  }
+  body.innerHTML = items
+    .map((item, index) => {
+      const thumb = item.thumbnailUrl || item.mediaUrl;
+      const thumbHtml = thumb
+        ? `<img src="${escapeHtml(thumb)}" alt="" loading="lazy" />`
+        : '<span class="pg-result-library-thumb-empty">—</span>';
+      const status = escapeHtml(item.status || '—');
+      const statusClass = libraryStatusClass(item.status);
+      const selected = index === libraryListState.selectedIndex ? ' selected' : '';
+      if (audio) {
+        const text = item.text || item.prompt || '';
+        return `<tr class="pg-result-library-row${selected}" data-library-index="${index}" tabindex="0">
+        <td class="pg-result-library-idx">${index + 1}</td>
+        <td class="pg-result-library-id"><code>${escapeHtml(item.id_base || '—')}</code></td>
+        <td class="pg-result-library-status"><span class="pg-result-library-status-pill pg-result-library-status-pill--${statusClass}">${status}</span></td>
+        <td class="pg-result-library-model">${escapeHtml(item.model || '—')}</td>
+        <td class="pg-result-library-text" title="${escapeHtml(text)}">${escapeHtml(truncateLibraryText(text, 120))}</td>
+        <td class="pg-result-library-file">${libraryFileOpenCell(item.mediaUrl)}</td>
+      </tr>`;
+      }
+      if (music) {
+        return `<tr class="pg-result-library-row${selected}" data-library-index="${index}" tabindex="0">
+        <td class="pg-result-library-idx">${index + 1}</td>
+        <td class="pg-result-library-thumb">${thumbHtml}</td>
+        <td class="pg-result-library-id"><code>${escapeHtml(item.id_base || '—')}</code></td>
+        <td class="pg-result-library-title">${escapeHtml(item.title || '—')}</td>
+        <td class="pg-result-library-status"><span class="pg-result-library-status-pill pg-result-library-status-pill--${statusClass}">${status}</span></td>
+        <td class="pg-result-library-prompt" title="${escapeHtml(item.prompt || '')}">${escapeHtml(truncateLibraryText(item.prompt))}</td>
+      </tr>`;
+      }
+      return `<tr class="pg-result-library-row${selected}" data-library-index="${index}" tabindex="0">
+        <td class="pg-result-library-idx">${index + 1}</td>
+        <td class="pg-result-library-thumb">${thumbHtml}</td>
+        <td class="pg-result-library-id"><code>${escapeHtml(item.id_base || '—')}</code></td>
+        <td class="pg-result-library-status"><span class="pg-result-library-status-pill pg-result-library-status-pill--${statusClass}">${status}</span></td>
+        <td class="pg-result-library-model">${escapeHtml(item.model || '—')}</td>
+        <td class="pg-result-library-prompt" title="${escapeHtml(item.prompt || '')}">${escapeHtml(truncateLibraryText(item.prompt))}</td>
+        <td class="pg-result-library-created">${escapeHtml(formatLibraryCreated(item.created))}</td>
+      </tr>`;
+    })
+    .join('');
+}
+
+function showLibraryListLayout({ switchTab = true } = {}) {
+  if (resultEmpty) resultEmpty.hidden = true;
+  const main = $('resultMain');
+  if (main) main.hidden = true;
+  const gallery = $('resultGallery');
+  if (gallery) gallery.hidden = true;
+  const wrap = $('resultLibraryList');
+  if (wrap) wrap.hidden = false;
+  libraryListState.active = true;
+  if (switchTab && !playgroundBooting && !userPinnedResponseTab) setResponseTab('result');
+}
+
+function showLibraryListResult(items, mediaHint = 'image', responseBody = null) {
+  const key = getLibraryWorkerKey(activeLibraryKind);
+  libraryListState.items = items.map((item) => normalizeLibraryListItem(item, activeLibraryKind));
+  libraryListState.media = String(mediaHint || 'image').toLowerCase();
+  libraryListState.selectedIndex = 0;
+  const firstPlayable = libraryListState.items.findIndex((item) => item.mediaUrl || item.thumbnailUrl);
+  if (firstPlayable >= 0) libraryListState.selectedIndex = firstPlayable;
+  const defaultView = libraryUsesCompactListTable(activeLibraryKind) ? 'list' : 'response';
+  panelResultCache.set(key, {
+    type: 'library',
+    items: libraryListState.items,
+    media: libraryListState.media,
+    selectedIndex: libraryListState.selectedIndex,
+    view: defaultView,
+    responseBody,
+    gallery: [],
+  });
+  activeResultWorkerKey = key;
+  if (responseBody != null && responseOutput) {
+    GwJsonHighlight?.displayInPre(responseOutput, responseBody);
+  }
+  syncLibraryTableHead(activeLibraryKind);
+  renderLibraryListTable();
+  showLibraryListLayout();
+  setLibraryListView(defaultView);
+  renderResultGallery([]);
 }
 
 function previewBaseUrl() {
@@ -1854,75 +2951,317 @@ function previewBaseUrl() {
   }
 }
 
-function applyRequestPreview({ method, path, headers, body, curl }) {
+function inferPlaygroundPublicHost(path) {
+  const p = String(path || '');
+  if (p === '/health' || p.startsWith('/gateway/')) return 'local';
+  if (
+    p.startsWith('/ai/library/') ||
+    p.startsWith('/ai/jobs/') ||
+    p.startsWith('/ai/models') ||
+    p.startsWith('/ai/upload/')
+  ) {
+    return 'v2';
+  }
+  return 'auth';
+}
+
+function publicDisplayUrl(path) {
+  const host = inferPlaygroundPublicHost(path);
+  if (host === 'local') return `${previewBaseUrl()}${path}`;
+  const api = globalThis.PortalGommoApi;
+  return api?.buildPublicUrl(host, path) || path;
+}
+
+function publicApiLabel(method, path) {
+  return `${method} ${path}`;
+}
+
+function publicCreateJobPath(jobType, modelSlug) {
+  const slug = modelSlug || '{model_id}';
+  return `/ai/jobs/${jobType}/${slug}`;
+}
+
+function publicPollPath(jobId, media) {
+  const id = jobId || '{id_base}';
+  return `/ai/jobs/${id}?media=${encodeURIComponent(media || 'image')}`;
+}
+
+const PREVIEW_PLACEHOLDER = {
+  TOKEN: '<ACCESS_TOKEN>',
+  MODEL: '{model_id}',
+  PROMPT: '<your prompt here>',
+  ID: '{id_base}',
+  PROJECT: 'default',
+};
+
+function isPreviewPlaceholder(val) {
+  const s = String(val ?? '');
+  return /^<[^>]+>$/.test(s) || /^\{[^}]+\}$/.test(s);
+}
+
+function buildPreviewAuthHeaders() {
+  const token = tokenEl?.value?.trim();
+  const tokenMask = token ? `${token.slice(0, 12)}…` : PREVIEW_PLACEHOLDER.TOKEN;
+  return {
+    Authorization: `Bearer ${tokenMask}`,
+    'Content-Type': 'application/x-www-form-urlencoded',
+  };
+}
+
+function mergePreviewFields(skeleton, actual) {
+  const out = { ...skeleton };
+  for (const [key, value] of Object.entries(actual || {})) {
+    if (value == null) continue;
+    const text = String(value).trim();
+    if (text) out[key] = value;
+  }
+  return out;
+}
+
+function catalogListForModel(model, field) {
+  if (!model) return null;
+  if (field === 'ratio') return model.ratios;
+  if (field === 'mode') return model.modes;
+  if (field === 'resolution') return model.resolutions;
+  return model.durations;
+}
+
+/** Catalog values from UI, or first/default option when model is loaded but chips not clicked yet. */
+function readCatalogFieldValuesOrDefaults(model) {
+  const fromUi = readCatalogFieldValues();
+  if (!model) return fromUi;
+  const jobType = $('jobType')?.value || 'image';
+  const out = { ...fromUi };
+  for (const def of CATALOG_FIELD_DEFS) {
+    if (out[def.field]) continue;
+    const list = catalogListForModel(model, def.field);
+    if (list?.length) out[def.field] = pickDefaultCatalogOption(def.field, list, jobType);
+  }
+  return out;
+}
+
+function buildMediaJobSkeletonFields(jobType, model) {
+  const fields = {};
+  if ($('mediaProjectId')) {
+    fields.project_id = $('mediaProjectId')?.value?.trim() || PREVIEW_PLACEHOLDER.PROJECT;
+  }
+
+  if (jobType === 'music') {
+    fields.mode = '<mode>';
+    fields.name = '<track title>';
+    fields.tags = '<style / tags>';
+    fields.prompt = '<music prompt>';
+    fields.lyrics = '<lyrics (custom mode)>';
+    return fields;
+  }
+
+  if (jobType === 'tts') {
+    fields.text = '<text to speak>';
+    fields.self = 'true';
+    return fields;
+  }
+
+  fields.prompt = PREVIEW_PLACEHOLDER.PROMPT;
+  return fields;
+}
+
+function buildLibrarySkeletonFields(cfg) {
+  const fields = { limit: '30' };
+  if (cfg.showProject || cfg.showAlbumFields) {
+    fields.project_id = PREVIEW_PLACEHOLDER.PROJECT;
+  }
+  if (cfg.showAlbumFields) {
+    fields.order_by = 'index';
+    fields.sort_by = 'desc';
+  }
+  if (cfg.showModel) fields.model = '<model>';
+  if (cfg.showCategory) fields.category = '<category>';
+  if (cfg.showSource) fields.source = '<source>';
+  if (!cfg.showAlbumFields) fields.after_id = '<optional>';
+  return fields;
+}
+
+function buildInfoSkeletonFields(cfg) {
+  const fields = { [cfg.formIdKey]: PREVIEW_PLACEHOLDER.ID };
+  if (cfg.showProject) fields.project_id = PREVIEW_PLACEHOLDER.PROJECT;
+  return fields;
+}
+
+function buildPreviewCurl(method, url, headers, bodyRaw, token) {
+  const curlToken = token || PREVIEW_PLACEHOLDER.TOKEN;
+  const lines = [`curl -X ${method} '${url}'`];
+  const auth = headers?.Authorization;
+  if (auth) {
+    lines.push(`  -H 'Authorization: Bearer ${token || PREVIEW_PLACEHOLDER.TOKEN}'`);
+  }
+  if (headers?.['Content-Type']) {
+    lines.push(`  -H 'Content-Type: ${headers['Content-Type']}'`);
+  } else if (headers?.Accept) {
+    lines.push(`  -H 'Accept: ${headers.Accept}'`);
+  }
+  if (bodyRaw) lines.push(`  -d '${bodyRaw}'`);
+  return lines.join(' \\\n');
+}
+
+function applyRequestPreview({
+  method,
+  path,
+  headers = {},
+  body,
+  bodyRaw,
+  bodyJson,
+  curl,
+  responseStructure,
+}) {
   const methodEl = $('requestMethod');
   const endpointEl = $('requestEndpoint');
   const fullUrlEl = $('requestFullUrl');
   const headersRows = $('requestHeadersRows');
-  const bodyRows = $('requestBodyRows');
+  const bodyRowsEl = $('requestBodyRows');
   const bodyRawEl = $('requestBodyRaw');
   const curlEl = $('requestCurl');
-  const url = `${previewBaseUrl()}${path}`;
+  const structEl = $('requestResponseStructure');
+  const url = publicDisplayUrl(path);
 
-  if (methodEl) methodEl.textContent = method;
-  if (endpointEl) endpointEl.textContent = path;
-  if (fullUrlEl) fullUrlEl.textContent = url;
+  const resolvedHeaders =
+    headers && Object.keys(headers).length ? headers : method === 'GET' ? { Accept: 'application/json' } : buildPreviewAuthHeaders();
+
+  if (methodEl) methodEl.textContent = method || 'POST';
+  if (endpointEl) endpointEl.textContent = url;
+  if (fullUrlEl) fullUrlEl.hidden = true;
   renderKvTableRows(
     headersRows,
-    Object.entries(headers).map(([k, v]) => [k, v]),
+    Object.entries(resolvedHeaders).map(([k, v]) => [k, v]),
   );
-  if (typeof body === 'string') {
-    renderKvTableRows(bodyRows, [['body', body]]);
-    if (bodyRawEl) bodyRawEl.textContent = body;
+  if (bodyJson != null) {
+    renderKvTableRows(
+      bodyRowsEl,
+      Object.entries(bodyJson).map(([k, v]) => [
+        k,
+        typeof v === 'object' ? JSON.stringify(v) : String(v),
+      ]),
+    );
+    if (bodyRawEl) GwJsonHighlight?.setJsonPre(bodyRawEl, bodyJson);
+  } else if (Array.isArray(body)) {
+    renderKvTableRows(bodyRowsEl, body);
+    if (bodyRawEl) {
+      const jsonFromRows = urlEncodedRowsToJsonObject(body);
+      if (Object.keys(jsonFromRows).length) GwJsonHighlight?.setJsonPre(bodyRawEl, jsonFromRows);
+      else bodyRawEl.textContent = bodyRaw || body.map(([k, v]) => `${k}=${v}`).join('\n');
+    }
+  } else if (typeof body === 'string') {
+    const rows = parseUrlEncodedBodyRows(body);
+    renderKvTableRows(bodyRowsEl, rows.length ? rows : [['body', body]]);
+    if (bodyRawEl) {
+      const jsonFromRows = urlEncodedRowsToJsonObject(rows);
+      if (Object.keys(jsonFromRows).length) GwJsonHighlight?.setJsonPre(bodyRawEl, jsonFromRows);
+      else bodyRawEl.textContent = body;
+    }
   } else {
-    renderKvTableRows(bodyRows, flattenRequestBodyRows(body));
+    renderKvTableRows(bodyRowsEl, flattenRequestBodyRows(body));
     if (bodyRawEl) GwJsonHighlight?.setJsonPre(bodyRawEl, body);
   }
-  if (curlEl) curlEl.textContent = curl;
-  renderAiGuidePanel();
+  if (curlEl) curlEl.textContent = curl || '';
+  if (structEl) {
+    const structText = formatResponseStructureDisplay(responseStructure);
+    structEl.textContent = structText || '—';
+    structEl.classList.toggle('pg-json-highlight', Boolean(structText));
+  }
+  setRequestBodyView(requestBodyRawView);
+  try {
+    renderAiGuidePanel();
+  } catch (err) {
+    console.warn('[playground] renderAiGuidePanel failed', err);
+  }
+  try {
+    globalThis.GatewayEndpointDetail?.refreshEndpointsTable?.();
+  } catch (err) {
+    console.warn('[playground] refreshEndpointsTable failed', err);
+  }
+}
+
+/** Populate Request tab before async boot (79ai-style skeleton). */
+function primeRequestPreviewSkeleton() {
+  const jobType = $('jobType')?.value || 'image';
+  const modelSlug = resolveMediaModelSlug();
+  const model = getActiveMediaModel();
+  const headers = buildPreviewAuthHeaders();
+  const path = publicCreateJobPath(jobType, modelSlug || PREVIEW_PLACEHOLDER.MODEL);
+  const url = publicDisplayUrl(path);
+  const skeleton = buildMediaJobSkeletonFields(jobType, model);
+  const catalogFill = readCatalogFieldValuesOrDefaults(model);
+  const fields = mergePreviewFields(mergePreviewFields(skeleton, catalogFill), readJobFields(''));
+  const formBody = buildGommoFormBody(fields, { forPreview: true });
+  const bodyRaw = formBody.toString();
+  const bodyJson = formFieldsToJsonObject(fields, { forPreview: true });
+  const token = tokenEl?.value?.trim();
+  applyRequestPreview({
+    method: 'POST',
+    path,
+    headers,
+    body: parseUrlEncodedBodyRows(bodyRaw),
+    bodyRaw,
+    bodyJson,
+    curl: buildPreviewCurl('POST', url, headers, bodyRaw, token),
+    responseStructure: buildCreateJobResponseStructure(jobType),
+  });
 }
 
 function buildInfoRequestPreview() {
-  const cfg = INFO_CONFIGS[activeInfoKind];
-  const id = $('infoJobId')?.value?.trim() || '{id}';
+  const cfg = INFO_CONFIGS[activeInfoKind] || {
+    formIdKey: 'id_base',
+    showProject: true,
+  };
+  const idRaw = $('infoJobId')?.value?.trim();
+  const id = idRaw || PREVIEW_PLACEHOLDER.ID;
   const path = `/ai/info/${activeInfoKind}/${encodeURIComponent(id)}`;
-  const fields = { [cfg.formIdKey]: id === '{id}' ? '' : id };
+  const skeleton = buildInfoSkeletonFields(cfg);
+  const actual = {};
+  if (idRaw) actual[cfg.formIdKey] = idRaw;
   if (cfg.showProject) {
     const projectId = $('infoProjectId')?.value?.trim();
-    if (projectId) fields.project_id = projectId;
+    if (projectId) actual.project_id = projectId;
   }
+  const fields = mergePreviewFields(skeleton, actual);
   const body = buildGommoFormBody(fields, { forPreview: true });
+  const headers = buildPreviewAuthHeaders();
+  const pubUrl = publicDisplayUrl(path);
+  const bodyJson = formFieldsToJsonObject(fields, { forPreview: true });
+  const bodyRaw = body.toString();
   const token = tokenEl?.value?.trim();
-  const tokenMask = token ? `${token.slice(0, 12)}…` : '<ACCESS_TOKEN>';
   return {
     method: 'POST',
     path,
-    headers: {
-      Authorization: `Bearer ${tokenMask}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: body.toString(),
-    curl: `curl -X POST '${previewBaseUrl()}${path}' \\\n  -H 'Authorization: Bearer ${token || '<ACCESS_TOKEN>'}' \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n  -d '${body.toString()}'`,
+    headers,
+    body: parseUrlEncodedBodyRows(bodyRaw),
+    bodyRaw,
+    bodyJson,
+    responseStructure: buildInfoJobResponseStructure(activeInfoKind),
+    curl: buildPreviewCurl('POST', pubUrl, headers, bodyRaw, token),
   };
 }
 
 function buildLibraryRequestPreview() {
-  const cfg = LIBRARY_CONFIGS[activeLibraryKind];
+  const cfg = LIBRARY_CONFIGS[activeLibraryKind] || LIBRARY_CONFIGS.musics;
   const path = cfg.path;
-  const fields = readLibraryFormFields();
-  if (!fields.limit) fields.limit = $('libLimit')?.value?.trim() || '30';
-  const body = buildGommoFormBody(fields, { forPreview: true });
+  const skeleton = buildLibrarySkeletonFields(cfg);
+  const fields = mergePreviewFields(skeleton, readLibraryFormFields());
+  const formBody = buildGommoFormBody(fields, { forPreview: true });
+  const bodyRaw = formBody.toString();
+  const bodyRows = parseUrlEncodedBodyRows(bodyRaw);
+  const headers = buildPreviewAuthHeaders();
+  const pubUrl = publicDisplayUrl(path);
+  const bodyJson = formFieldsToJsonObject(fields, { forPreview: true });
   const token = tokenEl?.value?.trim();
-  const tokenMask = token ? `${token.slice(0, 12)}…` : '<ACCESS_TOKEN>';
   return {
     method: 'POST',
     path,
-    headers: {
-      Authorization: `Bearer ${tokenMask}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: body.toString(),
-    curl: `curl -X POST '${previewBaseUrl()}${path}' \\\n  -H 'Authorization: Bearer ${token || '<ACCESS_TOKEN>'}' \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n  -d '${body.toString()}'`,
+    headers,
+    body: bodyRows,
+    bodyRaw,
+    bodyJson,
+    responseStructure: buildLibraryListResponseStructure(),
+    curl: buildPreviewCurl('POST', pubUrl, headers, bodyRaw, token),
   };
 }
 
@@ -1933,28 +3272,28 @@ function buildHealthRequestPreview() {
     path,
     headers: { Accept: 'application/json' },
     body: {},
+    bodyJson: null,
+    responseStructure: buildHealthResponseStructure(),
     curl: `curl '${previewBaseUrl()}${path}'`,
   };
 }
 
-function refreshProxyPanelPreview() {
-  const panel = document.querySelector('.pg-panel.active')?.dataset.panel;
-  if (panel === 'info-job') {
-    applyRequestPreview(buildInfoRequestPreview());
-    return;
-  }
-  if (panel === 'library') {
-    applyRequestPreview(buildLibraryRequestPreview());
-    return;
-  }
-  if (panel === 'health') {
-    applyRequestPreview(buildHealthRequestPreview());
-  }
+function buildProxyPanelRequestPreview(panel) {
+  if (panel === 'info-job') return buildInfoRequestPreview();
+  if (panel === 'library') return buildLibraryRequestPreview();
+  if (panel === 'health') return buildHealthRequestPreview();
+  return null;
+}
+
+function refreshProxyPanelPreview(panel = getActivePlaygroundPanelKey()) {
+  const preview = buildProxyPanelRequestPreview(panel);
+  if (preview) applyRequestPreview(preview);
 }
 
 async function runInfoJob() {
   const status = $('infoJobStatus');
   const cfg = INFO_CONFIGS[activeInfoKind];
+  activeResultWorkerKey = getInfoWorkerKey(activeInfoKind);
   const id = $('infoJobId')?.value?.trim();
   if (!id) {
     setStatus(status, pgT('proxy.info.idBase') + ' required', false);
@@ -1989,6 +3328,8 @@ async function runInfoJob() {
 async function runLibraryList() {
   const status = $('libraryStatus');
   const cfg = LIBRARY_CONFIGS[activeLibraryKind];
+  activeResultWorkerKey = getLibraryWorkerKey(activeLibraryKind);
+  userPinnedResponseTab = false;
   setStatus(status, 'Fetching…', 'running');
   try {
     getToken();
@@ -1998,24 +3339,40 @@ async function runLibraryList() {
   }
   const fields = readLibraryFormFields();
   if (!fields.limit) fields.limit = $('libLimit')?.value?.trim() || '30';
+  const label = `POST ${cfg.path}`;
+  const media =
+    activeLibraryKind === 'videos' || activeLibraryKind === 'album-videos'
+      ? 'video'
+      : activeLibraryKind === 'musics' || activeLibraryKind === 'audios'
+        ? 'audio'
+        : 'image';
   try {
-    const data = await apiFormPost(cfg.path, fields, `POST ${cfg.path}`);
-    const resultUrl = extractFirstListMediaUrl(data);
-    const media =
-      activeLibraryKind === 'videos' || activeLibraryKind === 'album-videos'
-        ? 'video'
-        : activeLibraryKind === 'musics' || activeLibraryKind === 'audios'
-          ? 'audio'
-          : 'image';
-    if (resultUrl) showResultUrl(resultUrl, media);
-    setStatus(status, 'OK — see RESPONSE', true);
+    const data = await apiFormPost(cfg.path, fields, label, { silent: true });
+    const items = extractLibraryListArrays(data);
+    showLibraryListResult(items, media, data);
+    if (responseMeta) responseMeta.textContent = `200 · ${label}`;
+    if (items.length) {
+      setStatus(
+        status,
+        pgT('result.library.count', '{count} items').replace('{count}', String(items.length)),
+        true,
+      );
+    } else {
+      setStatus(status, pgT('result.library.empty', 'No items in response'), true);
+    }
   } catch (err) {
+    const errBody = err.body || { success: false, message: err.message, status: err.status };
+    showLibraryListResult([], media, errBody);
+    if (responseMeta) {
+      responseMeta.textContent = err.status ? `${err.status} · ${label}` : label;
+    }
     setStatus(status, err.message, false);
   }
 }
 
 async function runHealthCheck() {
   const status = $('healthStatus');
+  activeResultWorkerKey = getHealthWorkerKey();
   setStatus(status, 'Checking…', 'running');
   try {
     await apiFetch('/health', { headers: { Accept: 'application/json' } }, 'GET /health');
@@ -2114,10 +3471,10 @@ function renderKvTableRows(tbody, entries) {
     return;
   }
   tbody.innerHTML = entries
-    .map(
-      ([key, val]) =>
-        `<tr><td class="pg-kv-key"><code>${escapeHtml(key)}</code></td><td class="pg-kv-val">${escapeHtml(val)}</td></tr>`,
-    )
+    .map(([key, val]) => {
+      const ph = isPreviewPlaceholder(val) ? ' pg-kv-val--placeholder' : '';
+      return `<tr><td class="pg-kv-key"><code>${escapeHtml(key)}</code></td><td class="pg-kv-val${ph}">${escapeHtml(val)}</td></tr>`;
+    })
     .join('');
 }
 
@@ -2131,7 +3488,7 @@ function setRequestBodyView(raw) {
   if (tableWrap) tableWrap.hidden = raw;
   if (rawEl) rawEl.hidden = !raw;
   if (toggle) {
-    toggle.textContent = raw ? pgT('request.keyValue') : pgT('request.rawJson');
+    toggle.textContent = raw ? pgT('request.formFields') : pgT('request.bodyJson');
     toggle.setAttribute('aria-pressed', raw ? 'true' : 'false');
   }
 }
@@ -2159,18 +3516,26 @@ function setResponseTab(tab) {
     /* ignore */
   }
   if (tab === 'endpoints') globalThis.GatewayEndpointDetail?.refreshEndpointsTable?.();
+  if (tab === 'request') refreshRequestPreview();
 }
 
 function restoreResponseTab() {
   try {
     const saved = sessionStorage.getItem(STORAGE_RESPONSE_TAB);
     if (saved && RESPONSE_TABS.has(saved)) setResponseTab(saved);
+    else setResponseTab('result');
   } catch {
-    /* ignore */
+    setResponseTab('result');
   }
 }
 
-restoreResponseTab();
+function finishPlaygroundBoot() {
+  playgroundBooting = false;
+  document.body?.classList.remove('pg-booting');
+  setRequestBodyView(requestBodyRawView);
+  restoreResponseTab();
+  refreshRequestPreview();
+}
 
 function getGuideContext() {
   const jobType = $('jobType')?.value || 'image';
@@ -2314,63 +3679,64 @@ function initPortalI18n() {
 
 function buildMediaJobRequestPreview() {
   const jobType = $('jobType')?.value || 'image';
-  const modelSlug = $('mediaModelSelect')?.value || '';
+  const modelSlug = resolveMediaModelSlug();
+  const model = getActiveMediaModel();
   const prompt = $('mediaPrompt')?.value?.trim() || '';
-  const wait = $('mediaWait')?.checked ?? false;
-  const fields = readJobFields(prompt);
-  const body = {
-    modelSlug: modelSlug || '<modelSlug>',
-    wait,
-    fields,
-  };
-  const path = `/gateway/jobs/${jobType}`;
-  let base = '';
-  try {
-    base = baseUrl();
-  } catch {
-    base = window.location.origin.replace(/\/$/, '');
-  }
-  const url = `${base}${path}`;
+  const skeleton = buildMediaJobSkeletonFields(jobType, model);
+  const catalogFill = readCatalogFieldValuesOrDefaults(model);
+  const actual = readJobFields(prompt);
+  const fields = mergePreviewFields(mergePreviewFields(skeleton, catalogFill), actual);
+  const path = publicCreateJobPath(jobType, modelSlug || PREVIEW_PLACEHOLDER.MODEL);
+  const url = publicDisplayUrl(path);
+  const formBody = buildGommoFormBody(fields, { forPreview: true });
+  const bodyRaw = formBody.toString();
+  const headers = buildPreviewAuthHeaders();
   const token = tokenEl?.value?.trim();
-  const tokenMask = token ? `${token.slice(0, 12)}…` : '<ACCESS_TOKEN>';
-  const headers = {
-    Authorization: `Bearer ${tokenMask}`,
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
+  const curl = buildPreviewCurl('POST', url, headers, bodyRaw, token);
+  const bodyRows = parseUrlEncodedBodyRows(bodyRaw);
+  const bodyJson = formFieldsToJsonObject(fields, { forPreview: true });
+  const pollMedia =
+    jobType === 'video' ? 'video' : jobType === 'music' ? 'music' : 'image';
+  return {
+    path,
+    url,
+    headers,
+    body: bodyRows,
+    bodyRaw,
+    bodyJson,
+    responseStructure: buildCreateJobResponseStructure(jobType),
+    pollResponseStructure: buildPollJobResponseStructure(pollMedia),
+    curl,
   };
-  const curlToken = token || '<ACCESS_TOKEN>';
-  const curl = `curl -X POST '${url}' \\\n  -H 'Authorization: Bearer ${curlToken}' \\\n  -H 'Content-Type: application/json' \\\n  -d '${JSON.stringify(body)}'`;
-  return { path, url, headers, body, curl };
 }
 
 function refreshRequestPreview() {
-  const panel = document.querySelector('.pg-panel.active')?.dataset.panel;
-  if (panel === 'info-job' || panel === 'library' || panel === 'health') {
-    refreshProxyPanelPreview();
-    return;
+  try {
+    const panel = getActivePlaygroundPanelKey();
+    const proxyPreview = buildProxyPanelRequestPreview(panel);
+    if (proxyPreview) {
+      applyRequestPreview(proxyPreview);
+      return;
+    }
+    const preview = buildMediaJobRequestPreview();
+    applyRequestPreview({
+      method: 'POST',
+      path: preview.path,
+      headers: preview.headers,
+      body: preview.body,
+      bodyRaw: preview.bodyRaw,
+      bodyJson: preview.bodyJson,
+      curl: preview.curl,
+      responseStructure: preview.responseStructure,
+    });
+  } catch (err) {
+    console.error('[playground] refreshRequestPreview failed', err);
+    try {
+      primeRequestPreviewSkeleton();
+    } catch (fallbackErr) {
+      console.error('[playground] request preview fallback failed', fallbackErr);
+    }
   }
-  const preview = buildMediaJobRequestPreview();
-  const methodEl = $('requestMethod');
-  const endpointEl = $('requestEndpoint');
-  const fullUrlEl = $('requestFullUrl');
-  const headersRows = $('requestHeadersRows');
-  const bodyRows = $('requestBodyRows');
-  const bodyRawEl = $('requestBodyRaw');
-  const curlEl = $('requestCurl');
-
-  if (methodEl) methodEl.textContent = 'POST';
-  if (endpointEl) endpointEl.textContent = preview.path;
-  if (fullUrlEl) fullUrlEl.textContent = preview.url;
-
-  renderKvTableRows(
-    headersRows,
-    Object.entries(preview.headers).map(([k, v]) => [k, v]),
-  );
-  renderKvTableRows(bodyRows, flattenRequestBodyRows(preview.body));
-  if (bodyRawEl) GwJsonHighlight?.setJsonPre(bodyRawEl, preview.body);
-  if (curlEl) curlEl.textContent = preview.curl;
-  renderAiGuidePanel();
-  globalThis.GatewayEndpointDetail?.refreshEndpointsTable?.();
 }
 
 function initGuidePanels() {
@@ -2393,14 +3759,40 @@ function getActiveCopyText() {
 document.querySelectorAll('.pg-response-tab').forEach((btn) => {
   btn.addEventListener('click', () => {
     const tab = btn.dataset.responseTab;
-    if (tab) setResponseTab(tab);
+    if (tab) {
+      userPinnedResponseTab = true;
+      setResponseTab(tab);
+    }
   });
 });
 
 function showResponse(body, meta = {}, opts = {}) {
   if (!opts.silent) {
-    if ($('resultMain')) $('resultMain').hidden = true;
-    if ($('resultLegacyJsonWrap')) $('resultLegacyJsonWrap').hidden = false;
+    const libraryOpen = libraryListState.active && !$('resultLibraryList')?.hidden;
+    const libraryResponseTab = libraryOpen && libraryListState.view === 'response';
+    const legacy = $('resultLegacyJsonWrap');
+
+    if (!libraryOpen) {
+      if ($('resultMain')) $('resultMain').hidden = true;
+      const libraryWrap = $('resultLibraryList');
+      if (libraryWrap) libraryWrap.hidden = true;
+      libraryListState.active = false;
+      if (legacy) {
+        legacy.hidden = false;
+        legacy.classList.remove('pg-result-json-wrap--library');
+      }
+    } else if (libraryResponseTab) {
+      if ($('resultMain')) $('resultMain').hidden = true;
+      if (legacy) {
+        legacy.hidden = false;
+        legacy.classList.add('pg-result-json-wrap--library');
+      }
+    } else {
+      if ($('resultMain')) $('resultMain').hidden = true;
+      if (legacy) legacy.hidden = true;
+    }
+
+    touchWorkerResponseBody(body);
   }
   if (responseOutput && !opts.silent) {
     GwJsonHighlight?.displayInPre(responseOutput, body);
@@ -2410,7 +3802,9 @@ function showResponse(body, meta = {}, opts = {}) {
   if (meta.ms != null) parts.push(`${meta.ms}ms`);
   if (meta.label) parts.unshift(meta.label);
   if (!opts.silent) responseMeta.textContent = parts.length ? parts.join(' · ') : '—';
-  if (!meta.keepTab && !opts.silent && !playgroundBooting) setResponseTab('result');
+  if (!meta.keepTab && !opts.silent && !playgroundBooting && !userPinnedResponseTab) {
+    setResponseTab('result');
+  }
 }
 
 function displayJsonPre(el, body, opts = {}) {
@@ -2520,13 +3914,16 @@ function buildPollPendingEcho(message) {
   };
 }
 
-function showJobResultLayout() {
+function showJobResultLayout({ focusTab = false } = {}) {
   if (resultEmpty) resultEmpty.hidden = true;
+  const libraryWrap = $('resultLibraryList');
+  if (libraryWrap) libraryWrap.hidden = true;
+  libraryListState.active = false;
   const main = $('resultMain');
   if (main) main.hidden = false;
   const legacy = $('resultLegacyJsonWrap');
   if (legacy) legacy.hidden = true;
-  if (!playgroundBooting) setResponseTab('result');
+  if (focusTab) setResponseTab('result');
 }
 
 function displayCreateJson(body, opts = {}) {
@@ -2652,6 +4049,11 @@ function finishResultJob(opts = {}) {
     setResultStatusPill('success');
     updateResultStepper('done');
   }
+  persistActiveJobResult({
+    phase: $('resultMain')?.dataset.phase,
+    stepper: opts.failed ? opts.errorStep || 'done' : opts.cancelled ? 'poll' : 'done',
+    stepperOpts: opts.failed ? { errorStep: opts.errorStep || 'done' } : {},
+  });
 }
 
 function jobTypeNeedsRefUrl(jobType) {
@@ -2902,7 +4304,8 @@ function setMediaSlotValue(slotId, url) {
 
 function getActiveMediaModel() {
   const jobType = $('jobType')?.value || 'image';
-  const slug = $('mediaModelSelect')?.value;
+  const slug = resolveMediaModelSlug();
+  if (slug && activeCatalogModel?.slug === slug) return activeCatalogModel;
   const envelope = slug ? getStoredModelsEnvelope(jobType) : null;
   return envelope && slug
     ? normalizeModels(envelope).find((m) => m.slug === slug)
@@ -3399,50 +4802,38 @@ function clearPreviewPlayers() {
 }
 
 function hidePreviewMedia() {
-  resultPreview.hidden = true;
+  if (resultPreview) resultPreview.hidden = true;
   clearPreviewPlayers();
-  if (resultEmpty) resultEmpty.hidden = false;
-  resetResultPanelState();
+  if (activeResultWorkerKey) activateWorkerResultContext(activeResultWorkerKey);
+  else showResultEmptyState();
 }
 
-function showResultUrl(url, mediaHint = '') {
+function persistActivePanelPreview(url, mediaHint = '') {
+  if (!activeResultWorkerKey) return;
+  if (activeResultWorkerKey.startsWith('media:')) {
+    persistActiveJobResult({ previewUrl: url, mediaHint });
+    return;
+  }
+  const prev = panelResultCache.get(activeResultWorkerKey) || { type: 'job', gallery: [] };
+  panelResultCache.set(activeResultWorkerKey, {
+    ...prev,
+    type: 'job',
+    previewUrl: url,
+    mediaHint,
+    gallery: prev.gallery || [],
+  });
+}
+
+function showResultUrl(url, mediaHint = '', { focusTab = false } = {}) {
   if (!url) return;
+  hideAllResultViews();
   appendResultGalleryEntry(url, mediaHint);
-  renderResultGallery();
   showJobResultLayout();
-  if (resultEmpty) resultEmpty.hidden = true;
-  const preview = $('resultPreview');
-  if (preview) preview.hidden = false;
-  setResponseTab('result');
-  resultLink.href = url;
-  resultLink.title = url;
-  resultLink.textContent = pgT('result.openTab', 'Open in new tab ↗');
-  clearPreviewPlayers();
-
-  const hint = String(mediaHint || '').toLowerCase();
-  const looksImage = /\.(png|jpe?g|webp|gif|bmp|svg)(\?|$)/i.test(url);
-  const looksVideo = /\.(mp4|webm|mov)(\?|$)/i.test(url);
-  const looksAudio =
-    /\.(mp3|wav|ogg|m4a|aac|flac)(\?|$)/i.test(url) || /\/audio/i.test(url);
-
-  if (hint === 'image' || looksImage) {
-    resultImage.src = url;
-    resultImage.hidden = false;
-    return;
-  }
-  if ((hint === 'video' || looksVideo) && resultVideo) {
-    resultVideo.src = url;
-    resultVideo.hidden = false;
-    return;
-  }
-  if ((hint === 'music' || hint === 'audio' || looksAudio) && resultAudio) {
-    resultAudio.src = url;
-    resultAudio.hidden = false;
-    return;
-  }
-  if (hint === 'image' || !looksVideo && !looksAudio) {
-    resultImage.src = url;
-    resultImage.hidden = false;
+  renderMainResultPreview(url, mediaHint);
+  persistActivePanelPreview(url, mediaHint);
+  if (focusTab) {
+    userPinnedResponseTab = false;
+    setResponseTab('result');
   }
 }
 
@@ -3729,10 +5120,6 @@ function extractChatSessionId(data) {
   return null;
 }
 
-function extractUploadUrl(data) {
-  return data?.data?.url || data?.url || data?.data?.file_url || null;
-}
-
 function extractTtsUrl(data) {
   return (
     data?.data?.fileUrl ||
@@ -3822,13 +5209,6 @@ async function fetchModelsForType(type, { statusEl, force = false } = {}) {
   }
 
   const task = (async () => {
-    try {
-      getToken();
-    } catch (err) {
-      if (statusEl) setStatus(statusEl, err.message, 'err');
-      return null;
-    }
-
     if (statusEl) setStatus(statusEl, 'Fetching catalog…', 'running');
 
     try {
@@ -3836,8 +5216,8 @@ async function fetchModelsForType(type, { statusEl, force = false } = {}) {
       if (modelsCatalogLang() === 'en') params.set('lang', 'en');
       const data = await apiFetch(
         `/gateway/models?${params}`,
-        { headers: authHeaders() },
-        `GET /gateway/models?${params}`,
+        { headers: optionalAuthHeaders() },
+        publicApiLabel('GET', `/ai/models?${params}`),
       );
       const models = normalizeModels(data);
       setStoredModels(type, data);
@@ -4026,6 +5406,7 @@ function onMediaModelChange() {
     updateStudioFieldVisibility(type, null);
     globalThis.ModelPriceUi?.sync(null);
     globalThis.GatewayEndpointDetail?.refreshEndpointsTable?.();
+    refreshRequestPreview();
     return;
   }
   const model = normalizeModels(envelope).find((m) => m.slug === slug);
@@ -4037,6 +5418,7 @@ function onMediaModelChange() {
   globalThis.GatewayEndpointDetail?.refresh();
   globalThis.GatewayEndpointDetail?.refreshEndpointsTable?.();
   globalThis.ModelPriceUi?.sync(model || null);
+  refreshRequestPreview();
   if (isEmbed) {
     syncWorkerToUrl();
     renderEmbedModelMenu();
@@ -4063,14 +5445,16 @@ function updateModelMetaBar(model) {
       : model.descriptionEn || model.descriptionVi || model.description || '';
   renderModelMetaDesc(desc);
   bar.classList.remove('pg-model-meta--loading');
-  refreshRequestPreview();
 }
 
 function updateMediaJobChrome(type, model) {
   const title = $('mediaJobTitle');
   const endpoint = $('mediaJobEndpoint');
   if (title) title.textContent = model?.name || MEDIA_JOB_LABELS[type] || 'Media job';
-  if (endpoint) endpoint.textContent = `POST /gateway/jobs/${type}`;
+  if (endpoint) {
+    const slug = $('mediaModelSelect')?.value || '{model_id}';
+    endpoint.textContent = publicApiLabel('POST', publicCreateJobPath(type, slug));
+  }
   syncJobTypeFormFields(type);
   updateEmbedStudio(type, model);
   updateSendPriceLabel(model);
@@ -4089,11 +5473,10 @@ async function openMediaJobPanel(type, { autoFetch = true } = {}) {
   if ($('modelType')) $('modelType').value = type;
   updateRefUrlFieldVisibility(type);
   applyMediaPromptDefaults(type);
-  document.querySelectorAll('.pg-panel').forEach((p) => {
-    p.classList.toggle('active', p.dataset.panel === 'media-job');
-  });
+  activatePlaygroundPanel('media-job');
   activateNavForPanel('media-job', type);
   renderPromptHistory();
+  activateWorkerResultContext(getMediaWorkerKey(type));
   await loadMediaJobForType(type, { autoFetch });
 }
 
@@ -4381,7 +5764,7 @@ async function runPollOnce() {
     return;
   }
   try {
-    const label = `GET /gateway/jobs/${jobId}?media=${media}`;
+    const label = publicApiLabel('POST', publicPollPath(jobId, media));
     const data = await requestPoll(jobId, media, label);
     const resultUrl = extractPollResultUrl(data);
     if (resultUrl) showResultUrl(resultUrl, media);
@@ -4422,7 +5805,7 @@ async function runPollLoop() {
     return;
   }
 
-  const label = `GET /gateway/jobs/${jobId}?media=${media}`;
+  const label = publicApiLabel('POST', publicPollPath(jobId, media));
 
   for (let attempt = 1; attempt <= POLL_MAX_ATTEMPTS; attempt++) {
     if (pollLoopGeneration !== gen) break;
@@ -4535,6 +5918,7 @@ async function runMediaJobPollLoop(jobId, media, jobMeta, gen) {
     try {
       const data = await fetchPollQuiet(jobId, media);
       displayPollJson(data);
+      persistActiveJobResult({ pollJson: data, phase: 'polling', stepper: 'poll' });
       const resultUrl = extractPollResultUrl(data);
       if (resultUrl) showResultUrl(resultUrl, media);
 
@@ -4599,6 +5983,7 @@ function showCredits(credits) {
       embed.textContent = `${credits.toLocaleString()} credits`;
     }
   }
+  syncConnectionModalUi();
 }
 
 async function fetchUserMe(statusEl, fetchOpts = {}) {
@@ -4680,10 +6065,12 @@ async function apiFetch(path, init = {}, label = '', opts = {}) {
       err.message === 'Failed to fetch'
         ? `${err.message} — is npm run dev running at ${baseUrl()}?`
         : err.message;
-    showResponse({ success: false, message: hint, code: 'NETWORK_ERROR' }, {
-      label,
-      ms: Math.round(performance.now() - start),
-    });
+    if (!opts.silent) {
+      showResponse({ success: false, message: hint, code: 'NETWORK_ERROR' }, {
+        label,
+        ms: Math.round(performance.now() - start),
+      });
+    }
     throw new Error(hint);
   }
   const ms = Math.round(performance.now() - start);
@@ -4694,7 +6081,9 @@ async function apiFetch(path, init = {}, label = '', opts = {}) {
   } else {
     body = { _raw: await res.text() };
   }
-  showResponse(body, { status: res.status, ms, label }, opts);
+  if (!opts.silent) {
+    showResponse(body, { status: res.status, ms, label, keepTab: opts.keepTab }, opts);
+  }
 
   const logicalFail = body && typeof body === 'object' && body.success === false;
   if (!res.ok || logicalFail) {
@@ -4780,10 +6169,12 @@ document.querySelectorAll('.pg-nav-item:not([disabled])').forEach((btn) => {
       return;
     }
     if (panel === 'info-job' && infoKind) {
+      if (isEmbed) closeEmbedDev();
       openInfoPanel(infoKind);
       return;
     }
     if (panel === 'library' && libraryKind) {
+      if (isEmbed) closeEmbedDev();
       openLibraryPanel(libraryKind);
       return;
     }
@@ -4792,9 +6183,8 @@ document.querySelectorAll('.pg-nav-item:not([disabled])').forEach((btn) => {
       return;
     }
     document.querySelectorAll('.pg-nav-item').forEach((b) => b.classList.toggle('active', b === btn));
-    document.querySelectorAll('.pg-panel').forEach((p) => {
-      p.classList.toggle('active', p.dataset.panel === panel);
-    });
+    activatePlaygroundPanel(panel);
+    activateWorkerResultContext(getPanelWorkerKey(panel, btn));
     if (isEmbed) syncEmbedChromeFromState();
     refreshRequestPreview();
   });
@@ -5006,15 +6396,16 @@ $('btnLogin').addEventListener('click', async () => {
       closeEmbedConnection();
       await applyEmbedView(
         {
-          mode: 'studio',
           workerId: embedView.workerId || 'create-image',
           model: embedView.model,
           connectionOpen: false,
         },
         { flash: false },
       );
-      const type = $('jobType')?.value || 'image';
-      await loadMediaJobForType(type, { autoFetch: true });
+      if (embedView.mode === 'studio') {
+        const type = $('jobType')?.value || 'image';
+        await loadMediaJobForType(type, { autoFetch: true });
+      }
     }
   } catch (err) {
     setStatus(status, err.message, false);
@@ -5107,8 +6498,12 @@ $('btnMediaJob')?.addEventListener('click', async () => {
   };
 
   const jobStart = performance.now();
+  activeResultWorkerKey = getMediaWorkerKey(jobType);
+  const prevGallery = panelResultCache.get(activeResultWorkerKey)?.gallery || [];
+  panelResultCache.set(activeResultWorkerKey, { type: 'job', gallery: prevGallery });
   resetResultPanelState();
-  showJobResultLayout();
+  userPinnedResponseTab = false;
+  showJobResultLayout({ focusTab: true });
   setResultPhase('sending');
   setResultStatusPill('running');
   updateResultStepper('create');
@@ -5124,8 +6519,18 @@ $('btnMediaJob')?.addEventListener('click', async () => {
   showResultStatusBar(true, pgT('result.creating', 'Creating job…'), { showCancel: true });
   showJobProgress(true, pgT('result.creating', 'Creating job…'), 6);
   setStatus(status, pgT('result.creating', 'Creating job…'), 'running');
-  responseMeta.textContent = `POST /gateway/jobs/${jobType}`;
+  const createLabel = publicApiLabel('POST', publicCreateJobPath(jobType, modelSlugVal));
+  responseMeta.textContent = createLabel;
   setSendButtonLoading(true);
+  persistActiveJobResult({
+    phase: 'sending',
+    stepper: 'create',
+    mediaHint: media,
+    header: { ...jobMeta, elapsedMs: null, jobId: null, statusPill: 'running' },
+    responseMeta: createLabel,
+    createJson: buildJobRequestEcho(jobType, modelSlugVal, fields, wait),
+    pollJson: buildPollPendingEcho(pgT('result.awaitingCreate', 'Waiting for create response…')),
+  });
 
   try {
     const payload = { modelSlug: modelSlugVal, wait, fields };
@@ -5137,7 +6542,7 @@ $('btnMediaJob')?.addEventListener('click', async () => {
         body: JSON.stringify(payload),
         signal: jobAbort.signal,
       },
-      `POST /gateway/jobs/${jobType}`,
+      publicApiLabel('POST', publicCreateJobPath(jobType, modelSlugVal)),
       { silent: true },
     );
 
@@ -5238,6 +6643,12 @@ $('btnMediaJob')?.addEventListener('click', async () => {
     finishResultJob({ failed: true, errorStep: 'create', elapsedMs: performance.now() - jobStart });
     setStatus(status, err.message, false);
     if (err.body) displayCreateJson(err.body);
+    persistActiveJobResult({
+      phase: 'failed',
+      stepper: 'create',
+      stepperOpts: { errorStep: 'create' },
+      createJson: err.body ?? readJsonPre($('resultCreateJson')),
+    });
   }
 });
 
@@ -5302,11 +6713,21 @@ $('btnHealth')?.addEventListener('click', () => {
   void runHealthCheck();
 });
 
-['infoJobId', 'infoProjectId', 'libLimit', 'libAfterId', 'libModel', 'libCategory', 'libSource', 'libProjectId'].forEach(
-  (id) => {
-    $(id)?.addEventListener('input', refreshProxyPanelPreview);
-  },
-);
+[
+  'infoJobId',
+  'infoProjectId',
+  'libLimit',
+  'libAfterId',
+  'libModel',
+  'libCategory',
+  'libSource',
+  'libProjectId',
+  'libOrderBy',
+  'libSortBy',
+].forEach((id) => {
+  $(id)?.addEventListener('input', () => refreshRequestPreview());
+  $(id)?.addEventListener('change', () => refreshRequestPreview());
+});
 
 $('btnAudioLists')?.addEventListener('click', async () => {
   const status = $('audioListsStatus');
@@ -5330,7 +6751,7 @@ $('btnAudioLists')?.addEventListener('click', async () => {
     } else if (items && Array.isArray(items.items)) {
       firstUrl = items.items.find((i) => i?.file_url)?.file_url;
     }
-    if (firstUrl) showResultUrl(firstUrl, 'audio');
+    if (firstUrl) showResultUrl(firstUrl, 'audio', { focusTab: true });
     setStatus(status, 'OK — see RESPONSE', true);
   } catch (err) {
     setStatus(status, err.message, false);
@@ -5412,6 +6833,7 @@ $('btnChat')?.addEventListener('click', async () => {
 
 $('btnUpload')?.addEventListener('click', async () => {
   const status = $('uploadStatus');
+  activeResultWorkerKey = 'upload';
   setStatus(status, 'Uploading…', 'running');
 
   const isVideo = $('upload-video').classList.contains('active');
@@ -5463,7 +6885,7 @@ $('btnUpload')?.addEventListener('click', async () => {
 
     const url = extractUploadUrl(body);
     applyUploadToActiveMediaSlot(url, kind);
-    showResultUrl(url, kind);
+    showResultUrl(url, kind, { focusTab: true });
     if (fileInput) fileInput.value = '';
     setStatus(status, url ? '' : 'Upload finished — check RESPONSE', url ? 'preview' : 'ok');
   } catch (err) {
@@ -5551,7 +6973,7 @@ $('btnTts')?.addEventListener('click', async () => {
       'POST /gateway/audio/tts',
     );
     const url = extractTtsUrl(data);
-    showResultUrl(url, 'audio');
+    showResultUrl(url, 'audio', { focusTab: true });
     logUsageEvent({
       jobType: 'audio',
       model: model || 'TTS',
@@ -5565,26 +6987,38 @@ $('btnTts')?.addEventListener('click', async () => {
   }
 });
 
+try {
+  primeRequestPreviewSkeleton();
+} catch (err) {
+  console.error('[playground] initial request preview failed', err);
+}
+
 void (async () => {
-  if (sessionStorage.getItem(STORAGE_MODELS_LEGACY) || sessionStorage.getItem(modelsStorageKey('image'))) {
-    migrateLegacyModelsStorage();
+  try {
+    if (sessionStorage.getItem(STORAGE_MODELS_LEGACY) || sessionStorage.getItem(modelsStorageKey('image'))) {
+      migrateLegacyModelsStorage();
+    }
+    if (isEmbed) {
+      await initEmbedStudio();
+    } else {
+      const initialType = $('jobType')?.value || 'image';
+      await loadMediaJobForType(initialType, { autoFetch: true });
+    }
+    initGuidePanels();
+    initMediaSendChrome();
+    globalThis.ModelPriceUi?.init();
+    refreshRequestPreview();
+    updateRefUrlFieldVisibility($('jobType')?.value || 'image');
+    try {
+      globalThis.GatewayEndpointDetail?.init();
+    } catch (err) {
+      console.warn('[playground] GatewayEndpointDetail.init failed', err);
+    }
+  } catch (err) {
+    console.error('[playground] boot failed', err);
+  } finally {
+    finishPlaygroundBoot();
   }
-  if (isEmbed) {
-    await initEmbedStudio();
-  } else {
-    const initialType = $('jobType')?.value || 'image';
-    const hasToken = Boolean(tokenEl?.value?.trim());
-    await loadMediaJobForType(initialType, { autoFetch: hasToken });
-  }
-  initGuidePanels();
-  initMediaSendChrome();
-  globalThis.ModelPriceUi?.init();
-  refreshRequestPreview();
-  updateRefUrlFieldVisibility($('jobType')?.value || 'image');
-  globalThis.GatewayEndpointDetail?.init();
-  playgroundBooting = false;
-  restoreResponseTab();
-  document.body?.classList.remove('pg-booting');
 })();
 
 if (sessionStorage.getItem(STORAGE_VOICES)) {
@@ -5602,12 +7036,15 @@ function openPanelByIdRaw(panelId) {
     if (isEmbed) syncEmbedChromeFromState();
     return;
   }
-  document.querySelectorAll('.pg-panel').forEach((p) => {
-    p.classList.toggle('active', p.dataset.panel === panelId);
-  });
+  activatePlaygroundPanel(panelId);
   document.querySelectorAll('.pg-nav-item').forEach((b) => {
     b.classList.toggle('active', b.dataset.panel === panelId && !b.dataset.jobType);
   });
+  if (isEmbed && panelId !== 'media-job') {
+    embedView.mode = 'dev';
+    syncEmbedViewModeClass();
+  }
+  activateWorkerResultContext(getPanelWorkerKey(panelId));
   if (isEmbed) syncEmbedChromeFromState();
 }
 

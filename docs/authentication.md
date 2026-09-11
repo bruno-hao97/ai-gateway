@@ -5,7 +5,18 @@ description: User tokens, Bearer auth, admin keys, and session checks
 
 # Authentication
 
-End users log in to **Gommo** and receive an **`access_token`**. The gateway stores nothing server-side — your app or browser keeps the token and sends it on each request.
+End users log in to **Gommo** and receive an **`access_token`**. Your app or browser keeps the token and sends it on each request.
+
+## Public Gommo API (recommended)
+
+| Operation | URL |
+|-----------|-----|
+| Login | `POST https://api.gommo.net/api/apps/go-mmo/auth/login` |
+| Me / credits | `POST https://api.gommo.net/ai/me` |
+
+Form body: `email`, `password`, `domain` (login) or `access_token`, `domain` (me). Header: `Authorization: Bearer <token>` when using Bearer style.
+
+→ [Gommo public API](./reference/gommo-public-api.md) · [Quickstart](./quickstart.md)
 
 ## Sign in on the developer site
 
@@ -27,7 +38,7 @@ On `/login/`, switch to the **Bearer token** tab to paste an existing Gommo `acc
 After sign-in, copy your token from [/app/token/](/app/token/) into **[79ai MCP](./mcp/other-hosts.md)**. See [all 10 tools](./mcp/tools.md) and [example prompts](./mcp/use-cases.md).
 :::
 
-## Gateway auth API (Mode B — recommended)
+## Gateway auth API (Mode B — dev optional)
 
 Use these JSON endpoints from your own app or scripts. The gateway fills `domain` from `GOMMO_API_DOMAIN` when omitted.
 

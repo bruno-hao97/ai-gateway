@@ -3,6 +3,37 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitepress';
 import { loadEnv } from 'vite';
 import { portalStaticPlugin } from './portal-plugin';
+import { docRedirects } from './redirects';
+
+const GITHUB_REPO = 'https://github.com/bruno-hao97/ai-gateway';
+const EDIT_BRANCH = 'main';
+
+function sharedThemeConfig(opts: {
+  logoLink: string;
+  prev: string;
+  next: string;
+  editText: string;
+}) {
+  return {
+    logo: '/logo.svg',
+    logoLink: opts.logoLink,
+    search: {
+      provider: 'local' as const,
+      options: { detailedView: true },
+    },
+    editLink: {
+      pattern: `${GITHUB_REPO}/edit/${EDIT_BRANCH}/docs/:path`,
+      text: opts.editText,
+    },
+    socialLinks: [{ icon: 'github' as const, link: GITHUB_REPO }],
+    outline: { level: [2, 3] as [number, number] },
+    docFooter: { prev: opts.prev, next: opts.next },
+    darkModeSwitchLabel: opts.prev === 'Previous' ? 'Appearance' : 'Giao diện',
+    sidebarMenuLabel: opts.prev === 'Previous' ? 'Menu' : 'Menu',
+    returnToTopLabel: opts.prev === 'Previous' ? 'Return to top' : 'Lên đầu trang',
+    langMenuLabel: opts.prev === 'Previous' ? 'Change language' : 'Ngôn ngữ',
+  };
+}
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const env = loadEnv('', repoRoot, '');
@@ -21,6 +52,8 @@ if (process.env.NODE_ENV !== 'production') {
 
 const overviewSidebarEn = [
   { text: 'Quickstart', link: '/quickstart' },
+  { text: 'Changelog', link: '/changelog' },
+  { text: 'Gommo public API', link: '/reference/gommo-public-api' },
   { text: 'Authentication', link: '/authentication' },
   { text: 'Principles', link: '/principles' },
   { text: 'MCP & agents', link: '/mcp' },
@@ -31,6 +64,8 @@ const overviewSidebarEn = [
 
 const overviewSidebarVi = [
   { text: 'Quickstart', link: '/vi/quickstart' },
+  { text: 'Changelog', link: '/vi/changelog' },
+  { text: 'Gommo public API', link: '/vi/reference/gommo-public-api' },
   { text: 'Authentication', link: '/vi/authentication' },
   { text: 'Nguyên tắc', link: '/vi/principles' },
   { text: 'MCP & agents', link: '/vi/mcp' },
@@ -98,6 +133,7 @@ const opsSidebarVi = [
 ];
 
 const referenceSidebarEn = [
+  { text: 'Gommo public API', link: '/reference/gommo-public-api' },
   { text: 'OpenAPI', link: '/reference/openapi' },
   { text: 'API Playground', link: '/app/playground/' },
   { text: 'Media & jobs', link: '/reference/media' },
@@ -110,6 +146,7 @@ const referenceSidebarEn = [
 ];
 
 const referenceSidebarVi = [
+  { text: 'Gommo public API', link: '/vi/reference/gommo-public-api' },
   { text: 'OpenAPI', link: '/vi/reference/openapi' },
   { text: 'API Playground', link: '/vi/app/playground/' },
   { text: 'Media & jobs', link: '/vi/reference/media' },
@@ -255,6 +292,7 @@ const pathSidebarVi = {
 /** Docs guide sidebar keys — models doc pages + routing stay in Docs zone (not catalog sidebar). */
 const docsGuideSidebarEn = {
   '/quickstart': docsSidebarEn,
+  '/changelog': docsSidebarEn,
   '/authentication': docsSidebarEn,
   '/principles': docsSidebarEn,
   '/mcp': docsSidebarEn,
@@ -276,6 +314,7 @@ const docsGuideSidebarEn = {
 
 const docsGuideSidebarVi = {
   '/vi/quickstart': docsSidebarVi,
+  '/vi/changelog': docsSidebarVi,
   '/vi/authentication': docsSidebarVi,
   '/vi/principles': docsSidebarVi,
   '/vi/mcp': docsSidebarVi,
@@ -299,25 +338,17 @@ export default defineConfig({
   title: 'AI Gateway',
   description: 'Developer docs — Gommo proxy + REST gateway (OpenRouter-style API platform)',
   base: '/',
+  cleanUrls: true,
   appearance: 'dark',
   lastUpdated: true,
+  head: [
+    ['link', { rel: 'icon', href: '/logo.svg', type: 'image/svg+xml' }],
+    ['meta', { property: 'og:type', content: 'website' }],
+    ['meta', { property: 'og:site_name', content: 'AI Gateway' }],
+    ['meta', { name: 'theme-color', content: '#646cff' }],
+  ],
   ignoreDeadLinks: [/^https?:\/\/localhost/, /README/],
-  redirects: {
-    '/reference/playground': '/app/playground/',
-    '/reference/playground.html': '/app/playground/',
-    '/vi/reference/playground': '/vi/app/playground/',
-    '/vi/reference/playground.html': '/vi/app/playground/',
-    '/portal': '/app/playground/',
-    '/portal/': '/app/playground/',
-    '/portal/index.html': '/app/playground/',
-    '/portal/playground': '/app/playground/',
-    '/portal/playground.html': '/app/playground/',
-    '/vi/portal': '/vi/app/playground/',
-    '/vi/portal/': '/vi/app/playground/',
-    '/vi/portal/index.html': '/vi/app/playground/',
-    '/vi/portal/playground': '/vi/app/playground/',
-    '/vi/portal/playground.html': '/vi/app/playground/',
-  },
+  redirects: docRedirects,
   vite: {
     plugins: [portalStaticPlugin()],
     server: {
@@ -328,6 +359,7 @@ export default defineConfig({
         '/ai': apiProxy,
         '/billing': apiProxy,
         '/api/apps/go-mmo': apiProxy,
+        '/api/library': apiProxy,
         '/health': apiProxy,
       },
     },
@@ -339,19 +371,17 @@ export default defineConfig({
       title: 'AI Gateway',
       description: 'Developer docs — Gommo proxy + REST gateway',
       themeConfig: {
-        logo: '/logo.svg',
-        logoLink: '/',
+        ...sharedThemeConfig({
+          logoLink: '/',
+          prev: 'Previous',
+          next: 'Next',
+          editText: 'Edit this page on GitHub',
+        }),
         nav: navEn,
         sidebar: {
           ...pathSidebarEn,
           ...docsGuideSidebarEn,
         },
-        outline: { level: [2, 3] },
-        docFooter: { prev: 'Previous', next: 'Next' },
-        darkModeSwitchLabel: 'Appearance',
-        sidebarMenuLabel: 'Menu',
-        returnToTopLabel: 'Return to top',
-        langMenuLabel: 'Change language',
       },
     },
     vi: {
@@ -361,19 +391,17 @@ export default defineConfig({
       title: 'AI Gateway',
       description: 'Tài liệu developer — proxy + REST gateway Gommo',
       themeConfig: {
-        logo: '/logo.svg',
-        logoLink: '/vi/',
+        ...sharedThemeConfig({
+          logoLink: '/vi/',
+          prev: 'Trước',
+          next: 'Tiếp',
+          editText: 'Sửa trang trên GitHub',
+        }),
         nav: navVi,
         sidebar: {
           ...pathSidebarVi,
           ...docsGuideSidebarVi,
         },
-        outline: { level: [2, 3] },
-        docFooter: { prev: 'Trước', next: 'Tiếp' },
-        darkModeSwitchLabel: 'Giao diện',
-        sidebarMenuLabel: 'Menu',
-        returnToTopLabel: 'Lên đầu trang',
-        langMenuLabel: 'Ngôn ngữ',
       },
     },
   },

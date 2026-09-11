@@ -1,0 +1,110 @@
+/* Guide pages — readable prose, consistent tables & callouts */
+
+.vp-doc .container {
+  max-width: 52rem;
+}
+
+.vp-doc h1 {
+  letter-spacing: -0.02em;
+}
+
+.vp-doc .header-anchor {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.vp-doc h2:hover .header-anchor,
+.vp-doc h3:hover .header-anchor {
+  opacity: 1;
+}
+
+.vp-doc table {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  margin: 1rem 0 1.25rem;
+}
+
+.vp-doc th,
+.vp-doc td {
+  border: 1px solid var(--vp-c-divider);
+  padding: 0.55rem 0.75rem;
+  vertical-align: top;
+}
+
+.vp-doc th {
+  background: var(--vp-c-bg-soft);
+  font-weight: 600;
+  text-align: left;
+}
+
+.vp-doc tr:hover td {
+  background: color-mix(in srgb, var(--vp-c-brand-1) 4%, transparent);
+}
+
+.vp-doc .custom-block {
+  border-radius: 8px;
+  margin: 1.25rem 0;
+}
+
+.vp-doc .custom-block.tip {
+  border-color: color-mix(in srgb, var(--vp-c-brand-1) 35%, var(--vp-c-divider));
+}
+
+.vp-doc .custom-block.warning {
+  border-color: color-mix(in srgb, #e3b341 45%, var(--vp-c-divider));
+}
+
+.vp-doc div[class*='language-'] {
+  border-radius: 8px;
+  margin: 1rem 0 1.25rem;
+}
+
+/* Mermaid diagrams */
+.vp-doc .mermaid {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg-soft);
+  overflow-x: auto;
+}
+
+.vp-doc .path-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.75rem;
+  margin: 1.25rem 0 1.5rem;
+  list-style: none;
+  padding: 0;
+}
+
+.vp-doc .path-card {
+  display: block;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.vp-doc .path-card:hover {
+  border-color: color-mix(in srgb, var(--vp-c-brand-1) 45%, var(--vp-c-divider));
+  background: color-mix(in srgb, var(--vp-c-brand-1) 6%, var(--vp-c-bg-soft));
+}
+
+.vp-doc .path-card strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--vp-c-brand-1);
+  font-size: 0.92rem;
+}
+
+.vp-doc .path-card span {
+  font-size: 0.82rem;
+  color: var(--vp-c-text-2);
+  line-height: 1.45;
+}

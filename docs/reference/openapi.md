@@ -1,11 +1,11 @@
 ---
 title: OpenAPI
-description: Machine-readable API spec for AI Gateway REST endpoints
+description: Machine-readable Gommo public API + optional AI Gateway dev spec
 ---
 
 # OpenAPI
 
-Download or browse the **OpenAPI 3.0** spec for Mode B REST, billing, admin, and health endpoints.
+Download or browse the **OpenAPI 3.0** spec for **Gommo public API** (v2 + platform hosts) and optional **AI Gateway** dev endpoints (billing, admin, Mode B REST).
 
 ## Spec file
 
@@ -13,43 +13,37 @@ Download or browse the **OpenAPI 3.0** spec for Mode B REST, billing, admin, and
 |-----|------------|
 | [http://localhost:5173/openapi.yaml](http://localhost:5173/openapi.yaml) | `https://docs.yourdomain.com/openapi.yaml` |
 
-When the API is deployed, you can also host a copy at `https://api.yourdomain.com/openapi.yaml` (copy from `docs/public/openapi.yaml`).
+## Default servers (Swagger)
 
-## Swagger Editor
+| Server | Description |
+|--------|-------------|
+| `https://v2.api.gommo.net` | Jobs, models, upload, album library |
+| `https://api.gommo.net` | Auth, chat, audio, info, library lists |
+| `http://localhost:3001` | AI Gateway dev — `/gateway/*`, billing, admin |
 
-Paste your public spec URL into [Swagger Editor](https://editor.swagger.io/):
-
-```
-https://editor.swagger.io/?url=https://docs.yourdomain.com/openapi.yaml
-```
-
-Or import the local file from `docs/public/openapi.yaml`.
+Each operation sets `servers` when it only applies to one host. See [Gommo public API](./gommo-public-api.md) for the full map.
 
 ## Path groups
 
-| Prefix | Description |
-|--------|-------------|
-| `GET /health` | Uptime and config flags |
-| `/gateway/auth/*` | Login and register (no Bearer required) |
-| `/gateway/*` | Models, jobs, upload, chat, audio (Bearer user token) |
-| `/billing/*` | Gommo VietQR top-up (default), legacy PayOS, order history |
-| `/admin/*` | Merchant ops (`x-admin-key`) |
-
-Proxy routes (`/v2`, `/api/v2`, `/api/apps/go-mmo`) are **not** in this spec — they pass through upstream unchanged. See [Integration modes](../routing/integration-modes.md).
+| Tag | Host | Examples |
+|-----|------|----------|
+| **Gommo V2** | v2.api.gommo.net | `/ai/models`, `/ai/jobs/{type}/{model}`, `/ai/library/album-images` |
+| **Gommo Platform** | api.gommo.net | `/ai/me`, `/api/v2/chat`, `/ai/info/image/{id}` |
+| **Gateway Dev** | localhost:3001 | `/gateway/jobs/{type}`, `/gateway/models` |
+| **Billing** | localhost:3001 | `/billing/payment/*` |
+| **Admin** | localhost:3001 | `/admin/*` |
 
 ## Auth in spec
 
 | Security scheme | Used on |
 |-----------------|---------|
-| `bearerAuth` | `/gateway/*`, `/billing/payment/*`, `/billing/topup/create`, `/billing/topup/orders` |
+| `bearerAuth` | Gommo public paths, `/gateway/*`, billing |
 | `adminKey` (`x-admin-key`) | `/admin/*` |
 
-## Detailed reference
+## Human-readable reference
 
-Human-readable examples with curl/PowerShell:
-
-→ [Media & jobs](./media.md) · [Chat](./chat.md) · [Upload](./upload.md) · [Audio](./audio.md) · [Billing](./billing.md) · [Admin](./admin.md)
+→ [Gommo public API](./gommo-public-api.md) · [Media & jobs](./media.md) · [Authentication](../authentication.md)
 
 ## Next
 
-→ [Authentication](../authentication.md) · [Deploy & ops](../deploy/)
+→ [Endpoint map](../routing/endpoint-map.md) · [Integration modes](../routing/integration-modes.md)

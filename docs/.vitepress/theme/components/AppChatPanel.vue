@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { useData } from 'vitepress';
+import { useHybridLocale } from '../composables/use-hybrid-locale';
 import ChatMessageBody from './ChatMessageBody.vue';
 import ChatMessageActionBar from './ChatMessageActionBar.vue';
 import ChatModelPicker from './ChatModelPicker.vue';
@@ -90,9 +90,7 @@ const props = defineProps<{
   onCreditsRefresh?: () => void | Promise<void>;
 }>();
 
-const { lang } = useData();
-const isVi = computed(() => lang.value === 'vi-VN');
-const prefix = computed(() => (isVi.value ? '/vi' : '') as '' | '/vi');
+const { isVi, prefix } = useHybridLocale();
 
 const GROUP_LABELS = computed(() =>
   isVi.value

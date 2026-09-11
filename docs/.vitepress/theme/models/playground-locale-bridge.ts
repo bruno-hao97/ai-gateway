@@ -1,5 +1,5 @@
 import { playgroundOrigin } from './gateway-base';
-import { isPlaygroundImmersivePath, stripLocale } from './docs-nav';
+import { isAppShellPath, stripLocale } from './docs-nav';
 
 export type PlaygroundPortalLocale = 'en' | 'vi';
 
@@ -90,18 +90,24 @@ function normalizeNavPath(path: string): string {
   return path.split('?')[0]?.split('#')[0] ?? path;
 }
 
-/** Same playground page, locale prefix may differ (/app/playground ↔ /vi/app/playground). */
-export function isPlaygroundHybridLocaleNav(fromPath: string, toHref: string): boolean {
+/** Same app-shell page, locale prefix may differ (/app ↔ /vi/app). */
+export function isHybridLocaleNav(fromPath: string, toHref: string): boolean {
   try {
     const fromBare = normalizeNavPath(fromPath);
     const toBare = normalizeNavPath(toHref);
-    if (!isPlaygroundImmersivePath(fromBare) || !isPlaygroundImmersivePath(toBare)) return false;
-    const target = stripLocale(new URL(toBare, window.location.origin).pathname);
+    const toPathname = new URL(toBare, window.location.origin).pathname;
+    if (!isAppShellPath(fromBare) || !isAppShellPath(toPathname)) return false;
+    const target = stripLocale(toPathname);
     const current = stripLocale(fromBare);
     return target.path === current.path;
   } catch {
     return false;
   }
+}
+
+/** @deprecated Use isHybridLocaleNav */
+export function isPlaygroundHybridLocaleNav(fromPath: string, toHref: string): boolean {
+  return isHybridLocaleNav(fromPath, toHref);
 }
 
 export const PLAYGROUND_LOCALE_EVENT = 'gw-playground-locale';
@@ -126,11 +132,11 @@ export function applyPlaygroundHybridLocale(locale: PlaygroundPortalLocale) {
  * @param fromPath VitePress route path (not URL bar — may differ after replaceState).
  * @returns true when navigation should be cancelled
  */
-export function tryPlaygroundHybridLocaleSwitch(to: string, fromPath?: string): boolean {
+export function tryHybridLocaleSwitch(to: string, fromPath?: string): boolean {
   if (typeof window === 'undefined') return false;
 
   const from = fromPath ?? window.location.pathname;
-  if (!isPlaygroundHybridLocaleNav(from, to)) return false;
+  if (!isHybridLocaleNav(from, to)) return false;
 
   const toBare = normalizeNavPath(to);
   const targetLocale = resolvePlaygroundLocaleNavTarget(toBare, from);
@@ -141,6 +147,11 @@ export function tryPlaygroundHybridLocaleSwitch(to: string, fromPath?: string): 
     applyPlaygroundHybridLocale(targetLocale);
   }
   return true;
+}
+
+/** @deprecated Use tryHybridLocaleSwitch */
+export function tryPlaygroundHybridLocaleSwitch(to: string, fromPath?: string): boolean {
+  return tryHybridLocaleSwitch(to, fromPath);
 }
 
 export function postPlaygroundLocale(locale: PlaygroundPortalLocale) {

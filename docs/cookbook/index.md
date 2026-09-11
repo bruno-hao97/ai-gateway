@@ -5,23 +5,27 @@ description: Task-oriented recipes — copy, run, ship
 
 # Cookbook
 
-Step-by-step recipes for **Mode B** (`/gateway/*`). Each page is one complete task with curl + PowerShell.
+Step-by-step recipes for the **[Gommo public API](../reference/gommo-public-api.md)** (`v2.api.gommo.net` + `api.gommo.net`). Each page is one complete task with curl + PowerShell.
+
+::: tip Gateway optional (dev)
+Recipes may show **AI Gateway** (`/gateway/*`, JSON body) as a local shortcut. Production integrations should call Gommo hosts directly — see [Gommo public API](../reference/gommo-public-api.md).
+:::
 
 ::: tip Try in browser first
-[Playground](/app/playground/) — embedded on the docs site; sign in to run jobs.
+[Playground](/app/playground/) — embedded on the docs site; sign in to run jobs. **Request** tab shows public URLs; **Try/Send** may proxy via local gateway.
 :::
 
 ## Prerequisites (all recipes)
 
 | Item | Value |
 |------|--------|
-| Gateway | `npm run dev` → `http://localhost:3001` |
+| Public API | `https://v2.api.gommo.net` (jobs) · `https://api.gommo.net` (auth/chat) |
 | Token | Gommo user `access_token` — [Authentication](../authentication.md) |
 | Catalog | Never guess `ratio` / `mode` / `resolution` / `duration` — [Models](../models/) |
 
 ```powershell
 $env:TOKEN = "<access_token>"
-$h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/json' }
+$h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/x-www-form-urlencoded' }
 ```
 
 ## Recipes

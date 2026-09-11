@@ -1,13 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { useData, useRoute } from 'vitepress';
-import {
-  normalizePlaygroundPortalLocale,
-  PLAYGROUND_LOCALE_EVENT,
-  playgroundLocaleFromPath,
-  syncPlaygroundStorageFromUrl,
-  type PlaygroundPortalLocale,
-} from '../models/playground-locale-bridge';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vitepress';
+import type { PlaygroundPortalLocale } from '../models/playground-locale-bridge';
+import { useHybridLocale } from '../composables/use-hybrid-locale';
 import { getStoredToken, getStoredDomain, importSessionFromUrl, loginUrlWithRedirect } from '../models/auth-api';
 import {
   fetchBillingPackages,
@@ -34,7 +29,14 @@ import ApiPlaygroundEmbed from './ApiPlaygroundEmbed.vue';
 import CreditsCheckoutModal from './CreditsCheckoutModal.vue';
 import ProfileUsagePanel from './ProfileUsagePanel.vue';
 import ProfileActivityPanel from './ProfileActivityPanel.vue';
+import OverviewUsageSection from './OverviewUsageSection.vue';
+import OverviewRecentTopups from './OverviewRecentTopups.vue';
+import OverviewOnboardingCard from './OverviewOnboardingCard.vue';
+import AccessTokenPanel from './AccessTokenPanel.vue';
+import FilesPanel from './FilesPanel.vue';
 import { formatApproxUsd, formatPayTotalLine } from '../models/invoice-buyer';
+
+const TOKEN_COPIED_STORAGE_KEY = 'gateway_token_copied';
 
 interface AppNavItem {
   id?: string;
@@ -49,19 +51,30 @@ type ProfileSection = 'general' | 'usage' | 'api' | 'activity' | 'logs';
 
 const PROFILE_SECTIONS = new Set<ProfileSection>(['general', 'usage', 'api', 'activity', 'logs']);
 
+const LOW_CREDITS_THRESHOLD = 10_000;
+
+type OverviewUsageStats = {
+  totalJobs: number;
+  loaded: boolean;
+  hasError: boolean;
+};
+
 const props = defineProps<{
-  view: 'overview' | 'profile' | 'playground' | 'chat' | 'token' | 'credits';
+  view: 'overview' | 'profile' | 'playground' | 'chat' | 'token' | 'credits' | 'files';
 }>();
 
-const { lang } = useData();
 const route = useRoute();
-const isVi = computed(() => lang.value === 'vi-VN');
-const prefix = computed(() => (isVi.value ? '/vi' : ''));
+const { isVi, prefix, locale: uiLocale } = useHybridLocale();
 
 const ready = ref(false);
 const me = ref<MeResponse | null>(getCachedMe());
 const loadError = ref('');
 const copied = ref(false);
+const overviewUsageStats = ref<OverviewUsageStats>({
+  totalJobs: 0,
+  loaded: false,
+  hasError: false,
+});
 
 const packages = ref<CreditPackage[]>([]);
 const packagesLoading = ref(false);
@@ -92,31 +105,36 @@ const checkoutToast = ref('');
 let checkoutToastTimer: ReturnType<typeof setTimeout> | null = null;
 const usagePanelRef = ref<InstanceType<typeof ProfileUsagePanel> | null>(null);
 const logsPanelRef = ref<InstanceType<typeof ProfileUsagePanel> | null>(null);
+const overviewUsageRef = ref<InstanceType<typeof OverviewUsageSection> | null>(null);
+const accessTokenRef = ref<InstanceType<typeof AccessTokenPanel> | null>(null);
+const filesPanelRef = ref<InstanceType<typeof FilesPanel> | null>(null);
+const tokenCopiedEver = ref(false);
 
-const playgroundUiLocale = ref<PlaygroundPortalLocale>(isVi.value ? 'vi' : 'en');
-
-const playgroundLocale = computed((): PlaygroundPortalLocale => {
-  if (props.view === 'playground') return playgroundUiLocale.value;
-  return isVi.value ? 'vi' : 'en';
-});
-
-function onPlaygroundLocaleEvent(event: Event) {
-  const detail = (event as CustomEvent<{ locale?: PlaygroundPortalLocale }>).detail;
-  if (!detail?.locale || props.view !== 'playground') return;
-  playgroundUiLocale.value = normalizePlaygroundPortalLocale(detail.locale);
-}
-
-function syncPlaygroundUiLocale() {
-  if (props.view !== 'playground') return;
-  if (typeof window !== 'undefined') {
-    playgroundUiLocale.value = playgroundLocaleFromPath(window.location.pathname);
-    syncPlaygroundStorageFromUrl(window.location.pathname);
-    return;
-  }
-  playgroundUiLocale.value = isVi.value ? 'vi' : 'en';
-}
+const playgroundLocale = computed((): PlaygroundPortalLocale => uiLocale.value);
 
 const credits = computed(() => getCredits(me.value));
+const creditsLow = computed(() => credits.value < LOW_CREDITS_THRESHOLD);
+const showLowCreditsBanner = computed(() => creditsLow.value);
+const creditsApproxUsd = computed(() => (isVi.value ? '' : formatApproxUsd(credits.value)));
+const overviewTopupPreview = computed(() => visibleTopupOrders.value.slice(0, 3));
+const showNoJobsBanner = computed(
+  () =>
+    overviewUsageStats.value.loaded &&
+    !overviewUsageStats.value.hasError &&
+    overviewUsageStats.value.totalJobs === 0 &&
+    tokenCopiedEver.value,
+);
+const hasOverviewJobs = computed(
+  () => overviewUsageStats.value.loaded && overviewUsageStats.value.totalJobs > 0,
+);
+
+function onOverviewUsageStats(payload: { totalJobs: number; hasError: boolean }) {
+  overviewUsageStats.value = {
+    totalJobs: payload.totalJobs,
+    loaded: true,
+    hasError: payload.hasError,
+  };
+}
 const displayName = computed(() => getDisplayName(me.value));
 const username = computed(() => getUsername(me.value));
 const email = computed(() => getEmail(me.value));
@@ -143,8 +161,13 @@ const navDeveloper = computed((): AppNavItem[] => [
     href: `${prefix.value}/app/token/`,
     icon: 'key',
   },
-  { id: 'playground', label: 'Playground', href: `${prefix.value}/app/playground/`, icon: 'terminal' },
-  { id: 'chat', label: 'Chat', href: `${prefix.value}/app/chat/`, icon: 'message' },
+  {
+    id: 'files',
+    label: 'Files',
+    href: `${prefix.value}/app/files/`,
+    icon: 'folder',
+    badge: 'beta',
+  },
   { label: isVi.value ? 'Models' : 'Models', href: `${prefix.value}/models/`, icon: 'grid' },
   { label: isVi.value ? 'So sánh' : 'Compare', href: `${prefix.value}/models/compare/`, icon: 'compare' },
   {
@@ -219,6 +242,11 @@ function isImmersiveView(): boolean {
   return props.view === 'playground' || props.view === 'chat';
 }
 
+/** Playground + chat: browse without docs login (connect/send still needs token). */
+function isPublicAppView(): boolean {
+  return props.view === 'playground' || props.view === 'chat';
+}
+
 function isAccountNavActive(item: AppNavItem): boolean {
   if (!item.id) return false;
   if (item.id === 'credits') return props.view === 'credits';
@@ -239,6 +267,18 @@ async function reloadUsagePanels() {
   }
 }
 
+function readTokenCopiedFlag(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.localStorage.getItem(TOKEN_COPIED_STORAGE_KEY) === '1';
+}
+
+function markTokenCopied() {
+  tokenCopiedEver.value = true;
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(TOKEN_COPIED_STORAGE_KEY, '1');
+  }
+}
+
 async function refreshProfile() {
   loadError.value = '';
   try {
@@ -246,6 +286,22 @@ async function refreshProfile() {
   } catch (e) {
     loadError.value = e instanceof Error ? e.message : String(e);
   }
+}
+
+async function refreshOverview() {
+  await refreshProfile();
+  await loadTopupOrders();
+  await overviewUsageRef.value?.reload();
+}
+
+async function refreshTokenView() {
+  await refreshProfile();
+  await accessTokenRef.value?.reload();
+}
+
+async function refreshFilesView() {
+  await refreshProfile();
+  await filesPanelRef.value?.reload();
 }
 
 async function loadTopupOrders() {
@@ -316,6 +372,7 @@ async function copyToken() {
   if (!token.value) return;
   try {
     await navigator.clipboard.writeText(token.value);
+    markTokenCopied();
     copied.value = true;
     setTimeout(() => {
       copied.value = false;
@@ -347,11 +404,14 @@ async function loadProfileView() {
 
 onMounted(async () => {
   importSessionFromUrl();
-  syncPlaygroundUiLocale();
-  window.addEventListener(PLAYGROUND_LOCALE_EVENT, onPlaygroundLocaleEvent);
+  tokenCopiedEver.value = readTokenCopiedFlag();
   if (!getStoredToken()) {
-    const returnPath = route.path + (typeof window !== 'undefined' ? window.location.search : '');
-    window.location.href = loginUrlWithRedirect(returnPath, prefix.value as '' | '/vi');
+    if (!isPublicAppView()) {
+      const returnPath = route.path + (typeof window !== 'undefined' ? window.location.search : '');
+      window.location.href = loginUrlWithRedirect(returnPath, prefix.value as '' | '/vi');
+      return;
+    }
+    ready.value = true;
     return;
   }
   await refreshProfile();
@@ -361,11 +421,10 @@ onMounted(async () => {
   if (props.view === 'profile') {
     await loadProfileView();
   }
+  if (props.view === 'overview') {
+    await loadTopupOrders();
+  }
   ready.value = true;
-});
-
-onUnmounted(() => {
-  window.removeEventListener(PLAYGROUND_LOCALE_EVENT, onPlaygroundLocaleEvent);
 });
 
 watch(
@@ -410,6 +469,7 @@ watch(
           >
             <AppNavIcon :name="item.icon" />
             <span class="or-app-nav-text">{{ item.label }}</span>
+            <span v-if="item.badge" class="or-app-nav-badge">{{ item.badge }}</span>
           </a>
         </template>
 
@@ -451,14 +511,17 @@ watch(
             <template v-else-if="view === 'playground'">Playground</template>
             <template v-else-if="view === 'chat'">Chat</template>
             <template v-else-if="view === 'token'">Access token</template>
-            <template v-else>{{ isVi ? 'Credits' : 'Credits' }}</template>
+            <template v-else-if="view === 'files'">
+              Files <span class="or-app-title-badge">beta</span>
+            </template>
+            <template v-else-if="view === 'credits'">{{ isVi ? 'Credits' : 'Credits' }}</template>
           </h1>
           <p v-if="view !== 'playground'" class="or-app-subtitle">
             <template v-if="view === 'overview'">
               {{
                 isVi
-                  ? 'Quản lý tài khoản và truy cập nhanh tới models, playground, billing.'
-                  : 'Manage your account and jump to models, playground, and billing.'
+                  ? 'Workspace gateway — credits, job và liên kết nhanh tới Playground, tài liệu.'
+                  : 'Your gateway workspace — credits, jobs, and quick links to Playground and docs.'
               }}
             </template>
             <template v-else-if="view === 'profile'">
@@ -482,11 +545,18 @@ watch(
             <template v-else-if="view === 'token'">
               {{
                 isVi
-                  ? 'Bearer token Gommo — dùng cho /gateway/* và proxy.'
-                  : 'Your Gommo Bearer token for /gateway/* and proxy routes.'
+                  ? 'Credential console — token, trạng thái kết nối và snippet tích hợp.'
+                  : 'Credential console — token, connection status, and integration snippets.'
               }}
             </template>
-            <template v-else>
+            <template v-else-if="view === 'files'">
+              {{
+                isVi
+                  ? 'Upload ảnh/video và duyệt album Gommo — dùng URL trong job hoặc Playground.'
+                  : 'Upload images and videos and browse your Gommo album — use URLs in jobs or Playground.'
+              }}
+            </template>
+            <template v-else-if="view === 'credits'">
               {{
                 isVi
                   ? 'Nạp credit qua Gommo (VietQR) — credits cộng tự động sau khi chuyển khoản.'
@@ -516,7 +586,17 @@ watch(
           <button
             type="button"
             class="or-app-btn or-app-btn-ghost"
-            @click="view === 'profile' ? loadProfileView() : refreshProfile()"
+            @click="
+              view === 'profile'
+                ? loadProfileView()
+                : view === 'overview'
+                  ? refreshOverview()
+                  : view === 'token'
+                    ? refreshTokenView()
+                    : view === 'files'
+                      ? refreshFilesView()
+                      : refreshProfile()
+            "
           >
             {{ isVi ? 'Làm mới' : 'Refresh' }}
           </button>
@@ -542,60 +622,119 @@ watch(
 
         <!-- Overview -->
         <section v-else-if="view === 'overview'" class="or-app-section">
-          <div class="or-app-hero">
-            <p class="or-app-hero-kicker">{{ isVi ? 'Xin chào' : 'Welcome back' }}</p>
-            <h2 class="or-app-hero-name">{{ displayName }}</h2>
-            <p class="or-app-hero-balance">
-              {{ isVi ? 'Số dư' : 'Balance' }}:
-              <strong>{{ formatCredits(credits) }}</strong> credits
-            </p>
+          <div class="or-app-hero or-app-hero--overview">
+            <div class="or-app-profile-hero or-app-hero-profile">
+              <img
+                v-if="avatarUrl"
+                :src="avatarUrl"
+                alt=""
+                class="or-app-profile-hero-avatar or-app-profile-avatar-img"
+              />
+              <div v-else class="or-app-profile-hero-avatar">{{ profileInitials }}</div>
+              <div class="or-app-profile-hero-text">
+                <p class="or-app-hero-kicker">{{ isVi ? 'Xin chào' : 'Welcome back' }}</p>
+                <h2 class="or-app-profile-hero-name">{{ displayName }}</h2>
+                <p v-if="username" class="or-app-profile-hero-handle">@{{ username }}</p>
+                <p class="or-app-hero-balance">
+                  {{ isVi ? 'Số dư' : 'Balance' }}:
+                  <strong>{{ formatCredits(credits) }}</strong> credits
+                  <span v-if="creditsApproxUsd" class="or-app-hero-balance-usd">{{ creditsApproxUsd }}</span>
+                </p>
+              </div>
+            </div>
+            <div class="or-overview-hero-actions">
+              <a :href="`${prefix}/app/playground/`" class="or-app-btn or-app-btn-primary">
+                {{ isVi ? 'Mở Playground' : 'Open Playground' }}
+              </a>
+              <button
+                type="button"
+                class="or-app-btn or-app-btn-ghost"
+                :disabled="!token"
+                @click="copyToken"
+              >
+                {{ copied ? (isVi ? 'Đã copy!' : 'Copied!') : isVi ? 'Copy token' : 'Copy token' }}
+              </button>
+              <a
+                v-if="creditsLow && !showLowCreditsBanner"
+                :href="`${prefix}/app/credits/`"
+                class="or-app-btn or-app-btn-ghost"
+              >
+                {{ isVi ? 'Nạp credits' : 'Top up credits' }}
+              </a>
+            </div>
           </div>
 
-          <div class="or-app-grid">
-            <a :href="`${prefix}/models/`" class="or-app-card">
-              <h3>{{ isVi ? 'Models catalog' : 'Models catalog' }}</h3>
-              <p>{{ isVi ? 'Duyệt model image, video, chat…' : 'Browse image, video, chat models…' }}</p>
-              <span class="or-app-card-cta">{{ isVi ? 'Mở catalog' : 'Open catalog' }} →</span>
+          <div v-if="showLowCreditsBanner" class="or-overview-banner or-overview-banner--warn" role="status">
+            <p>
+              {{
+                isVi
+                  ? `Số dư thấp (${formatCredits(credits)} credits) — nạp thêm để tránh job bị dừng giữa chừng.`
+                  : `Low balance (${formatCredits(credits)} credits) — top up to avoid interrupted jobs.`
+              }}
+            </p>
+            <a :href="`${prefix}/app/credits/`" class="or-overview-banner-link">
+              {{ isVi ? 'Nạp ngay' : 'Top up' }} →
             </a>
-            <a :href="`${prefix}/models/compare/`" class="or-app-card">
-              <h3>{{ isVi ? 'So sánh models' : 'Compare models' }}</h3>
-              <p>{{ isVi ? 'Credits và metadata side-by-side.' : 'Credits and metadata side-by-side.' }}</p>
-              <span class="or-app-card-cta">{{ isVi ? 'So sánh' : 'Compare' }} →</span>
+          </div>
+
+          <div v-if="showNoJobsBanner" class="or-overview-banner or-overview-banner--info" role="status">
+            <p>
+              {{
+                isVi
+                  ? 'Chưa có job trong 7 ngày qua — chạy thử image hoặc video trong Playground.'
+                  : 'No jobs in the last 7 days — try an image or video job in Playground.'
+              }}
+            </p>
+            <a :href="`${prefix}/app/playground/`" class="or-overview-banner-link">
+              {{ isVi ? 'Mở Playground' : 'Open Playground' }} →
             </a>
-            <a :href="`${prefix}/app/chat/`" class="or-app-card">
-              <h3>Chat</h3>
-              <p>{{ isVi ? 'Trò chuyện với Auto Router — stream SSE, lịch sử local.' : 'Chat with Auto Router — SSE stream, local history.' }}</p>
-              <span class="or-app-card-cta">{{ isVi ? 'Mở chat' : 'Open chat' }} →</span>
-            </a>
-            <a :href="`${prefix}/app/playground/`" class="or-app-card">
-              <h3>Playground</h3>
-              <p>{{ isVi ? 'Thử job, chat, upload trong portal.' : 'Try jobs, chat, upload in the portal.' }}</p>
-              <span class="or-app-card-cta">{{ isVi ? 'Mở playground' : 'Open playground' }} →</span>
-            </a>
-            <a :href="`${prefix}/app/credits/`" class="or-app-card">
-              <h3>{{ isVi ? 'Nạp credits' : 'Top up credits' }}</h3>
-              <p>{{ isVi ? 'Gói credit qua Gommo.' : 'Credit packages via Gommo.' }}</p>
-              <span class="or-app-card-cta">{{ isVi ? 'Wallet' : 'Wallet' }} →</span>
-            </a>
-            <a :href="`${prefix}/app/token/`" class="or-app-card">
-              <h3>Access token</h3>
-              <p>{{ isVi ? 'Copy Bearer cho API client.' : 'Copy Bearer for your API client.' }}</p>
-              <span class="or-app-card-cta">{{ isVi ? 'Xem token' : 'View token' }} →</span>
-            </a>
-            <a :href="`${prefix}/app/profile/?section=usage`" class="or-app-card">
-              <h3>Usage</h3>
-              <p>{{ isVi ? 'Thống kê credit và lịch sử job.' : 'Credit stats and job history.' }}</p>
-              <span class="or-app-card-cta">{{ isVi ? 'Xem usage' : 'View usage' }} →</span>
-            </a>
-            <a :href="`${prefix}/app/profile/`" class="or-app-card">
-              <h3>{{ isVi ? 'Hồ sơ' : 'Profile' }}</h3>
-              <p>{{ isVi ? 'Email, username và số dư credit.' : 'Email, username, and credit balance.' }}</p>
-              <span class="or-app-card-cta">{{ isVi ? 'Xem hồ sơ' : 'View profile' }} →</span>
-            </a>
+          </div>
+
+          <OverviewUsageSection
+            ref="overviewUsageRef"
+            :credits="credits"
+            :is-vi="isVi"
+            :prefix="prefix"
+            @stats-loaded="onOverviewUsageStats"
+          />
+
+          <div class="or-overview-secondary">
+            <OverviewRecentTopups
+              :orders="overviewTopupPreview"
+              :loading="ordersLoading"
+              :is-vi="isVi"
+              :prefix="prefix"
+            />
+            <OverviewOnboardingCard
+              :is-vi="isVi"
+              :prefix="prefix"
+              :token-copied="tokenCopiedEver"
+              :has-jobs="hasOverviewJobs"
+            />
+          </div>
+
+          <h2 class="or-overview-links-title">{{ isVi ? 'Tài liệu' : 'Resources' }}</h2>
+          <div class="or-app-grid or-app-grid--overview">
             <a :href="`${prefix}/quickstart`" class="or-app-card">
               <h3>Quickstart</h3>
-              <p>{{ isVi ? 'Hướng dẫn tích hợp gateway REST.' : 'Gateway REST integration guide.' }}</p>
-              <span class="or-app-card-cta">{{ isVi ? 'Đọc docs' : 'Read docs' }} →</span>
+              <p>{{ isVi ? 'Tích hợp gateway REST — login, models, tạo job.' : 'Gateway REST integration — login, models, create jobs.' }}</p>
+              <span class="or-app-card-cta">{{ isVi ? 'Đọc hướng dẫn' : 'Read guide' }} →</span>
+            </a>
+            <a :href="`${prefix}/mcp/`" class="or-app-card">
+              <h3>{{ isVi ? 'MCP (Cursor & IDE)' : 'MCP (Cursor & IDE)' }}</h3>
+              <p>
+                {{
+                  isVi
+                    ? '10 tools ảnh/video — cấu hình Cursor, Claude Desktop.'
+                    : '10 image/video tools — set up Cursor, Claude Desktop.'
+                }}
+              </p>
+              <span class="or-app-card-cta">{{ isVi ? 'Cấu hình MCP' : 'Set up MCP' }} →</span>
+            </a>
+            <a :href="`${prefix}/authentication`" class="or-app-card">
+              <h3>{{ isVi ? 'Authentication' : 'Authentication' }}</h3>
+              <p>{{ isVi ? 'Bearer token, domain Gommo, và các mode tích hợp.' : 'Bearer token, Gommo domain, and integration modes.' }}</p>
+              <span class="or-app-card-cta">{{ isVi ? 'Xem auth' : 'View auth' }} →</span>
             </a>
           </div>
         </section>
@@ -674,34 +813,30 @@ watch(
 
           <!-- API access -->
           <div v-else-if="profileSection === 'api'" class="or-app-profile-panel">
-            <div class="or-app-panel">
+            <div class="or-app-panel or-token-profile-shortcut">
               <h3 class="or-app-panel-title">{{ isVi ? 'Gommo Bearer token' : 'Gommo Bearer token' }}</h3>
               <p class="or-app-panel-desc">
                 {{
                   isVi
-                    ? 'Một access token cho /gateway/* — không phải nhiều API keys như OpenRouter.'
-                    : 'One access token for /gateway/* — not multiple platform API keys.'
+                    ? 'Một session token cho /gateway/* — snippet, health check và MCP trên trang Access token.'
+                    : 'One session token for /gateway/* — snippets, health checks, and MCP on the Access token page.'
                 }}
               </p>
               <div class="or-app-token-row">
                 <code class="or-app-token-value">{{ maskedToken }}</code>
-                <button type="button" class="or-app-btn or-app-btn-primary" @click="copyToken">
-                  {{ copied ? (isVi ? 'Đã copy' : 'Copied') : isVi ? 'Copy token' : 'Copy token' }}
+                <button type="button" class="or-app-btn or-app-btn-ghost" @click="copyToken">
+                  {{ copied ? (isVi ? 'Đã copy' : 'Copied') : isVi ? 'Copy' : 'Copy' }}
                 </button>
               </div>
+              <div class="or-token-profile-shortcut-actions">
+                <a :href="`${prefix}/app/token/`" class="or-app-btn or-app-btn-primary">
+                  {{ isVi ? 'Mở Access token' : 'Open Access token' }} →
+                </a>
+                <a :href="`${prefix}/authentication`" class="or-app-btn or-app-btn-ghost">
+                  {{ isVi ? 'Tài liệu auth' : 'Auth docs' }}
+                </a>
+              </div>
             </div>
-            <div class="or-app-panel">
-              <h3 class="or-app-panel-title">curl</h3>
-              <pre class="or-app-code"><code>{{ curlSnippet }}</code></pre>
-              <button type="button" class="or-app-btn or-app-btn-ghost" @click="copySnippet">
-                {{ isVi ? 'Copy curl' : 'Copy curl' }}
-              </button>
-            </div>
-            <p class="or-app-muted">
-              <a :href="`${prefix}/app/token/`">{{ isVi ? 'Trang Access token đầy đủ' : 'Full Access token page' }}</a>
-              ·
-              <a :href="`${prefix}/authentication`">{{ isVi ? 'Tài liệu auth' : 'Auth docs' }}</a>
-            </p>
           </div>
 
           <!-- Logs -->
@@ -735,49 +870,24 @@ watch(
         </section>
 
         <!-- Token -->
-        <section v-else-if="view === 'token'" class="or-app-section">
-          <div class="or-app-panel">
-            <h3 class="or-app-panel-title">{{ isVi ? 'Bearer token' : 'Bearer token' }}</h3>
-            <p class="or-app-panel-desc">
-              {{
-                isVi
-                  ? 'Gửi header Authorization: Bearer <token> cho /gateway/jobs, chat, upload…'
-                  : 'Send Authorization: Bearer <token> for /gateway/jobs, chat, upload…'
-              }}
-            </p>
-            <div class="or-app-token-row">
-              <code class="or-app-token-value">{{ maskedToken }}</code>
-              <button type="button" class="or-app-btn or-app-btn-primary" @click="copyToken">
-                {{ copied ? (isVi ? 'Đã copy' : 'Copied') : isVi ? 'Copy token' : 'Copy token' }}
-              </button>
-            </div>
-          </div>
+        <section v-else-if="view === 'token'" class="or-app-section or-app-section--token">
+          <AccessTokenPanel
+            ref="accessTokenRef"
+            :is-vi="isVi"
+            :prefix="prefix"
+            :token="token"
+            :masked-token="maskedToken"
+            :display-name="displayName"
+            :username="username"
+            :credits="credits"
+            :domain="loginDomain"
+            @token-copied="markTokenCopied"
+          />
+        </section>
 
-          <div class="or-app-panel">
-            <h3 class="or-app-panel-title">curl</h3>
-            <pre class="or-app-code"><code>{{ curlSnippet }}</code></pre>
-            <button type="button" class="or-app-btn or-app-btn-ghost" @click="copySnippet">
-              {{ isVi ? 'Copy curl' : 'Copy curl' }}
-            </button>
-          </div>
-
-          <div class="or-app-panel">
-            <h3 class="or-app-panel-title">{{ isVi ? '79ai MCP (Cursor & IDE)' : '79ai MCP (Cursor & IDE)' }}</h3>
-            <p class="or-app-panel-desc">
-              {{
-                isVi
-                  ? 'Token này dùng cho 79ai MCP — 10 tools: ảnh, video, credit, thông báo… Cursor, Claude Desktop và host tương thích. Không cần gateway local.'
-                  : 'Use this token for 79ai MCP — 10 tools: images, video, credits, notifications… Works in Cursor, Claude Desktop, and compatible hosts. No local gateway required.'
-              }}
-            </p>
-            <p class="or-app-panel-desc or-app-muted">
-              <a :href="`${prefix}/mcp/other-hosts`">{{ isVi ? 'Cấu hình JSON (Cursor / Claude / ChatGPT)' : 'JSON config (Cursor / Claude / ChatGPT)' }}</a>
-              ·
-              <a :href="`${prefix}/mcp/tools`">{{ isVi ? '10 tools' : '10 tools' }}</a>
-              ·
-              <a :href="`${prefix}/mcp/use-cases`">{{ isVi ? 'Prompt mẫu' : 'Example prompts' }}</a>
-            </p>
-          </div>
+        <!-- Files -->
+        <section v-else-if="view === 'files'" class="or-app-section or-app-section--files">
+          <FilesPanel ref="filesPanelRef" :is-vi="isVi" :prefix="prefix" />
         </section>
 
         <!-- Credits -->

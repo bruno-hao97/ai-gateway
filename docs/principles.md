@@ -5,7 +5,20 @@ description: Core design principles of AI Gateway
 
 # Principles
 
-Core principles for building on AI Gateway — an OpenRouter-style **API platform** over [Gommo](https://gommo.net).
+Core principles for building on AI Gateway — an OpenRouter-style **API platform** over [Gommo](https://gommo.net). Read this before choosing [integration mode](./routing/integration-modes.md).
+
+## Request flow
+
+```
+Your app
+  │
+  ├─ Mode A (direct) ──► v2.api.gommo.net  (jobs · models · upload)
+  │                   └─► api.gommo.net    (login · chat · audio)
+  │
+  └─ Mode B/C ──► AI Gateway (optional)
+                    ├─► v2.api.gommo.net
+                    └─► api.gommo.net
+```
 
 ## Why AI Gateway?
 
@@ -80,7 +93,7 @@ Common codes: `UNAUTHORIZED`, `UPSTREAM_ERROR`, `RATE_LIMITED`, `NOT_CONFIGURED`
 
 ## What we optimize for
 
-- **Integrator speed** — quickstart in minutes, playground at `/portal/`.
+- **Integrator speed** — quickstart in minutes, playground at [/app/playground/](/app/playground/).
 - **Operational clarity** — health check, structured logs, Docker deploy.
 - **Upstream fidelity** — proxy Mode C preserves Gommo envelopes when you need drop-in compatibility.
 

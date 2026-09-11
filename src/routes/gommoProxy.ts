@@ -116,8 +116,16 @@ function mountProxy(mountPath: string, upstreamBase: string, stripPrefix?: strin
 }
 
 mountProxy('/v2', config.gommo.baseUrl, '/v2');
+// Library list + album paths on v2 host (79ai: v2.api.gommo.net/ai/library/*)
+mountProxy('/ai/library/album-videos', config.gommo.baseUrl);
+mountProxy('/ai/library/album-images', config.gommo.baseUrl);
+mountProxy('/ai/library/musics', config.gommo.baseUrl);
+mountProxy('/ai/library/audios', config.gommo.baseUrl);
+mountProxy('/ai/library/images', config.gommo.baseUrl);
+mountProxy('/ai/library/videos', config.gommo.baseUrl);
 mountProxy('/ai', config.gommo.authBaseUrl);
 mountProxy('/api/v2', config.gommo.authBaseUrl);
+mountProxy('/api/library', config.gommo.authBaseUrl);
 mountProxy(config.gommo.authPath, config.gommo.authBaseUrl);
 
 export default router;

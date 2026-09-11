@@ -9,10 +9,10 @@ import LegalPage from './components/LegalPage.vue';
 import AboutPage from './components/AboutPage.vue';
 import AppDashboard from './components/AppDashboard.vue';
 import ApiPlaygroundEmbed from './components/ApiPlaygroundEmbed.vue';
-import { isPlaygroundImmersivePath } from './models/docs-nav';
+import { isAppShellPath } from './models/docs-nav';
 import {
   syncPlaygroundStorageFromUrl,
-  tryPlaygroundHybridLocaleSwitch,
+  tryHybridLocaleSwitch,
 } from './models/playground-locale-bridge';
 import './brand.css';
 import './nav.css';
@@ -25,15 +25,13 @@ import './about.css';
 import './app-dashboard.css';
 import './api-playground.css';
 import './site-footer.css';
+import './doc-prose.css';
 
 export default {
   extends: DefaultTheme,
   Layout,
   enhanceApp({ app, router }) {
-    if (
-      typeof window !== 'undefined' &&
-      isPlaygroundImmersivePath(window.location.pathname)
-    ) {
+    if (typeof window !== 'undefined' && isAppShellPath(window.location.pathname)) {
       syncPlaygroundStorageFromUrl();
     }
 
@@ -46,11 +44,9 @@ export default {
     app.component('AppDashboard', AppDashboard);
     app.component('ApiPlaygroundEmbed', ApiPlaygroundEmbed);
 
-    const blockPlaygroundHybridNav = (to: string) => {
+    router.onBeforeRouteChange = (to: string) => {
       const from = router.route.path;
-      if (tryPlaygroundHybridLocaleSwitch(to, from)) return false;
+      if (tryHybridLocaleSwitch(to, from)) return false;
     };
-
-    router.onBeforeRouteChange = blockPlaygroundHybridNav;
   },
 } satisfies Theme;

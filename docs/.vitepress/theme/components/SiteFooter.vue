@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useData } from 'vitepress';
+import { useHybridLocale } from '../composables/use-hybrid-locale';
 
 interface FooterLink {
   label: string;
@@ -14,9 +14,7 @@ interface FooterColumn {
   links: FooterLink[];
 }
 
-const { lang } = useData();
-const isVi = computed(() => lang.value === 'vi-VN');
-const prefix = computed(() => (isVi.value ? '/vi' : ''));
+const { isVi, prefix } = useHybridLocale();
 const year = new Date().getFullYear();
 
 function t(en: string, vi: string): string {
@@ -62,6 +60,7 @@ const linkColumns = computed((): FooterColumn[] => {
       title: t('Developer', 'Developer'),
       links: [
         { label: t('Quickstart', 'Quickstart'), href: `${p}/quickstart` },
+        { label: t('Changelog', 'Changelog'), href: `${p}/changelog` },
         { label: t('Authentication', 'Authentication'), href: `${p}/authentication` },
         { label: t('API Reference', 'API Reference'), href: `${p}/reference/openapi` },
         { label: t('Cookbook', 'Cookbook'), href: `${p}/cookbook/` },

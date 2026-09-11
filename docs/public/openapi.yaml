@@ -1,29 +1,50 @@
 openapi: 3.0.3
 info:
-  title: AI Gateway API
-  description: REST gateway over Gommo — Mode B endpoints, billing, admin, health
-  version: 0.1.0
+  title: Gommo API (documented via AI Gateway)
+  description: |
+    **Public Gommo API** — primary integration surface (79ai-style).
+
+    - `https://v2.api.gommo.net` — jobs, models, upload, album library
+    - `https://api.gommo.net` — auth, chat, audio, info, library lists
+
+    Optional **AI Gateway** (`http://localhost:3001`) wraps Mode B REST (`/gateway/*`), billing, and admin for local dev.
+    See docs/reference/gommo-public-api.md
+  version: 0.2.0
   contact:
     url: https://github.com/bruno-hao97/ai-gateway
 
 servers:
+  - url: https://v2.api.gommo.net
+    description: Gommo V2 — jobs, models, upload, albums
+  - url: https://api.gommo.net
+    description: Gommo platform — auth, chat, audio, info, library
   - url: http://localhost:3001
-    description: Local dev
-  - url: https://api.yourdomain.com
-    description: Production
+    description: AI Gateway dev (Mode B REST, billing, admin)
 
 tags:
+  - name: Gommo V2
+    description: Public API on v2.api.gommo.net
+  - name: Gommo Platform
+    description: Public API on api.gommo.net
   - name: Health
   - name: OpenAI
-  - name: Gateway
+  - name: Gateway Dev
+    description: AI Gateway Mode B — localhost only
   - name: Billing
   - name: Admin
+
+x-gommo-hosts:
+  v2: https://v2.api.gommo.net
+  auth: https://api.gommo.net
 
 paths:
   /health:
     get:
       tags: [Health]
-      summary: Health check
+      servers:
+        - url: http://localhost:3001
+      summary: Health check (AI Gateway)
+      security: []
       responses:
         '200':
           description: OK
@@ -32,9 +53,348 @@ paths:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
 
+  /ai/models:
+    get:
+      tags: [Gommo V2]
+      servers:
+        - url: https://v2.api.gommo.net
+      summary: List models by job type
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            example: image
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Model catalog
+    post:
+      tags: [Gommo V2]
+      servers:
+        - url: https://v2.api.gommo.net
+      summary: List models (form body)
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                domain:
+                  type: string
+                  example: 79ai.net
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Model catalog
+
+  /ai/jobs/{type}/{modelSlug}:
+    post:
+      tags: [Gommo V2]
+      servers:
+        - url: https://v2.api.gommo.net
+      summary: Create media job (form-urlencoded)
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            example: image
+        - name: modelSlug
+          in: path
+          required: true
+          schema:
+            type: string
+            example: flux-dev
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                domain:
+                  type: string
+                prompt:
+                  type: string
+                ratio:
+                  type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Job created
+
+  /ai/jobs/{id}:
+    post:
+      tags: [Gommo V2]
+      servers:
+        - url: https://v2.api.gommo.net
+      summary: Poll job status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: media
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [image, video, music]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Job status
+
+  /ai/upload/image:
+    post:
+      tags: [Gommo V2]
+      servers:
+        - url: https://v2.api.gommo.net
+      summary: Upload image
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Upload URL
+
+  /ai/upload/video:
+    post:
+      tags: [Gommo V2]
+      servers:
+        - url: https://v2.api.gommo.net
+      summary: Upload video
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                video_file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Upload URL
+
+  /ai/library/album-images:
+    post:
+      tags: [Gommo V2]
+      servers:
+        - url: https://v2.api.gommo.net
+      summary: Image album list
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                domain:
+                  type: string
+                project_id:
+                  type: string
+                  example: default
+                limit:
+                  type: integer
+                  example: 30
+                order_by:
+                  type: string
+                sort_by:
+                  type: string
+      responses:
+        '200':
+          description: Album images
+
+  /ai/library/album-videos:
+    post:
+      tags: [Gommo V2]
+      servers:
+        - url: https://v2.api.gommo.net
+      summary: Video album list
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                domain:
+                  type: string
+                project_id:
+                  type: string
+                  example: default
+                limit:
+                  type: integer
+                  example: 30
+                order_by:
+                  type: string
+                sort_by:
+                  type: string
+      responses:
+        '200':
+          description: Album videos
+
+  /ai/info/image/{id}:
+    post:
+      tags: [Gommo Platform]
+      servers:
+        - url: https://api.gommo.net
+      summary: Image job info
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Image status
+
+  /ai/info/video/{id}:
+    post:
+      tags: [Gommo Platform]
+      servers:
+        - url: https://api.gommo.net
+      summary: Video job info
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Video status
+
+  /ai/library/musics:
+    post:
+      tags: [Gommo Platform]
+      servers:
+        - url: https://v2.api.gommo.net
+      summary: Music library list
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Music list
+
+  /ai/library/audios:
+    post:
+      tags: [Gommo Platform]
+      servers:
+        - url: https://v2.api.gommo.net
+      summary: Audio library list
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Audio list
+
+  /api/v2/chat:
+    post:
+      tags: [Gommo Platform]
+      servers:
+        - url: https://api.gommo.net
+      summary: Chat or stream
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: JSON or SSE
+
+  /ai/audio:
+    post:
+      tags: [Gommo Platform]
+      servers:
+        - url: https://api.gommo.net
+      summary: Platform audio (voices, TTS)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Audio response
+
+  /ai/me:
+    post:
+      tags: [Gommo Platform]
+      servers:
+        - url: https://api.gommo.net
+      summary: Profile and credits
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                access_token:
+                  type: string
+                domain:
+                  type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile
+
+  /api/apps/go-mmo/auth/login:
+    post:
+      tags: [Gommo Platform]
+      servers:
+        - url: https://api.gommo.net
+      summary: Login (form)
+      security: []
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+                domain:
+                  type: string
+      responses:
+        '200':
+          description: access_token
+
   /v1/models:
     get:
       tags: [OpenAI]
+      servers:
+        - url: http://localhost:3001
       summary: List chat models (OpenAI-compatible)
       description: Returns configured Gommo chat model as an OpenAI-style model list.
       security:
@@ -65,6 +425,8 @@ paths:
   /v1/chat/completions:
     post:
       tags: [OpenAI]
+      servers:
+        - url: http://localhost:3001
       summary: Chat completions (OpenAI-compatible)
       description: |
         OpenAI-compatible chat endpoint mapped to Gommo upstream chat.
@@ -105,7 +467,9 @@ paths:
 
   /gateway/auth/login:
     post:
-      tags: [Gateway]
+      tags: [Gateway Dev]
+      servers:
+        - url: http://localhost:3001
       summary: Login with Gommo email and password
       description: |
         Returns a Gommo `access_token` for `Authorization: Bearer` on `/gateway/*`.
@@ -129,7 +493,9 @@ paths:
 
   /gateway/auth/register:
     post:
-      tags: [Gateway]
+      tags: [Gateway Dev]
+      servers:
+        - url: http://localhost:3001
       summary: Register Gommo user
       description: |
         Creates a Gommo account via merchant credentials on the server
@@ -155,7 +521,9 @@ paths:
 
   /gateway/models:
     get:
-      tags: [Gateway]
+      tags: [Gateway Dev]
+      servers:
+        - url: http://localhost:3001
       summary: List models by type (public catalog — Bearer optional)
       description: |
         OpenRouter-style public browse. No Authorization required when upstream allows it;
@@ -188,16 +556,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/SuccessEnvelope'
 
-  /gateway/jobs/{type}:
+  /gateway/jobs/{segment}:
     post:
-      tags: [Gateway]
-      summary: Create media job
+      tags: [Gateway Dev]
+      servers:
+        - url: http://localhost:3001
+      summary: Create media job (segment = job type)
       security:
         - bearerAuth: []
       parameters:
-        - name: type
+        - name: segment
           in: path
           required: true
+          description: Job type — `image`, `video`, `music`, `tts`, tool types, …
           schema:
             type: string
             example: image
@@ -214,17 +585,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessEnvelope'
-
-  /gateway/jobs/{id}:
     get:
-      tags: [Gateway]
-      summary: Poll job status
+      tags: [Gateway Dev]
+      servers:
+        - url: http://localhost:3001
+      summary: Poll job status (segment = job id)
       security:
         - bearerAuth: []
       parameters:
-        - name: id
+        - name: segment
           in: path
           required: true
+          description: Job id from create response (`id_base`, `job_id`, …)
           schema:
             type: string
         - name: media
@@ -243,7 +615,9 @@ paths:
 
   /gateway/upload/image:
     post:
-      tags: [Gateway]
+      tags: [Gateway Dev]
+      servers:
+        - url: http://localhost:3001
       summary: Upload image
       security:
         - bearerAuth: []
@@ -266,7 +640,9 @@ paths:
 
   /gateway/upload/video:
     post:
-      tags: [Gateway]
+      tags: [Gateway Dev]
+      servers:
+        - url: http://localhost:3001
       summary: Upload video
       security:
         - bearerAuth: []
@@ -289,7 +665,9 @@ paths:
 
   /gateway/chat:
     post:
-      tags: [Gateway]
+      tags: [Gateway Dev]
+      servers:
+        - url: http://localhost:3001
       summary: Chat agent or stream
       security:
         - bearerAuth: []
@@ -305,7 +683,9 @@ paths:
 
   /gateway/audio/voices:
     post:
-      tags: [Gateway]
+      tags: [Gateway Dev]
+      servers:
+        - url: http://localhost:3001
       summary: Search voices
       security:
         - bearerAuth: []
@@ -325,7 +705,9 @@ paths:
 
   /gateway/audio/tts:
     post:
-      tags: [Gateway]
+      tags: [Gateway Dev]
+      servers:
+        - url: http://localhost:3001
       summary: Text-to-speech
       security:
         - bearerAuth: []
@@ -350,7 +732,9 @@ paths:
 
   /gateway/audio/lists:
     get:
-      tags: [Gateway]
+      tags: [Gateway Dev]
+      servers:
+        - url: http://localhost:3001
       summary: Audio history
       security:
         - bearerAuth: []
@@ -360,7 +744,9 @@ paths:
 
   /gateway/usage/stats:
     post:
-      tags: [Gateway]
+      tags: [Gateway Dev]
+      servers:
+        - url: http://localhost:3001
       summary: Usage statistics (79ai-style, preferred)
       description: |
         Aggregated usage from Gommo `POST /api/v2/usage-history` with `action=stats`.
@@ -395,7 +781,9 @@ paths:
         '200':
           description: Usage stats (summary, chart, table)
     get:
-      tags: [Gateway]
+      tags: [Gateway Dev]
+      servers:
+        - url: http://localhost:3001
       summary: Usage statistics (79ai-style)
       description: |
         Aggregated usage from Gommo `POST /api/v2/usage-history` with `action=stats`.
@@ -447,7 +835,9 @@ paths:
 
   /gateway/usage/logs:
     post:
-      tags: [Gateway]
+      tags: [Gateway Dev]
+      servers:
+        - url: http://localhost:3001
       summary: Usage job logs (79ai items table)
       description: |
         Per-job rows from Gommo `POST /api/v2/usage-history` with `action=logs`.
@@ -485,7 +875,9 @@ paths:
         '200':
           description: Usage log items
     get:
-      tags: [Gateway]
+      tags: [Gateway Dev]
+      servers:
+        - url: http://localhost:3001
       summary: Usage job logs (query params)
       security:
         - bearerAuth: []
@@ -518,7 +910,9 @@ paths:
 
   /gateway/usage/list:
     post:
-      tags: [Gateway]
+      tags: [Gateway Dev]
+      servers:
+        - url: http://localhost:3001
       summary: Usage job list (deprecated — use /usage/logs)
       deprecated: true
       description: |
@@ -555,7 +949,9 @@ paths:
         '200':
           description: Usage list items
     get:
-      tags: [Gateway]
+      tags: [Gateway Dev]
+      servers:
+        - url: http://localhost:3001
       summary: Usage job list (query params)
       security:
         - bearerAuth: []
@@ -587,7 +983,9 @@ paths:
 
   /gateway/usage/history:
     get:
-      tags: [Gateway]
+      tags: [Gateway Dev]
+      servers:
+        - url: http://localhost:3001
       summary: Usage history (deprecated — use /usage/logs)
       deprecated: true
       description: Alias for `/gateway/usage/logs` (Gommo usage-history action=logs).
@@ -618,10 +1016,14 @@ paths:
   /billing/status:
     get:
       tags: [Billing]
+      servers:
+        - url: http://localhost:3001
       summary: Billing configuration status
       description: |
         Returns Gommo payment availability (`gommoPayment`, `billingMode`),
         legacy PayOS flags, and merchant readiness.
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: Status flags
@@ -633,7 +1035,11 @@ paths:
   /billing/packages:
     get:
       tags: [Billing]
+      servers:
+        - url: http://localhost:3001
       summary: Credit packages
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: Package list
@@ -645,6 +1051,8 @@ paths:
   /billing/payment/create:
     post:
       tags: [Billing]
+      servers:
+        - url: http://localhost:3001
       summary: Create Gommo VietQR payment (default top-up)
       description: |
         Proxies Gommo `subscriptions/create_payment`. Persists a local order with
@@ -680,6 +1088,8 @@ paths:
   /billing/payment/sync:
     post:
       tags: [Billing]
+      servers:
+        - url: http://localhost:3001
       summary: Sync Gommo payment status
       description: |
         Proxies Gommo `subscriptions/payment_sync`. When `paid` is true, marks the
@@ -713,6 +1123,8 @@ paths:
   /billing/topup/create:
     post:
       tags: [Billing]
+      servers:
+        - url: http://localhost:3001
       summary: Create PayOS topup order (legacy)
       deprecated: true
       description: Legacy PayOS checkout. Prefer `/billing/payment/create` (Gommo VietQR).
@@ -737,6 +1149,8 @@ paths:
   /billing/topup/orders:
     get:
       tags: [Billing]
+      servers:
+        - url: http://localhost:3001
       summary: List topup orders for signed-in user
       security:
         - bearerAuth: []
@@ -774,7 +1188,11 @@ paths:
   /billing/topup/orders/{orderCode}:
     get:
       tags: [Billing]
+      servers:
+        - url: http://localhost:3001
       summary: Get order status
+      security:
+        - bearerAuth: []
       parameters:
         - name: orderCode
           in: path
@@ -797,6 +1215,8 @@ paths:
   /admin/merchant/balance:
     get:
       tags: [Admin]
+      servers:
+        - url: http://localhost:3001
       summary: Merchant balance
       security:
         - adminKey: []
@@ -807,6 +1227,8 @@ paths:
   /admin/credits/send:
     post:
       tags: [Admin]
+      servers:
+        - url: http://localhost:3001
       summary: Send credits to user
       security:
         - adminKey: []
@@ -832,6 +1254,8 @@ paths:
   /admin/users/register:
     post:
       tags: [Admin]
+      servers:
+        - url: http://localhost:3001
       summary: Register Gommo user (merchant)
       security:
         - adminKey: []

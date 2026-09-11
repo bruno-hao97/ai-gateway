@@ -31,7 +31,7 @@
   let activeEndpointId = null;
   let activeDetailTab = 'overview';
   let payloadVariant = 'json';
-  let codeMode = 'gateway';
+  let codeMode = 'public';
   let sandboxDraft = {
     path: '',
     body: '',
@@ -173,6 +173,10 @@
     const jt = ep.jobType || ctx.jobType || 'image';
     const slug = ctx.modelSlug || 'model_slug';
 
+    if (mode === 'public') {
+      return global.GatewayEndpointRegistry?.resolvePublicPath(ep, ctx) || ep.path || '';
+    }
+
     if (mode === 'proxy') {
       if (ep.id === 'list-models') return `/v2/ai/models?type=${jt}`;
       if (ep.id === 'poll-job') {
@@ -297,7 +301,8 @@
   }
 
   function buildPayloadText(ep, ctx) {
-    if (codeMode === 'proxy' && payloadVariant === 'form') {
+    const useFlat = codeMode === 'proxy' || codeMode === 'public';
+    if (useFlat && payloadVariant === 'form') {
       const flat = buildProxyFlatPayload(ep, ctx);
       return Object.entries(flat)
         .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
@@ -307,14 +312,21 @@
       const flat = buildProxyFlatPayload(ep, ctx);
       return JSON.stringify({ ...flat, file: '@reference.jpg' }, null, 2);
     }
-    const body = codeMode === 'proxy' ? buildProxyFlatPayload(ep, ctx) : buildGatewayPayload(ep, ctx);
+    const body = useFlat ? buildProxyFlatPayload(ep, ctx) : buildGatewayPayload(ep, ctx);
     return JSON.stringify(body, null, 2);
   }
 
-  function buildCurl(ep, ctx) {
+  function resolveRequestUrl(ep, ctx) {
+    if (codeMode === 'public') {
+      return global.GatewayEndpointRegistry?.resolvePublicApi(ep, ctx)?.url || '';
+    }
     const base = ctx.baseUrl.replace(/\/$/, '');
     const path = resolvePath(ep, ctx, codeMode);
-    const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
+    return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+  }
+
+  function buildCurl(ep, ctx) {
+    const url = resolveRequestUrl(ep, ctx);
     const token = $('token')?.value?.trim();
     const tokenMask = token ? `${token.slice(0, 12)}…` : 'YOUR_ACCESS_TOKEN';
 
@@ -330,7 +342,7 @@
     if (ep.contentTypes?.includes('application/x-www-form-urlencoded') && ep.id === 'me-credits') {
       return `curl -X ${ep.method} '${url}' \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n  -d 'access_token=${tokenMask}&domain=${ctx.domain}'`;
     }
-    if (payloadVariant === 'form' && codeMode === 'proxy') {
+    if (payloadVariant === 'form' && (codeMode === 'proxy' || codeMode === 'public')) {
       const flat = buildProxyFlatPayload(ep, ctx);
       const data = Object.entries(flat).map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&');
       return `curl -X ${ep.method} '${url}' \\\n  -H 'Authorization: Bearer ${tokenMask}' \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n  -d '${data}'`;
@@ -374,24 +386,27 @@
 
   function renderModeToggle() {
     return `<div class="pg-ep-mode-tabs">
+      <button type="button" class="pg-ep-mode-tab${codeMode === 'public' ? ' active' : ''}" data-code-mode="public">${pgT('ep.mode.public')}</button>
       <button type="button" class="pg-ep-mode-tab${codeMode === 'gateway' ? ' active' : ''}" data-code-mode="gateway">${pgT('ep.mode.gateway')}</button>
-      <button type="button" class="pg-ep-mode-tab${codeMode === 'proxy' ? ' active' : ''}" data-code-mode="proxy">${pgT('ep.mode.proxy')}</button>
     </div>`;
   }
 
   function renderOverview(ep, ctx) {
     const desc = isVi() ? ep.overview?.vi : ep.overview?.en;
     const types = (ep.contentTypes || []).map((c) => `<code>${c}</code>`).join(', ');
+    const reg = global.GatewayEndpointRegistry;
+    const pub = reg?.resolvePublicApi?.(ep, ctx);
+    const hostLabel = pub ? reg.publicHostLabel(pub.host, isVi()) : '—';
     return `
       <p class="pg-ep-detail-lead">${escapeHtml(desc || '')}</p>
       <dl class="pg-ep-detail-dl">
         <dt>${pgT('ep.overview.group')}</dt><dd><code>${escapeHtml(ep.group || '—')}</code></dd>
         <dt>${pgT('ep.overview.execution')}</dt><dd>${ep.async ? '<span class="pg-ep-badge">async</span>' : 'sync'}</dd>
         <dt>${pgT('ep.overview.contentTypes')}</dt><dd>${types || '—'}</dd>
-        ${ep.upstreamPath ? `<dt>${pgT('ep.overview.upstream')}</dt><dd><code>${escapeHtml(ep.upstreamPath)}</code></dd>` : ''}
+        ${pub ? `<dt>${pgT('ep.overview.publicHost')}</dt><dd><code>${escapeHtml(pub.host)}</code> — ${escapeHtml(hostLabel)}</dd>` : ''}
+        ${pub ? `<dt>${pgT('ep.overview.publicUrl')}</dt><dd><code>${escapeHtml(pub.url)}</code></dd>` : ''}
         <dt>${pgT('ep.overview.gatewayPath')}</dt><dd><code>${escapeHtml(resolvePath(ep, ctx, 'gateway'))}</code></dd>
-        <dt>${pgT('ep.overview.proxyPath')}</dt><dd><code>${escapeHtml(resolvePath(ep, ctx, 'proxy'))}</code></dd>
-        <dt>${pgT('ep.overview.baseUrl')}</dt><dd><code>${escapeHtml(ctx.baseUrl)}</code></dd>
+        <dt>${pgT('ep.overview.gatewayBase')}</dt><dd><code>${escapeHtml(ctx.baseUrl)}</code></dd>
       </dl>`;
   }
 
@@ -446,7 +461,10 @@
   function renderPayload(ep, ctx) {
     const variants = [];
     if (codeMode === 'gateway') variants.push('json');
-    else {
+    else if (codeMode === 'public') {
+      variants.push('form', 'json');
+      if (ep.id?.startsWith('upload')) variants.push('multipart');
+    } else {
       variants.push('json', 'form');
       if (ep.id?.startsWith('create-') || ep.id?.startsWith('upload')) variants.push('multipart');
     }
@@ -755,8 +773,10 @@
     });
     contentEl.querySelectorAll('[data-code-mode]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        codeMode = btn.dataset.codeMode || 'gateway';
+        const ep = global.GatewayEndpointRegistry?.getById(activeEndpointId);
+        codeMode = btn.dataset.codeMode || 'public';
         if (codeMode === 'gateway') payloadVariant = 'json';
+        else if (codeMode === 'public' && ep?.id?.startsWith('create-')) payloadVariant = 'form';
         renderModal();
       });
     });
@@ -817,7 +837,12 @@
       methodEl.className = `pg-method ${ep.method.toLowerCase()}`;
     }
     if (titleEl) titleEl.textContent = label(ep);
-    if (pathEl) pathEl.textContent = path;
+    if (pathEl) {
+      pathEl.textContent =
+        codeMode === 'public'
+          ? global.GatewayEndpointRegistry?.resolvePublicApi(ep, ctx)?.url || path
+          : path;
+    }
     if (tryBtn) tryBtn.hidden = ep.id === 'poll-job';
 
     if (navEl) {
@@ -840,8 +865,13 @@
     if (!ep) return;
     activeEndpointId = id;
     activeDetailTab = 'overview';
-    codeMode = 'gateway';
-    payloadVariant = ep.contentTypes?.includes('application/json') ? 'json' : 'multipart';
+    codeMode = 'public';
+    payloadVariant =
+      ep.id?.startsWith('create-') || ep.contentTypes?.includes('application/x-www-form-urlencoded')
+        ? 'form'
+        : ep.contentTypes?.includes('application/json')
+          ? 'json'
+          : 'multipart';
     sandboxDraft = {
       path: '',
       body: '',
@@ -932,16 +962,19 @@
         global.openInfoPanel?.('music');
         break;
       case 'library-images':
-        global.openLibraryPanel?.('images');
+        global.openLibraryPanel?.('album-images');
         break;
       case 'library-videos':
-        global.openLibraryPanel?.('videos');
+        global.openLibraryPanel?.('album-videos');
         break;
       case 'library-musics':
         global.openLibraryPanel?.('musics');
         break;
       case 'library-audios':
         global.openLibraryPanel?.('audios');
+        break;
+      case 'library-album-images':
+        global.openLibraryPanel?.('album-images');
         break;
       case 'library-album-videos':
         global.openLibraryPanel?.('album-videos');
@@ -990,12 +1023,18 @@
   }
 
   function renderEndpointsBase(ctx) {
-    const base = (ctx?.baseUrl || endpointsBaseUrl()).replace(/\/$/, '');
+    const v2 = global.PortalGommoApi?.V2_BASE || 'https://v2.api.gommo.net';
     const baseEl = $('endpointsBaseUrl');
-    if (baseEl) baseEl.textContent = base;
+    if (baseEl) baseEl.textContent = v2;
 
     const hintEl = $('endpointsContextHint');
-    if (hintEl) hintEl.hidden = true;
+    if (hintEl) {
+      hintEl.hidden = false;
+      hintEl.textContent = pgT(
+        'endpoints.publicHostsHint',
+        'Jobs, models, upload, and albums use v2.api.gommo.net. Info, library, chat, and audio use api.gommo.net — full URL is shown per row.',
+      );
+    }
   }
 
   function copyEndpointsBase() {
@@ -1010,15 +1049,14 @@
     if (!tbody || !reg) return;
 
     const ctx = readPlaygroundContext({});
-    const base = (ctx.baseUrl || endpointsBaseUrl()).replace(/\/$/, '');
     renderEndpointsBase(ctx);
 
     tbody.innerHTML = reg.ENDPOINTS.map((ep) => {
       const name = label(ep);
       const sub = epSummary(ep);
       const m = ep.method.toLowerCase();
-      const path = resolvePath(ep, ctx, 'gateway');
-      const fullUrl = `${base}${path.startsWith('/') ? path : `/${path}`}`;
+      const pub = reg.resolvePublicApi(ep, ctx);
+      const fullUrl = pub.url;
       return `<tr>
         <td class="pg-endpoints-name-cell">
           <div class="pg-endpoints-name">${escapeHtml(name)}</div>

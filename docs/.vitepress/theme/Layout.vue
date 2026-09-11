@@ -12,7 +12,7 @@ import {
   playgroundLocaleFromPath,
   playgroundLocaleMenuItems,
   syncPlaygroundStorageFromUrl,
-  tryPlaygroundHybridLocaleSwitch,
+  tryHybridLocaleSwitch,
   type PlaygroundLocaleMenuItem,
   type PlaygroundPortalLocale,
 } from './models/playground-locale-bridge';
@@ -111,7 +111,7 @@ const HYBRID_VP_NAV = [
 
 function patchHybridVpNavMenu() {
 
-  if (typeof document === 'undefined' || !playgroundImmersive.value) return;
+  if (typeof document === 'undefined' || !appShell.value) return;
 
   const vi = navIsVi.value;
 
@@ -275,37 +275,87 @@ function localeMenuLinkHost(root: Element): Element {
 
 
 
-function syncPlaygroundLocaleLinksInRoot(root: Element, items: PlaygroundLocaleMenuItem[]) {
+function localeMenuLinks(root: Element): HTMLAnchorElement[] {
 
-  for (const link of [...root.querySelectorAll('a.link')]) {
+  return [...root.querySelectorAll('a.link')].filter((link): link is HTMLAnchorElement => {
 
-    if (!(link instanceof HTMLAnchorElement)) continue;
+    if (!(link instanceof HTMLAnchorElement)) return false;
 
     const label = link.textContent?.trim();
 
-    if (label !== 'English' && label !== 'Tiếng Việt') continue;
+    return label === 'English' || label === 'Tiếng Việt';
 
-    link.closest('li.VPMenuLink')?.remove() ?? link.remove();
+  });
 
-  }
+}
+
+
+
+function removeLocaleMenuLink(link: HTMLAnchorElement) {
+
+  link.closest('li.VPMenuLink')?.remove() ?? link.remove();
+
+}
+
+
+
+function createHybridLocaleMenuLink(host: Element, item: PlaygroundLocaleMenuItem): HTMLAnchorElement {
+
+  const li = document.createElement('li');
+
+  li.className = 'VPMenuLink';
+
+  li.dataset.gwHybridLocale = item.locale;
+
+  const link = document.createElement('a');
+
+  link.className = 'link';
+
+  link.dataset.gwHybridLocale = item.locale;
+
+  li.appendChild(link);
+
+  host.appendChild(li);
+
+  applyPlaygroundLocaleMenuItem(link, item);
+
+  return link;
+
+}
+
+
+
+function syncPlaygroundLocaleLinksInRoot(root: Element, items: PlaygroundLocaleMenuItem[]) {
+
+  const existing = localeMenuLinks(root);
 
   const host = localeMenuLinkHost(root);
 
-  for (const item of items) {
+  for (let i = 0; i < items.length; i++) {
 
-    const li = document.createElement('li');
+    const item = items[i]!;
 
-    li.className = 'VPMenuLink';
+    const link = existing[i];
 
-    const link = document.createElement('a');
+    if (link) {
 
-    link.className = 'link';
+      link.dataset.gwHybridLocale = item.locale;
 
-    li.appendChild(link);
+      link.closest('li.VPMenuLink')?.setAttribute('data-gw-hybrid-locale', item.locale);
 
-    host.appendChild(li);
+      applyPlaygroundLocaleMenuItem(link, item);
 
-    applyPlaygroundLocaleMenuItem(link, item);
+      continue;
+
+    }
+
+    createHybridLocaleMenuLink(host, item);
+
+  }
+
+  for (let i = items.length; i < existing.length; i++) {
+
+    removeLocaleMenuLink(existing[i]!);
 
   }
 
@@ -313,19 +363,41 @@ function syncPlaygroundLocaleLinksInRoot(root: Element, items: PlaygroundLocaleM
 
 
 
-function patchHybridVpTranslationsMenu() {
+function cleanupHybridLocaleMenuLinks(root: Element) {
 
-  if (typeof document === 'undefined' || !playgroundImmersive.value) return;
+  for (const el of [...root.querySelectorAll('[data-gw-hybrid-locale]')]) {
 
-  const items = playgroundLocaleMenuItems();
+    if (el instanceof HTMLAnchorElement) removeLocaleMenuLink(el);
 
-  const current = items.find((item) => item.active) ?? items[0]!;
+    else el.remove();
 
-  const triggerTitle = document.querySelector('.VPNavBarTranslations button .title');
+  }
 
-  if (triggerTitle) triggerTitle.textContent = current.label;
+}
 
-  const roots = [
+
+
+function dedupeLocaleMenuLinks(root: Element) {
+
+  const seen = new Set<string>();
+
+  for (const link of localeMenuLinks(root)) {
+
+    const label = link.textContent?.trim() ?? '';
+
+    if (seen.has(label)) removeLocaleMenuLink(link);
+
+    else seen.add(label);
+
+  }
+
+}
+
+
+
+function localeMenuRoots(): Element[] {
+
+  return [
 
     document.querySelector('.VPNavBarTranslations .VPMenu'),
 
@@ -335,7 +407,39 @@ function patchHybridVpTranslationsMenu() {
 
   ].filter((el): el is Element => el instanceof Element);
 
-  for (const root of roots) syncPlaygroundLocaleLinksInRoot(root, items);
+}
+
+
+
+function patchHybridVpTranslationsMenu() {
+
+  if (typeof document === 'undefined') return;
+
+  const roots = localeMenuRoots();
+
+  if (appShell.value) {
+
+    const items = playgroundLocaleMenuItems();
+
+    const current = items.find((item) => item.active) ?? items[0]!;
+
+    const triggerTitle = document.querySelector('.VPNavBarTranslations button .title');
+
+    if (triggerTitle) triggerTitle.textContent = current.label;
+
+    for (const root of roots) syncPlaygroundLocaleLinksInRoot(root, items);
+
+    return;
+
+  }
+
+  for (const root of roots) {
+
+    cleanupHybridLocaleMenuLinks(root);
+
+    dedupeLocaleMenuLinks(root);
+
+  }
 
 }
 
@@ -369,7 +473,7 @@ function syncLayoutChrome() {
 
 function syncHybridNavFromUrl() {
 
-  if (!playgroundImmersive.value) {
+  if (!appShell.value) {
 
     hybridNavVi.value = null;
 
@@ -409,9 +513,9 @@ function onPlaygroundLocaleEvent(event: Event) {
 
 
 
-function onPlaygroundLangClick(event: MouseEvent) {
+function onHybridLangClick(event: MouseEvent) {
 
-  if (!playgroundImmersive.value) return;
+  if (!appShell.value) return;
 
   const anchor = (event.target as Element | null)?.closest?.('a');
 
@@ -419,7 +523,7 @@ function onPlaygroundLangClick(event: MouseEvent) {
 
   const to = `${anchor.pathname}${anchor.search}${anchor.hash}`;
 
-  if (!tryPlaygroundHybridLocaleSwitch(to, route.path)) return;
+  if (!tryHybridLocaleSwitch(to, route.path)) return;
 
   event.preventDefault();
 
@@ -437,7 +541,7 @@ onMounted(() => {
 
   syncHybridNavFromUrl();
 
-  document.addEventListener('click', onPlaygroundLangClick, true);
+  document.addEventListener('click', onHybridLangClick, true);
 
   window.addEventListener(PLAYGROUND_LOCALE_EVENT, onPlaygroundLocaleEvent);
 
@@ -449,7 +553,7 @@ onMounted(() => {
 
 onUnmounted(() => {
 
-  document.removeEventListener('click', onPlaygroundLangClick, true);
+  document.removeEventListener('click', onHybridLangClick, true);
 
   window.removeEventListener(PLAYGROUND_LOCALE_EVENT, onPlaygroundLocaleEvent);
 

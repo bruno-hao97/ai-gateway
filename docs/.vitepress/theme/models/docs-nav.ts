@@ -19,6 +19,7 @@ export function stripLocale(path: string): { locale: 'en' | 'vi'; path: string }
 
 const GUIDE_PREFIXES = [
   '/quickstart',
+  '/changelog',
   '/authentication',
   '/principles',
   '/mcp',

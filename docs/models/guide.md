@@ -5,7 +5,11 @@ description: How Gommo model catalogs work through AI Gateway
 
 # Models integration guide
 
-AI Gateway does not host its own model weights — it **proxies Gommo’s catalog**. Every media integration follows the same flow:
+::: tip Public API first
+Integrate with [Gommo public API](../reference/gommo-public-api.md) — `GET https://v2.api.gommo.net/ai/models?type=…`. Gateway `/gateway/models` is optional for local dev.
+:::
+
+Gommo hosts the model catalog. Every media integration follows the same flow:
 
 1. **List models** for a [job type](./job-types.md)
 2. **Pick `modelSlug`** and allowed [parameters](./parameters.md) from the response

@@ -1,39 +1,47 @@
 ---
 title: Quickstart
-description: Login, list models, create one image job
+description: Login, list models, create one image job — Gommo public API
 ---
 
 # Quickstart
 
-Login → list models → create **one image job** (with `ratio` from catalog).
+Get from **zero to one image job** on the public Gommo API (`v2.api.gommo.net` + `api.gommo.net`). Full host map: [Gommo public API](./reference/gommo-public-api.md).
+
+## Choose your path
+
+| Path | Start here |
+|------|------------|
+| **HTTP client** | Continue below — curl or PowerShell |
+| **Browser** | [API Playground](/app/playground/) — Request tab shows public URLs |
+| **AI agents** | [MCP](/mcp/) — 10 `gommo_*` tools, token from [/app/token/](/app/token/) |
+| **Self-host gateway** | [Integration modes](./routing/integration-modes.md) — Mode B on `:3001` |
 
 ## Prerequisites
 
 | Item | Value |
 |------|--------|
-| Gateway running | `npm run dev` → `http://localhost:3001` |
-| Gommo account | email + password + **registration domain** |
-| Server env | `GOMMO_API_DOMAIN` in `.env` (default `79ai.net`) |
+| Gommo account | email + password + **registration domain** (e.g. `79ai.net`) |
+| HTTPS client | curl, PowerShell, or [Playground](/app/playground/) |
 
-::: tip No CORS for playground
-Try the same flow in browser: [Playground](/app/playground/) (sign in required).
+::: tip Playground
+Try the same flow in browser: [Playground](/app/playground/) — **Endpoints** tab shows full public URLs per operation.
 :::
 
-## 1. Login
+## 1. Login (`api.gommo.net`)
 
 ::: code-group
 
 ```bash [curl]
-curl.exe -X POST "http://localhost:3001/api/apps/go-mmo/auth/login" ^
+curl.exe -X POST "https://api.gommo.net/api/apps/go-mmo/auth/login" ^
   -H "Content-Type: application/x-www-form-urlencoded" ^
-  -d "email=YOU@example.com&password=YOUR_PASSWORD&domain=%GOMMO_API_DOMAIN%"
+  -d "email=YOU@example.com&password=YOUR_PASSWORD&domain=79ai.net"
 ```
 
 ```powershell [PowerShell]
 $domain = if ($env:GOMMO_API_DOMAIN) { $env:GOMMO_API_DOMAIN } else { '79ai.net' }
 $loginBody = "email=YOU@example.com&password=YOUR_PASSWORD&domain=$domain"
 $login = Invoke-RestMethod -Method POST `
-  -Uri "http://localhost:3001/api/apps/go-mmo/auth/login" `
+  -Uri "https://api.gommo.net/api/apps/go-mmo/auth/login" `
   -ContentType "application/x-www-form-urlencoded" `
   -Body $loginBody
 $env:TOKEN = $login.access_token
@@ -41,19 +49,21 @@ $env:TOKEN = $login.access_token
 
 :::
 
-## 2. List models (never guess ratio)
+## 2. List models (`v2.api.gommo.net`)
+
+Never guess `ratio` — read from catalog only.
 
 ::: code-group
 
-```bash [curl — REST]
-curl.exe "http://localhost:3001/gateway/models?type=image" ^
+```bash [curl]
+curl.exe "https://v2.api.gommo.net/ai/models?type=image" ^
   -H "Authorization: Bearer %TOKEN%"
 ```
 
-```powershell [PowerShell — REST]
+```powershell [PowerShell]
 $h = @{ Authorization = "Bearer $env:TOKEN" }
 $models = Invoke-RestMethod `
-  -Uri "http://localhost:3001/gateway/models?type=image" `
+  -Uri "https://v2.api.gommo.net/ai/models?type=image" `
   -Headers $h
 $m = $models.data[0]
 $slug = $m.model
@@ -65,55 +75,38 @@ Write-Host "model=$slug ratio=$ratio"
 
 :::
 
-Save `$slug` and `$ratio` — **use only values from the response**.
-
 ::: warning Never guess ratio
 See [Models](./models/) and [Principles](./principles.md).
 :::
 
-## 3. Create image job (wait = poll until done)
+## 3. Create image job (form body)
 
 ::: code-group
 
 ```bash [curl]
-curl.exe -X POST "http://localhost:3001/gateway/jobs/image" ^
+curl.exe -X POST "https://v2.api.gommo.net/ai/jobs/image/MODEL_SLUG" ^
   -H "Authorization: Bearer %TOKEN%" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"modelSlug\":\"MODEL_SLUG\",\"wait\":true,\"fields\":{\"prompt\":\"A cute cat, studio photo\",\"ratio\":\"RATIO_FROM_MODELS\"}}"
+  -H "Content-Type: application/x-www-form-urlencoded" ^
+  -d "domain=79ai.net&prompt=A cute cat, studio photo&ratio=RATIO_FROM_MODELS"
 ```
 
 ```powershell [PowerShell]
-$jobBody = @{
-  modelSlug = $slug
-  wait = $true
-  fields = @{
-    prompt = 'A cute cat, studio photo'
-    ratio = $ratio
-  }
-} | ConvertTo-Json -Depth 5
-
+$domain = if ($env:GOMMO_API_DOMAIN) { $env:GOMMO_API_DOMAIN } else { '79ai.net' }
+$body = "domain=$domain&prompt=A cute cat, studio photo&ratio=$ratio"
 $job = Invoke-RestMethod -Method POST `
-  -Uri "http://localhost:3001/gateway/jobs/image" `
-  -Headers (@{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/json' }) `
-  -Body $jobBody
-$job.data.resultUrl
+  -Uri "https://v2.api.gommo.net/ai/jobs/image/$slug" `
+  -Headers @{ Authorization = "Bearer $env:TOKEN" } `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body $body
 ```
 
 :::
 
-## 4. Same flow via proxy (Mode C)
+Poll with `POST https://v2.api.gommo.net/ai/jobs/{id_base}?media=image` every **3.5s**, max **80** attempts.
 
-```powershell
-$domain = if ($env:GOMMO_API_DOMAIN) { $env:GOMMO_API_DOMAIN } else { '79ai.net' }
-$form = "type=image&domain=$domain"
-Invoke-RestMethod -Method POST `
-  -Uri "http://localhost:3001/v2/ai/models?type=image" `
-  -Headers @{ Authorization = "Bearer $env:TOKEN" } `
-  -ContentType "application/x-www-form-urlencoded" `
-  -Body $form
-```
+## Optional: AI Gateway dev (Mode B)
 
-## Health check
+Run `npm run dev` → `http://localhost:3001` for JSON REST (`POST /gateway/jobs/image` with `modelSlug` + `wait: true`). See [Integration modes](./routing/integration-modes.md).
 
 ```powershell
 Invoke-RestMethod http://localhost:3001/health
@@ -123,11 +116,10 @@ Invoke-RestMethod http://localhost:3001/health
 
 - `scripts/test-image-job.ps1`
 - `scripts/test-gateway.ps1`
-- `scripts/test-admin.ps1`
 
 ## Next
 
+- [Gommo public API](./reference/gommo-public-api.md)
 - [Principles](./principles.md)
-- [Models](./models/)
 - [Authentication](./authentication.md)
 - [Media reference](./reference/media.md)

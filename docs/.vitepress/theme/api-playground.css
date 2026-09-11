@@ -70,28 +70,40 @@ body.gw-api-playground-immersive .VPContent {
 }
 
 /* Hybrid locale menu — 2 options only; hide duplicate headers inside flyout */
+body.gw-app-shell .VPNavBarTranslations .VPMenu .title,
 body.gw-api-playground-immersive .VPNavBarTranslations .VPMenu .title,
+body.gw-app-shell .VPNavBarExtra .group.translations .trans-title,
 body.gw-api-playground-immersive .VPNavBarExtra .group.translations .trans-title,
+body.gw-app-shell .VPNavScreenTranslations .trans-title,
 body.gw-api-playground-immersive .VPNavScreenTranslations .trans-title {
   display: none;
 }
 
+body.gw-app-shell .VPNavBarTranslations .VPMenuLink a.link.active,
 body.gw-api-playground-immersive .VPNavBarTranslations .VPMenuLink a.link.active,
+body.gw-app-shell .VPNavBarExtra .group.translations .VPMenuLink a.link.active,
 body.gw-api-playground-immersive .VPNavBarExtra .group.translations .VPMenuLink a.link.active,
+body.gw-app-shell .VPNavScreenTranslations .VPMenuLink a.link.active,
 body.gw-api-playground-immersive .VPNavScreenTranslations .VPMenuLink a.link.active {
   color: var(--vp-c-brand-1);
   font-weight: 600;
 }
 
+body.gw-app-shell .VPNavBarTranslations .VPMenuLink a.link:not(.active),
 body.gw-api-playground-immersive .VPNavBarTranslations .VPMenuLink a.link:not(.active),
+body.gw-app-shell .VPNavBarExtra .group.translations .VPMenuLink a.link:not(.active),
 body.gw-api-playground-immersive .VPNavBarExtra .group.translations .VPMenuLink a.link:not(.active),
+body.gw-app-shell .VPNavScreenTranslations .VPMenuLink a.link:not(.active),
 body.gw-api-playground-immersive .VPNavScreenTranslations .VPMenuLink a.link:not(.active) {
   color: var(--vp-c-text-2);
   font-weight: 500;
 }
 
+body.gw-app-shell .VPNavBarTranslations .VPMenuLink a.link:not(.active):hover,
 body.gw-api-playground-immersive .VPNavBarTranslations .VPMenuLink a.link:not(.active):hover,
+body.gw-app-shell .VPNavBarExtra .group.translations .VPMenuLink a.link:not(.active):hover,
 body.gw-api-playground-immersive .VPNavBarExtra .group.translations .VPMenuLink a.link:not(.active):hover,
+body.gw-app-shell .VPNavScreenTranslations .VPMenuLink a.link:not(.active):hover,
 body.gw-api-playground-immersive .VPNavScreenTranslations .VPMenuLink a.link:not(.active):hover {
   color: var(--vp-c-brand-1);
 }

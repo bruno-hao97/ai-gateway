@@ -39,8 +39,32 @@
     return origin || DEFAULT_API;
   }
 
+  const GOMMO_V2_BASE_URL = 'https://v2.api.gommo.net';
+  const GOMMO_AUTH_BASE_URL = 'https://api.gommo.net';
+
+  function resolveGommoPublicBase(host) {
+    if (host === 'v2') return GOMMO_V2_BASE_URL;
+    if (host === 'auth') return GOMMO_AUTH_BASE_URL;
+    return '';
+  }
+
+  function buildGommoPublicUrl(host, path) {
+    const base = resolveGommoPublicBase(host).replace(/\/$/, '');
+    const p = String(path || '').trim();
+    if (!p) return base;
+    if (/^https?:\/\//i.test(p)) return p;
+    return `${base}${p.startsWith('/') ? p : `/${p}`}`;
+  }
+
   global.PortalGatewayConfig = {
     DEFAULT_API,
     resolveBaseUrl: resolveGatewayBaseUrl,
+  };
+
+  global.PortalGommoApi = {
+    V2_BASE: GOMMO_V2_BASE_URL,
+    AUTH_BASE: GOMMO_AUTH_BASE_URL,
+    resolvePublicBase: resolveGommoPublicBase,
+    buildPublicUrl: buildGommoPublicUrl,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -2,11 +2,56 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import type { Plugin } from 'vite';
+import { docRedirects } from './redirects';
 
 const portalRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../../apps/docs-portal',
 );
+
+function splitPathQuery(raw: string): { pathname: string; qs: string } {
+  const qIdx = raw.indexOf('?');
+  const pathname = (qIdx >= 0 ? raw.slice(0, qIdx) : raw) || '/';
+  const qs = qIdx >= 0 ? raw.slice(qIdx) : '';
+  return { pathname, qs };
+}
+
+function shouldSkipDocRedirect(pathname: string): boolean {
+  return (
+    pathname.startsWith('/@') ||
+    pathname.startsWith('/node_modules') ||
+    pathname.startsWith('/portal/') ||
+    pathname.startsWith('/__vite') ||
+    pathname.startsWith('/gateway') ||
+    pathname.startsWith('/ai') ||
+    pathname.startsWith('/billing') ||
+    pathname.startsWith('/health')
+  );
+}
+
+/** Dev: apply docRedirects + strip `.html` (VitePress clean URLs). */
+function redirectDocPath(req: import('http').IncomingMessage, res: import('http').ServerResponse): boolean {
+  const raw = req.url || '/';
+  const { pathname, qs } = splitPathQuery(raw);
+
+  if (shouldSkipDocRedirect(pathname)) return false;
+
+  const exact = docRedirects[pathname];
+  if (exact) {
+    res.statusCode = 302;
+    res.setHeader('Location', `${exact}${qs}`);
+    res.end();
+    return true;
+  }
+
+  if (!pathname.endsWith('.html')) return false;
+
+  const withoutHtml = pathname.slice(0, -5) || '/';
+  res.statusCode = 302;
+  res.setHeader('Location', `${withoutHtml}${qs}`);
+  res.end();
+  return true;
+}
 
 /** Dev: serve apps/docs-portal at /portal without running gateway :3001 */
 export function portalStaticPlugin(): Plugin {
@@ -20,6 +65,8 @@ export function portalStaticPlugin(): Plugin {
     apply: 'serve',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
+        if (redirectDocPath(req, res)) return;
+
         const raw = req.url || '/';
         const pathname = raw.split('?')[0] ?? '/';
         const normalized = pathname.replace(/\/+$/, '') || '/';

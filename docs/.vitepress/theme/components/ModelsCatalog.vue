@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { useData } from 'vitepress';
+import { useHybridLocale } from '../composables/use-hybrid-locale';
 import FilterCheckList from './FilterCheckList.vue';
 import SidebarIcon from './SidebarIcon.vue';
 import {
@@ -30,9 +30,7 @@ import {
   type ViewMode,
 } from '../models/catalog-api';
 
-const { lang } = useData();
-const isVi = computed(() => lang.value === 'vi-VN');
-const localePrefix = computed((): '' | '/vi' => (isVi.value ? '/vi' : ''));
+const { isVi, prefix: localePrefix } = useHybridLocale();
 
 const LIST_LIMIT = 6;
 

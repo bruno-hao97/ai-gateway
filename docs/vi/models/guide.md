@@ -5,7 +5,11 @@ description: Catalog model Gommo qua AI Gateway
 
 # Hướng dẫn tích hợp Models
 
-AI Gateway không host model weights — **proxy catalog Gommo**. Flow:
+::: tip Public API trước
+Tích hợp qua [Gommo public API](../reference/gommo-public-api.md) — `GET https://v2.api.gommo.net/ai/models?type=…`. Gateway `/gateway/models` chỉ dùng khi dev local.
+:::
+
+Gommo host catalog model. Flow:
 
 1. **List models** theo [job type](./job-types.md)
 2. **Chọn `modelSlug`** và [parameters](./parameters.md) từ response

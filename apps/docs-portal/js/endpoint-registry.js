@@ -610,19 +610,28 @@
       workflowVi: ['POST form với access_token và domain.'],
     },
     {
-      id: 'library-album-videos',
-      name: { en: 'Album videos', vi: 'Album video' },
+      id: 'library-album-images',
+      name: { en: 'Image album', vi: 'Album ảnh' },
       method: 'POST',
-      path: '/ai/library/album-videos',
+      path: '/ai/library/album-images',
       group: 'library',
       async: false,
       contentTypes: ['application/x-www-form-urlencoded'],
       auth: true,
       overview: {
-        en: 'List video albums with optional model filter.',
-        vi: 'Liệt kê album video với bộ lọc model tuỳ chọn.',
+        en: 'List images inside an album (Gommo platform library; same payload as list images).',
+        vi: 'Liệt kê ảnh trong album (library platform Gommo; cùng payload với list images).',
       },
       parameters: [
+        {
+          name: 'project_id',
+          in: 'body',
+          type: 'string',
+          required: false,
+          description: 'Project slug.',
+          descriptionVi: 'Project slug.',
+          example: 'default',
+        },
         {
           name: 'limit',
           in: 'body',
@@ -632,9 +641,81 @@
           descriptionVi: 'Kích thước trang.',
           example: '30',
         },
+        {
+          name: 'order_by',
+          in: 'body',
+          type: 'string',
+          required: false,
+          description: 'Sort field (e.g. index, id).',
+          descriptionVi: 'Trường sắp xếp (vd. index, id).',
+          example: 'index',
+        },
+        {
+          name: 'sort_by',
+          in: 'body',
+          type: 'string',
+          required: false,
+          description: 'asc or desc.',
+          descriptionVi: 'asc hoặc desc.',
+          example: 'desc',
+        },
       ],
-      workflow: ['POST form with access_token and domain.'],
-      workflowVi: ['POST form với access_token và domain.'],
+      workflow: ['POST form with access_token, domain, project_id, limit, order_by, sort_by.'],
+      workflowVi: ['POST form với access_token, domain, project_id, limit, order_by, sort_by.'],
+    },
+    {
+      id: 'library-album-videos',
+      name: { en: 'Video album', vi: 'Album video' },
+      method: 'POST',
+      path: '/ai/library/album-videos',
+      group: 'library',
+      async: false,
+      contentTypes: ['application/x-www-form-urlencoded'],
+      auth: true,
+      overview: {
+        en: 'List videos inside an album (Gommo platform library).',
+        vi: 'Liệt kê video trong album (library platform Gommo).',
+      },
+      parameters: [
+        {
+          name: 'project_id',
+          in: 'body',
+          type: 'string',
+          required: false,
+          description: 'Project slug.',
+          descriptionVi: 'Project slug.',
+          example: 'default',
+        },
+        {
+          name: 'limit',
+          in: 'body',
+          type: 'number',
+          required: false,
+          description: 'Page size.',
+          descriptionVi: 'Kích thước trang.',
+          example: '30',
+        },
+        {
+          name: 'order_by',
+          in: 'body',
+          type: 'string',
+          required: false,
+          description: 'Sort field (e.g. index, id).',
+          descriptionVi: 'Trường sắp xếp (vd. index, id).',
+          example: 'index',
+        },
+        {
+          name: 'sort_by',
+          in: 'body',
+          type: 'string',
+          required: false,
+          description: 'asc or desc.',
+          descriptionVi: 'asc hoặc desc.',
+          example: 'desc',
+        },
+      ],
+      workflow: ['POST form with access_token, domain, project_id, limit, order_by, sort_by.'],
+      workflowVi: ['POST form với access_token, domain, project_id, limit, order_by, sort_by.'],
     },
     {
       id: 'health',
@@ -952,6 +1033,94 @@
     return ENDPOINTS.find((e) => e.id === id) || null;
   }
 
+  /** @returns {'v2' | 'auth' | 'local'} */
+  function inferPublicHost(ep) {
+    if (ep?.publicHost) return ep.publicHost;
+    const id = ep?.id || '';
+    if (id === 'health') return 'local';
+    if (
+      id === 'list-models' ||
+      id === 'poll-job' ||
+      id === 'create-tool-job' ||
+      id.startsWith('create-') ||
+      id.startsWith('upload-') ||
+      id.startsWith('library-')
+    ) {
+      return 'v2';
+    }
+    if (id === 'chat' || id === 'auth-login' || id.startsWith('audio-') || id === 'me-credits') {
+      return 'auth';
+    }
+    if (ep?.path?.startsWith('/gateway/')) return 'auth';
+    if (ep?.path?.startsWith('/ai/')) return 'auth';
+    return 'auth';
+  }
+
+  function applyPublicPathTokens(path, ep, ctx = {}) {
+    const jt = ep?.jobType || ctx.jobType || 'image';
+    const slug = ctx.modelSlug || '{model_id}';
+    const media =
+      ep?.pollMedia ||
+      (jt === 'music' ? 'music' : jt === 'video' || jt.startsWith('video-') ? 'video' : 'image');
+    return String(path || '')
+      .replaceAll('{type}', jt)
+      .replaceAll('{tool-type}', jt)
+      .replaceAll('{modelSlug}', slug)
+      .replaceAll('{model_id}', slug)
+      .replaceAll('{id}', '{id_base}')
+      .replaceAll('{media}', media);
+  }
+
+  function resolvePublicPath(ep, ctx = {}) {
+    if (ep?.publicPath) return applyPublicPathTokens(ep.publicPath, ep, ctx);
+    const id = ep?.id || '';
+    const jt = ep?.jobType || ctx.jobType || 'image';
+    const slug = ctx.modelSlug || '{model_id}';
+
+    if (id === 'list-models') return `/ai/models?type=${encodeURIComponent(jt)}`;
+    if (id === 'poll-job') {
+      const media =
+        ep.pollMedia ||
+        (jt === 'music' ? 'music' : jt === 'video' || jt.startsWith('video-') ? 'video' : 'image');
+      return `/ai/jobs/{id_base}?media=${encodeURIComponent(media)}`;
+    }
+    if (id?.startsWith('create-') || id === 'create-tool-job') {
+      return `/ai/jobs/${jt}/${slug}`;
+    }
+    if (id === 'upload-image') return '/ai/upload/image';
+    if (id === 'upload-video') return '/ai/upload/video';
+    if (id === 'upload-audio') return '/ai/upload/audio';
+    if (id === 'chat') return '/api/v2/chat';
+    if (id === 'audio-tts') return '/ai/audio';
+    if (id === 'audio-lists') {
+      const pid = ctx.projectId?.trim();
+      return pid ? `/ai/audio/lists?projectId=${encodeURIComponent(pid)}` : '/ai/audio/lists';
+    }
+    if (id === 'auth-login') return '/api/apps/go-mmo/auth/login';
+    if (id === 'me-credits') return '/ai/me';
+    if (id === 'health') return '/health';
+    return applyPublicPathTokens(ep?.path || '', ep, ctx);
+  }
+
+  function resolvePublicApi(ep, ctx = {}) {
+    const host = inferPublicHost(ep);
+    const path = resolvePublicPath(ep, ctx);
+    if (host === 'local') {
+      const base = String(ctx.baseUrl || '').replace(/\/$/, '');
+      const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
+      return { host, base, path, url };
+    }
+    const base = global.PortalGommoApi?.resolvePublicBase(host) || '';
+    const url = global.PortalGommoApi?.buildPublicUrl(host, path) || `${base}${path}`;
+    return { host, base, path, url };
+  }
+
+  function publicHostLabel(host, isVi) {
+    if (host === 'v2') return isVi ? 'v2.api.gommo.net' : 'v2.api.gommo.net';
+    if (host === 'auth') return isVi ? 'api.gommo.net' : 'api.gommo.net';
+    return isVi ? 'Gateway (local)' : 'Gateway (local)';
+  }
+
   global.GatewayEndpointRegistry = {
     ENDPOINTS,
     POLL_POLICY,
@@ -965,5 +1134,9 @@
     localizeWorkflow,
     localizeAuthHeader,
     getById,
+    inferPublicHost,
+    resolvePublicPath,
+    resolvePublicApi,
+    publicHostLabel,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

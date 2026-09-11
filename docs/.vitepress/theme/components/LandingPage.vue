@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { useData } from 'vitepress';
+import { useHybridLocale } from '../composables/use-hybrid-locale';
 import { apiBase } from '../models/gateway-base';
 import {
   JOB_TYPES,
@@ -12,11 +12,8 @@ import {
   type CatalogModel,
 } from '../models/catalog-api';
 
-const { lang } = useData();
-const isVi = computed(() => lang.value === 'vi-VN');
+const { isVi, prefix } = useHybridLocale();
 const catalogLang = computed((): CatalogLang | undefined => (isVi.value ? 'vi' : 'en'));
-
-const prefix = computed(() => (isVi.value ? '/vi' : ''));
 
 const quickstartLink = computed(() => `${prefix.value}/quickstart`);
 const loginLink = computed(() => `${prefix.value}/login/`);

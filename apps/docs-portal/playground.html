@@ -16,8 +16,15 @@
         document.addEventListener('DOMContentLoaded', function () {
           var conn = document.getElementById('panel-connection');
           var media = document.getElementById('panel-media-job');
+          var worker = p.get('worker') || '';
+          var devWorker =
+            worker.indexOf('library-') === 0 ||
+            worker.indexOf('info-') === 0 ||
+            worker.indexOf('upload-') === 0 ||
+            worker === 'health' ||
+            worker === 'list-models';
           if (conn) conn.classList.remove('active');
-          if (media) media.classList.add('active');
+          if (media && !devWorker) media.classList.add('active');
         });
         return;
       }
@@ -160,14 +167,6 @@
       </nav>
       <p class="pg-sidebar-label">Media library</p>
       <nav class="pg-nav" data-nav-group="library">
-        <button type="button" class="pg-nav-item" data-panel="library" data-library-kind="images" data-search="library images list">
-          <span class="pg-nav-method post">POST</span>
-          Library images
-        </button>
-        <button type="button" class="pg-nav-item" data-panel="library" data-library-kind="videos" data-search="library videos list">
-          <span class="pg-nav-method post">POST</span>
-          Library videos
-        </button>
         <button type="button" class="pg-nav-item" data-panel="library" data-library-kind="musics" data-search="library music list">
           <span class="pg-nav-method post">POST</span>
           Library music
@@ -175,6 +174,10 @@
         <button type="button" class="pg-nav-item" data-panel="library" data-library-kind="audios" data-search="library audio tts list">
           <span class="pg-nav-method post">POST</span>
           Library audio
+        </button>
+        <button type="button" class="pg-nav-item" data-panel="library" data-library-kind="album-images" data-search="library album image list">
+          <span class="pg-nav-method post">POST</span>
+          Album images
         </button>
         <button type="button" class="pg-nav-item" data-panel="library" data-library-kind="album-videos" data-search="library album video list">
           <span class="pg-nav-method post">POST</span>
@@ -231,53 +234,78 @@
 
     <main class="pg-main gw-scroll">
       <div class="pg-panel" id="panel-connection" data-panel="connection">
-        <header class="pg-panel-head">
+        <header class="pg-panel-head pg-connection-dev-only">
           <p class="pg-panel-kicker">Gateway REST</p>
           <h1>Connection</h1>
           <p class="pg-endpoint"><code>POST /gateway/auth/login</code></p>
         </header>
 
-        <div class="banner-warn" role="alert">
+        <div class="pg-connection-embed-only">
+          <header class="pg-connection-modal__head">
+            <div class="pg-connection-modal__intro">
+              <h2 class="pg-connection-modal__title" id="connectionModalTitle" data-i18n="conn.title">Sign in</h2>
+              <p class="pg-connection-modal__sub" id="connectionModalSub" data-i18n="conn.subtitle">Connect your account to send requests</p>
+            </div>
+            <button type="button" class="pg-connection-modal__close" id="btnConnectionClose" data-i18n-aria="conn.close" aria-label="Close">×</button>
+          </header>
+
+          <div class="pg-connection-connected" id="connectionConnected" hidden>
+            <div class="pg-connection-account">
+              <span class="pg-connection-dot" aria-hidden="true"></span>
+              <div class="pg-connection-account__meta">
+                <p class="pg-connection-account__label" id="connectionAccountLabel">—</p>
+                <p class="pg-connection-account__credits" id="connectionCreditsLabel">—</p>
+              </div>
+            </div>
+            <div class="pg-connection-connected__actions">
+              <button type="button" class="btn btn-secondary pg-connection-btn-block" id="btnConnectionSwitch" data-i18n="conn.switchAccount">Use another account</button>
+              <button type="button" class="btn btn-ghost pg-connection-btn-block" id="btnConnectionSignOut" data-i18n="conn.signOut">Sign out</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="banner-warn pg-connection-dev-only" role="alert">
           <strong>Dev only</strong>
           User token in <code>sessionStorage</code>. Never paste merchant or admin keys.
         </div>
 
-        <div class="gw-job-panel">
-        <p class="pg-token-badge" id="tokenBadge">No token</p>
-        <p class="pg-token-badge pg-credits-badge" id="creditsBadge" hidden></p>
-        <button type="button" class="btn btn-secondary btn-sm pg-fetch-me" id="btnFetchMe">Fetch credits (/ai/me)</button>
+        <div class="gw-job-panel" id="connectionAuth">
+        <p class="pg-token-badge pg-connection-dev-only" id="tokenBadge">No token</p>
+        <p class="pg-token-badge pg-credits-badge pg-connection-dev-only" id="creditsBadge" hidden></p>
+        <button type="button" class="btn btn-secondary btn-sm pg-fetch-me pg-connection-dev-only" id="btnFetchMe">Fetch credits (/ai/me)</button>
 
-        <div class="pg-tabs" role="tablist">
-          <button type="button" class="pg-tab active" data-auth-tab="login">Login</button>
-          <button type="button" class="pg-tab" data-auth-tab="token">Bearer token</button>
+        <div class="pg-tabs pg-connection-segments" role="tablist">
+          <button type="button" class="pg-tab active" data-auth-tab="login" data-i18n="conn.tabLogin">Login</button>
+          <button type="button" class="pg-tab" data-auth-tab="token" data-i18n="conn.tabToken">Paste token</button>
         </div>
 
         <div id="auth-login" class="pg-tab-panel active">
           <div class="field">
-            <label for="loginEmail">Email</label>
+            <label for="loginEmail" data-i18n="conn.email">Email</label>
             <input id="loginEmail" type="email" autocomplete="username" />
           </div>
           <div class="field">
-            <label for="loginPassword">Password</label>
+            <label for="loginPassword" data-i18n="conn.password">Password</label>
             <input id="loginPassword" type="password" autocomplete="current-password" />
           </div>
-          <div class="field">
-            <label for="loginDomain">Registration domain</label>
+          <div class="field pg-connection-domain-field">
+            <label for="loginDomain" data-i18n="conn.domain">Domain</label>
             <input id="loginDomain" type="text" placeholder="79ai.net" value="79ai.net" />
           </div>
-          <button type="button" class="btn btn-primary" id="btnLogin">Login → save token</button>
+          <button type="button" class="btn btn-primary pg-connection-submit" id="btnLogin" data-i18n="conn.signIn">Sign in</button>
         </div>
 
         <div id="auth-token" class="pg-tab-panel">
           <div class="field">
-            <label for="token">Access token</label>
-            <input id="token" type="password" placeholder="Paste Bearer token" autocomplete="off" />
+            <label for="token" data-i18n="conn.accessToken">Access token</label>
+            <input id="token" type="password" placeholder="Paste Bearer token" autocomplete="off" data-i18n-placeholder="conn.tokenPh" />
           </div>
-          <button type="button" class="btn btn-secondary" id="btnSaveToken">Save token</button>
+          <button type="button" class="btn btn-primary pg-connection-submit" id="btnSaveToken" data-i18n="conn.saveToken">Save token</button>
         </div>
         </div>
 
-        <div class="pg-status-slot" id="authStatus" role="status" aria-live="polite"></div>
+        <div class="pg-status-slot pg-connection-status" id="authStatus" role="status" aria-live="polite"></div>
+        <p class="pg-connection-foot pg-connection-embed-only" id="connectionFoot" data-i18n="conn.footnote">Token is stored in this browser only.</p>
       </div>
 
       <div class="pg-panel" id="panel-models" data-panel="models">
@@ -589,41 +617,71 @@
       </div>
 
       <div class="pg-panel" id="panel-library" data-panel="library">
-        <header class="pg-panel-head">
-          <p class="pg-panel-kicker" data-i18n="proxy.library.kicker">Media library</p>
-          <h1 id="libraryTitle">Image library</h1>
-          <p class="pg-endpoint"><code id="libraryEndpoint">POST /ai/library/images</code></p>
-        </header>
+        <div class="pg-library-workspace" id="libraryWorkspace">
+          <div class="pg-library-workspace-scroll gw-scroll">
+            <header class="pg-panel-head" id="libraryPanelHead">
+              <p class="pg-panel-kicker" data-i18n="proxy.library.kicker">Media library</p>
+              <h1 id="libraryTitle">Image library</h1>
+              <p class="pg-endpoint"><code id="libraryEndpoint">POST /ai/library/images</code></p>
+            </header>
 
-        <div class="gw-job-panel">
-          <div class="field">
-            <label for="libLimit" data-i18n="proxy.library.limit">Limit</label>
-            <input id="libLimit" type="number" min="1" max="100" value="30" autocomplete="off" />
+            <div class="gw-job-panel" id="libraryFormPanel">
+              <div id="libListFieldsWrap">
+                <div class="field" id="libLimitWrap">
+                  <label for="libLimit" data-i18n="proxy.library.limit">Limit</label>
+                  <input id="libLimit" type="number" min="1" max="100" value="30" autocomplete="off" />
+                </div>
+                <div class="field" id="libAfterIdWrap">
+                  <label for="libAfterId" data-i18n="proxy.library.afterId">After ID</label>
+                  <input id="libAfterId" type="text" data-i18n-placeholder="proxy.library.afterIdPh" placeholder="pagination (optional)" autocomplete="off" spellcheck="false" />
+                </div>
+                <div class="field" id="libModelWrap">
+                  <label for="libModel" data-i18n="proxy.library.model">Model</label>
+                  <input id="libModel" type="text" data-i18n-placeholder="proxy.library.modelPh" placeholder="filter by model slug (optional)" autocomplete="off" spellcheck="false" />
+                </div>
+                <div class="field" id="libCategoryWrap" hidden>
+                  <label for="libCategory" data-i18n="proxy.library.category">Category</label>
+                  <input id="libCategory" type="text" data-i18n-placeholder="proxy.library.categoryPh" placeholder="highlight, MEDIA_CATEGORY_…" autocomplete="off" spellcheck="false" />
+                </div>
+                <div class="field" id="libSourceWrap" hidden>
+                  <label for="libSource" data-i18n="proxy.library.source">Source</label>
+                  <input id="libSource" type="text" data-i18n-placeholder="proxy.library.sourcePh" placeholder="upload, generator, …" autocomplete="off" spellcheck="false" />
+                </div>
+                <div class="field" id="libProjectWrap" hidden>
+                  <label for="libProjectId" data-i18n="media.project">Project</label>
+                  <input id="libProjectId" type="text" value="default" autocomplete="off" spellcheck="false" />
+                </div>
+              </div>
+              <div id="libAlbumFieldsWrap" hidden>
+                <div class="field">
+                  <label for="libOrderBy" data-i18n="proxy.library.orderBy">Order by</label>
+                  <input id="libOrderBy" type="text" value="index" data-i18n-placeholder="proxy.library.orderByPh" placeholder="index" autocomplete="off" spellcheck="false" />
+                </div>
+                <div class="field">
+                  <label for="libSortBy" data-i18n="proxy.library.sortBy">Sort by</label>
+                  <select id="libSortBy">
+                    <option value="desc" selected>desc</option>
+                    <option value="asc">asc</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <section class="pg-lib-info-card" id="libInfoCard" hidden>
+              <p class="pg-lib-info-kicker" data-i18n="proxy.library.infoKicker">Library (list)</p>
+              <p class="pg-lib-info-endpoint"><code id="libInfoEndpoint">POST /ai/library/musics</code></p>
+              <p class="pg-lib-info-hint" id="libInfoHint" data-i18n="proxy.library.infoHint">Uses domain and project_id from the form. Bearer token in header.</p>
+            </section>
+
+            <p class="hint pg-hint-advanced" id="libHintList" data-i18n="proxy.library.hint">Lists account media — same filters as the mobile app library.</p>
+            <p class="hint pg-hint-advanced" id="libHintAlbum" hidden data-i18n="proxy.library.albumVideosListHint">List video albums — limit, project_id, order_by, sort_by.</p>
           </div>
-          <div class="field">
-            <label for="libAfterId" data-i18n="proxy.library.afterId">After ID</label>
-            <input id="libAfterId" type="text" data-i18n-placeholder="proxy.library.afterIdPh" placeholder="pagination (optional)" autocomplete="off" spellcheck="false" />
-          </div>
-          <div class="field" id="libModelWrap">
-            <label for="libModel" data-i18n="proxy.library.model">Model</label>
-            <input id="libModel" type="text" data-i18n-placeholder="proxy.library.modelPh" placeholder="filter by model slug (optional)" autocomplete="off" spellcheck="false" />
-          </div>
-          <div class="field" id="libCategoryWrap" hidden>
-            <label for="libCategory" data-i18n="proxy.library.category">Category</label>
-            <input id="libCategory" type="text" data-i18n-placeholder="proxy.library.categoryPh" placeholder="highlight, MEDIA_CATEGORY_…" autocomplete="off" spellcheck="false" />
-          </div>
-          <div class="field" id="libSourceWrap" hidden>
-            <label for="libSource" data-i18n="proxy.library.source">Source</label>
-            <input id="libSource" type="text" data-i18n-placeholder="proxy.library.sourcePh" placeholder="upload, generator, …" autocomplete="off" spellcheck="false" />
-          </div>
-          <div class="field" id="libProjectWrap" hidden>
-            <label for="libProjectId" data-i18n="media.project">Project</label>
-            <input id="libProjectId" type="text" value="default" autocomplete="off" spellcheck="false" />
-          </div>
+
+          <footer class="pg-library-workspace-foot">
+            <button type="button" class="btn btn-primary pg-run pg-library-fetch-btn" id="btnLibrary" data-i18n="proxy.send">Send request</button>
+            <div class="pg-status-slot" id="libraryStatus" role="status" aria-live="polite"></div>
+          </footer>
         </div>
-        <button type="button" class="btn btn-primary pg-run" id="btnLibrary" data-i18n="proxy.send">Send request</button>
-        <div class="pg-status-slot" id="libraryStatus" role="status" aria-live="polite"></div>
-        <p class="hint pg-hint-advanced" data-i18n="proxy.library.hint">Lists account media — same filters as the mobile app library.</p>
       </div>
 
       <div class="pg-panel" id="panel-health" data-panel="health">
@@ -819,9 +877,9 @@
             <p class="pg-request-label" data-i18n="request.endpoint">Endpoint</p>
             <div class="pg-request-endpoint-row">
               <span class="pg-method post" id="requestMethod">POST</span>
-              <code class="pg-request-endpoint" id="requestEndpoint">/gateway/jobs/image</code>
+              <code class="pg-request-endpoint" id="requestEndpoint">https://v2.api.gommo.net/ai/jobs/image/{model_id}</code>
             </div>
-            <p class="pg-request-url" id="requestFullUrl"></p>
+            <p class="pg-request-url" id="requestFullUrl" hidden></p>
           </div>
           <div class="pg-request-block">
             <p class="pg-request-label" data-i18n="request.headers">Headers</p>
@@ -836,10 +894,11 @@
           </div>
           <div class="pg-request-block">
             <div class="pg-request-label-row">
-              <p class="pg-request-label" data-i18n="request.body">Body</p>
-              <button type="button" class="pg-request-view-toggle" id="btnRequestBodyView" aria-pressed="false" data-i18n="request.rawJson">Raw JSON</button>
+              <p class="pg-request-label" data-i18n="request.bodyJson">Request body (JSON)</p>
+              <button type="button" class="pg-request-view-toggle" id="btnRequestBodyView" aria-pressed="false" data-i18n="request.bodyJson">JSON</button>
             </div>
-            <div class="pg-kv-table-wrap" id="requestBodyTableWrap">
+            <pre class="pg-request-pre pg-request-pre--raw pg-json-panel" id="requestBodyRaw"></pre>
+            <div class="pg-kv-table-wrap" id="requestBodyTableWrap" hidden>
               <table class="pg-kv-table">
                 <thead>
                   <tr><th>Key</th><th>Value</th></tr>
@@ -847,11 +906,14 @@
                 <tbody id="requestBodyRows"></tbody>
               </table>
             </div>
-            <pre class="pg-request-pre pg-request-pre--raw pg-json-panel" id="requestBodyRaw" hidden></pre>
           </div>
           <div class="pg-request-block">
             <p class="pg-request-label" data-i18n="request.curl">cURL</p>
             <pre class="pg-request-pre pg-request-curl" id="requestCurl"></pre>
+          </div>
+          <div class="pg-request-block">
+            <p class="pg-request-label" data-i18n="request.responseStructure">Response structure</p>
+            <pre class="pg-request-pre pg-request-structure pg-json-panel" id="requestResponseStructure"></pre>
           </div>
           <p class="hint pg-request-hint" data-i18n="request.hint">Updates from the form on the left. Token masked until saved.</p>
         </div>
@@ -860,6 +922,46 @@
           <div class="pg-result-gallery" id="resultGallery" hidden>
             <p class="pg-result-gallery-label" data-i18n="result.recent">Recent results</p>
             <div class="pg-result-gallery-track gw-scroll" id="resultGalleryTrack" role="list"></div>
+          </div>
+          <div class="pg-result-library" id="resultLibraryList" hidden>
+            <div class="pg-result-library-head">
+              <p class="pg-result-library-count" id="resultLibraryCount"></p>
+              <div class="pg-result-library-toggle" role="tablist" aria-label="Library result view">
+                <button type="button" class="pg-result-library-toggle-btn" id="btnLibraryViewResponse" data-library-view="response" role="tab" aria-selected="false" data-i18n="result.response">Response</button>
+                <button type="button" class="pg-result-library-toggle-btn active" id="btnLibraryViewList" data-library-view="list" role="tab" aria-selected="true" data-i18n="result.library.list">List</button>
+                <button type="button" class="pg-result-library-toggle-btn" id="btnLibraryViewPreview" data-library-view="preview" role="tab" aria-selected="false" data-i18n="result.library.preview">Preview</button>
+              </div>
+            </div>
+            <div class="pg-result-library-list" id="resultLibraryListPane">
+              <div class="pg-result-library-table-wrap gw-scroll">
+                <table class="pg-result-library-table">
+                  <thead id="resultLibraryTableHead">
+                    <tr>
+                      <th scope="col">#</th>
+                      <th scope="col" data-i18n="result.library.cover">Cover</th>
+                      <th scope="col">id_base</th>
+                      <th scope="col" data-i18n="result.library.title">Title</th>
+                      <th scope="col" data-i18n="result.library.status">Status</th>
+                      <th scope="col" data-i18n="result.library.model">Model</th>
+                      <th scope="col" data-i18n="result.library.prompt">Prompt</th>
+                      <th scope="col" data-i18n="result.library.created">Created</th>
+                    </tr>
+                  </thead>
+                  <tbody id="resultLibraryTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="pg-result-library-preview" id="resultLibraryPreviewPane" hidden>
+              <div class="pg-result-output-head">
+                <p class="pg-result-output-label" data-i18n="result.output">Output</p>
+                <a id="resultLibraryOpenLink" class="pg-result-output-open" href="#" target="_blank" rel="noopener noreferrer" data-i18n="result.openTab">Open in new tab ↗</a>
+              </div>
+              <div class="pg-preview-media pg-preview-media--result">
+                <img id="resultLibraryPreviewImage" alt="" hidden />
+                <video id="resultLibraryPreviewVideo" controls hidden></video>
+                <audio id="resultLibraryPreviewAudio" controls hidden></audio>
+              </div>
+            </div>
           </div>
           <div class="pg-result-empty" id="resultEmpty">
             <div class="pg-result-empty-icon" id="resultEmptyIcon" hidden aria-hidden="true">⬡</div>
@@ -995,6 +1097,10 @@
             <section class="pg-result-json-col pg-result-json-col--legacy">
               <div class="pg-result-json-head">
                 <span class="pg-result-json-title" data-i18n="result.response">Response</span>
+                <span class="pg-result-json-actions">
+                  <button type="button" class="pg-result-json-btn" data-json-copy="responseOutput" data-i18n="copy">Copy</button>
+                  <button type="button" class="pg-result-json-btn" data-json-full="responseOutput" data-i18n="result.full">Full</button>
+                </span>
               </div>
               <pre class="pg-result-json-pre" id="responseOutput">Run a request to see JSON here.</pre>
             </section>
@@ -1003,7 +1109,7 @@
 
         <div class="pg-response-pane" id="responsePaneEndpoints" data-response-pane="endpoints" role="tabpanel" hidden>
           <section class="pg-endpoints-base" aria-label="API gateway base URL">
-            <h3 class="pg-endpoints-base-title" data-i18n="endpoints.gatewayList">API gateway catalog</h3>
+            <h3 class="pg-endpoints-base-title" data-i18n="endpoints.gatewayList">Gommo API catalog</h3>
             <div class="pg-endpoints-base-row">
               <span class="pg-endpoints-base-label" data-i18n="guide.baseUrl">Base URL</span>
               <code class="pg-endpoints-base-val" id="endpointsBaseUrl">—</code>

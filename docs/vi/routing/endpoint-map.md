@@ -5,7 +5,10 @@ description: Bảng endpoint theo mode — Direct, REST, Proxy
 
 # Endpoint map
 
-So sánh thao tác phổ biến. `{gateway}` = base API (vd. `http://localhost:3001`).
+So sánh thao tác phổ biến.
+
+**Tích hợp public (khuyến nghị):** gọi thẳng Gommo — [Gommo public API](../reference/gommo-public-api.md).  
+**Dev tùy chọn:** `{gateway}` = AI Gateway local (vd. `http://localhost:3001`).
 
 ## Media & jobs
 

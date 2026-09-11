@@ -7,13 +7,17 @@ description: Câu hỏi thường gặp về AI Gateway
 
 Câu hỏi phổ biến về AI Gateway và Gommo upstream.
 
+::: info Trạng thái upstream
+Catalog, job và login gọi **Gommo public API**. Nếu `v2.api.gommo.net` hoặc `api.gommo.net` sập, `/models/` và Playground **Send** sẽ fail — docs và UI vẫn load. Thử lại khi upstream hồi.
+:::
+
 ## Bắt đầu
 
 <details>
 <summary>AI Gateway khác gì gọi Gommo trực tiếp?</summary>
 
-**Direct (Mode A):** backend gọi `v2.api.gommo.net` và `api.gommo.net`.  
-**Gateway:** một base URL — REST `/gateway/*` (Mode B) hoặc path proxy (Mode C). Ẩn URL upstream, tập trung env, poll tùy chọn `wait: true`, billing Gommo VietQR.
+**Gommo public API (khuyến nghị):** gọi thẳng `https://v2.api.gommo.net` và `https://api.gommo.net` — xem [Gommo public API](./reference/gommo-public-api.md).  
+**AI Gateway (dev tùy chọn):** một base local — REST `/gateway/*` (Mode B) hoặc path proxy (Mode C). Poll `wait: true`, billing Gommo VietQR.
 
 </details>
 

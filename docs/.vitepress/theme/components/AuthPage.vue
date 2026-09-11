@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { useData } from 'vitepress';
+import { useHybridLocale } from '../composables/use-hybrid-locale';
 import {
   DEFAULT_DOMAIN,
   getStoredToken,
@@ -16,9 +16,7 @@ const props = defineProps<{
   mode: 'login' | 'signup';
 }>();
 
-const { lang } = useData();
-const isVi = computed(() => lang.value === 'vi-VN');
-const prefix = computed(() => (isVi.value ? '/vi' : ''));
+const { isVi, prefix } = useHybridLocale();
 
 const homeLink = computed(() => `${prefix.value}/`);
 const loginLink = computed(() => `${prefix.value}/login/`);

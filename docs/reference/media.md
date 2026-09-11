@@ -5,9 +5,9 @@ description: List models, create jobs, poll — REST, proxy, and direct
 
 # Media & jobs
 
-Gateway poll interval: **3500ms**, max **80** attempts when `wait: true`.
+**Public API (recommended):** [Gommo public API](./gommo-public-api.md) — `https://v2.api.gommo.net` for jobs/models/upload.
 
-Mode B: **`domain` optional** — gateway uses `GOMMO_API_DOMAIN`. Mode A/C: send `domain` in form (same value as env).
+Poll interval: **3500ms**, max **80** attempts. Send `domain` in form body (e.g. `79ai.net`). Gateway Mode B optional for local dev (`wait: true` in JSON).
 
 ## Endpoint map
 

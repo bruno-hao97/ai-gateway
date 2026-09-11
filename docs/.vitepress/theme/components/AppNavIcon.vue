@@ -68,6 +68,11 @@ defineProps<{ name: string }>();
     <template v-else-if="name === 'message'">
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </template>
+    <!-- folder -->
+    <template v-else-if="name === 'folder'">
+      <path d="M3 7h5l2 2h11v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7z" />
+      <path d="M3 7V5a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v2" />
+    </template>
     <!-- chevron -->
     <template v-else-if="name === 'chevron'">
       <path d="m6 9 6 6 6-6" />

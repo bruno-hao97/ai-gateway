@@ -1,41 +1,49 @@
 ---
 title: OpenAPI
-description: Spec OpenAPI tại /openapi.yaml — xem trên Swagger Editor
+description: Spec Gommo public API + AI Gateway dev (machine-readable)
 ---
 
 # OpenAPI
 
-AI Gateway phát hành spec OpenAPI 3 tại **`/openapi.yaml`** (cùng host với API, ví dụ `http://localhost:3001/openapi.yaml`).
+Tải hoặc xem **OpenAPI 3.0** cho **Gommo public API** (host v2 + platform) và **AI Gateway** dev tùy chọn (billing, admin, Mode B REST).
 
-## Xem trên Swagger Editor
+## File spec
 
-Mở [Swagger Editor](https://editor.swagger.io/?url=) và dán URL spec đã host:
+| Dev | Production |
+|-----|------------|
+| [http://localhost:5173/openapi.yaml](http://localhost:5173/openapi.yaml) | `https://docs.yourdomain.com/openapi.yaml` |
 
-```
-https://your-api-host/openapi.yaml
-```
+## Server mặc định (Swagger)
 
-Ví dụ local: `http://localhost:3001/openapi.yaml`
+| Server | Mô tả |
+|--------|--------|
+| `https://v2.api.gommo.net` | Jobs, models, upload, album library |
+| `https://api.gommo.net` | Auth, chat, audio, info, library list |
+| `http://localhost:3001` | AI Gateway dev — `/gateway/*`, billing, admin |
 
-Swagger Editor tải spec và hiển thị schema, thử request trực tiếp (cần CORS nếu gọi từ browser).
+Mỗi operation có `servers` khi chỉ áp dụng một host. Xem [Gommo public API](./gommo-public-api.md).
 
-## Nhóm path chính
+## Nhóm path
 
-| Prefix | Mục đích |
+| Tag | Host | Ví dụ |
+|-----|------|-------|
+| **Gommo V2** | v2.api.gommo.net | `/ai/models`, `/ai/jobs/{type}/{model}`, `/ai/library/album-images` |
+| **Gommo Platform** | api.gommo.net | `/ai/me`, `/api/v2/chat`, `/ai/info/image/{id}` |
+| **Gateway Dev** | localhost:3001 | `/gateway/jobs/{type}`, `/gateway/models` |
+| **Billing** | localhost:3001 | `/billing/payment/*` |
+| **Admin** | localhost:3001 | `/admin/*` |
+
+## Auth trong spec
+
+| Scheme | Dùng cho |
 |--------|----------|
-| `/health` | Health check — không auth |
-| `/gateway/auth/*` | Đăng nhập, đăng ký — không cần Bearer |
-| `/gateway/*` | REST wrap: models, jobs, upload, chat, audio — auth `Authorization: Bearer` user |
-| `/billing/*` | Gommo VietQR (mặc định), PayOS legacy, packages, lịch sử đơn |
-| `/admin/*` | Merchant balance, send credits, register user — auth `x-admin-key` (chỉ server) |
+| `bearerAuth` | Path Gommo public, `/gateway/*`, billing |
+| `adminKey` (`x-admin-key`) | `/admin/*` |
 
-Chi tiết từng endpoint:
+## Tài liệu đọc thêm
 
-- [Media & jobs](./media.md)
-- [Upload](./upload.md)
-- [Chat](./chat.md)
-- [Audio](./audio.md)
-- [Billing (Gommo + PayOS legacy)](./billing.md)
-- [Admin (chỉ server)](./admin.md)
+→ [Gommo public API](./gommo-public-api.md) · [Media & jobs](./media.md) · [Authentication](../authentication.md)
 
-Auth user: xem [Authentication](../authentication.md).
+## Tiếp theo
+
+→ [Endpoint map](../routing/endpoint-map.md) · [Integration modes](../routing/integration-modes.md)

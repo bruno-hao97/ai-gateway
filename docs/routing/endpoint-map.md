@@ -5,7 +5,10 @@ description: Cross-mode endpoint reference — Direct, REST, and Proxy
 
 # Endpoint map
 
-Side-by-side mapping for common operations. Replace `{gateway}` with your API base (e.g. `http://localhost:3001`).
+Side-by-side mapping for common operations.
+
+**Public integration (recommended):** call Gommo directly — see [Gommo public API](../reference/gommo-public-api.md).  
+**Optional dev:** replace `{gateway}` with your AI Gateway base (e.g. `http://localhost:3001`).
 
 ## Media & jobs
 
