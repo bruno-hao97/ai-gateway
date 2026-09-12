@@ -12,6 +12,7 @@
     "start": "node dist/index.js",
     "client:build": "npm run build --workspace=@ai-gateway/client",
     "client:test": "npm run test --workspace=@ai-gateway/client",
+    "theme:test": "node --import tsx --test docs/.vitepress/theme/models/playground-locale-bridge.test.ts",
     "client:publish": "npm publish --workspace=@ai-gateway/client --access public",
     "portal:sync": "node scripts/sync-portal-to-docs.mjs",
     "docs:dev": "vitepress dev docs --port 5173",

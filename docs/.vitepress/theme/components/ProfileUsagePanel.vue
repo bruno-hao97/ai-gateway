@@ -25,6 +25,7 @@ import {
 } from '../models/usage-stats';
 import type { UsageRange } from '../models/usage-history';
 import ActivityUsageCharts from './ActivityUsageCharts.vue';
+import UsageJobDetailModal from './UsageJobDetailModal.vue';
 
 const props = defineProps<{
   credits: number;
@@ -36,10 +37,13 @@ const props = defineProps<{
   activityTab?: 'trends';
   /** Sync period from Activity hub (?period=) */
   initialPeriod?: UsageStatsPeriod;
+  /** Pre-filter Explore by model (?model=) */
+  initialModelFilter?: string;
 }>();
 
 const emit = defineEmits<{
   periodChange: [period: UsageStatsPeriod];
+  modelFilterChange: [model: string];
 }>();
 
 const logsOnly = computed(() => props.mode === 'logs');
@@ -58,7 +62,10 @@ const listHasMore = ref(false);
 const range = ref<UsageRange>('30d');
 const typeFilter = ref<UsageStatsType | 'all'>('all');
 const searchQuery = ref('');
+const modelFilter = ref('');
 const chartDays = ref(14);
+const selectedJob = ref<UsageListItem | null>(null);
+const jobDetailOpen = ref(false);
 
 const typeOptions = computed(() => [
   { id: 'all' as const, label: props.isVi ? 'Tất cả' : 'All' },
@@ -133,12 +140,19 @@ const tableRows = computed(() =>
   }),
 );
 
-const filteredListItems = computed(() =>
-  filterListItems(listItems.value, {
+const filteredListItems = computed(() => {
+  let items = listItems.value;
+  const model = modelFilter.value.trim();
+  if (model) {
+    items = items.filter((item) => (item.model || '').trim() === model);
+  }
+  return filterListItems(items, {
     type: typeFilter.value,
     query: searchQuery.value,
-  }),
-);
+  });
+});
+
+const hasActiveModelFilter = computed(() => modelFilter.value.trim().length > 0);
 
 const exploreLogCount = computed(() => filteredListItems.value.length);
 
@@ -216,6 +230,7 @@ async function reloadRecords() {
   }
   if (!trendsOnly.value) {
     await loadList(true);
+    await loadAllPagesForModelFilter();
   }
   loading.value = false;
 }
@@ -224,6 +239,16 @@ async function loadMoreList() {
   if (listLoading.value || !listHasMore.value) return;
   listPage.value += 1;
   await loadList(false);
+}
+
+async function loadAllPagesForModelFilter() {
+  const model = modelFilter.value.trim();
+  if (!logsOnly.value || !model) return;
+  let guard = 0;
+  while (listHasMore.value && guard < 30) {
+    await loadMoreList();
+    guard += 1;
+  }
 }
 
 defineExpose({ reloadRecords });
@@ -270,10 +295,38 @@ function applyInitialPeriod(period?: UsageStatsPeriod) {
   }
 }
 
+function applyInitialModelFilter(model?: string) {
+  modelFilter.value = (model || '').trim();
+}
+
+function clearModelFilter() {
+  if (!modelFilter.value) return;
+  modelFilter.value = '';
+  emit('modelFilterChange', '');
+}
+
+function openJobDetail(row: UsageListItem) {
+  selectedJob.value = row;
+  jobDetailOpen.value = true;
+}
+
+function closeJobDetail() {
+  jobDetailOpen.value = false;
+  selectedJob.value = null;
+}
+
 watch(
   () => props.initialPeriod,
   (period) => {
     applyInitialPeriod(period);
+  },
+  { immediate: true },
+);
+
+watch(
+  () => props.initialModelFilter,
+  (model) => {
+    applyInitialModelFilter(model);
   },
   { immediate: true },
 );
@@ -425,6 +478,14 @@ onMounted(() => {
       </div>
     </div>
 
+    <div v-if="logsOnly && hasActiveModelFilter" class="or-usage-explore-filter-chip">
+      <span class="or-usage-explore-filter-label">{{ isVi ? 'Model' : 'Model' }}</span>
+      <code class="or-usage-model">{{ modelFilter }}</code>
+      <button type="button" class="or-usage-explore-filter-clear" @click="clearModelFilter">
+        {{ isVi ? 'Xóa lọc' : 'Clear filter' }}
+      </button>
+    </div>
+
     <div class="or-usage-toolbar" :class="{ 'or-usage-toolbar--sticky': logsOnly }">
       <div class="or-usage-filters">
         <div class="or-usage-filter-group" role="group" :aria-label="isVi ? 'Khoảng thời gian' : 'Time range'">
@@ -550,7 +611,7 @@ onMounted(() => {
           <h3 class="or-app-panel-title">{{ isVi ? 'Job logs' : 'Job logs' }}</h3>
           <p v-if="logsOnly && exploreLogSummary" class="or-usage-explore-meta or-app-muted">
             {{ exploreLogSummary }}
-            <span v-if="searchQuery.trim()"> · {{ isVi ? 'đã lọc' : 'filtered' }}</span>
+            <span v-if="hasActiveModelFilter || searchQuery.trim()"> · {{ isVi ? 'đã lọc' : 'filtered' }}</span>
           </p>
         </div>
         <a
@@ -565,10 +626,10 @@ onMounted(() => {
       <div v-if="listLoading && filteredListItems.length === 0" class="or-activity-skeleton or-activity-skeleton--table" aria-hidden="true" />
       <p v-else-if="!listLoading && filteredListItems.length === 0" class="or-app-muted or-usage-empty">
         {{
-          searchQuery.trim()
+          hasActiveModelFilter || searchQuery.trim()
             ? isVi
-              ? 'Không có job khớp tìm kiếm.'
-              : 'No jobs match your search.'
+              ? 'Không có job khớp bộ lọc.'
+              : 'No jobs match the current filters.'
             : isVi
               ? 'Chưa có bản ghi trong khoảng đã chọn.'
               : 'No records in the selected range.'
@@ -591,7 +652,11 @@ onMounted(() => {
               <tr
                 v-for="row in filteredListItems"
                 :key="row.id_base || `${row.created_at}-${row.model}`"
-                class="or-usage-explore-row"
+                class="or-usage-explore-row or-usage-explore-row--clickable"
+                tabindex="0"
+                role="button"
+                @click="openJobDetail(row)"
+                @keydown.enter="openJobDetail(row)"
               >
                 <td class="or-usage-td-time">
                   {{ formatUsageTime(listItemCreatedAt(row) || '', isVi) }}
@@ -668,5 +733,12 @@ onMounted(() => {
         </table>
       </div>
     </div>
+
+    <UsageJobDetailModal
+      :open="jobDetailOpen"
+      :item="selectedJob"
+      :is-vi="isVi"
+      @close="closeJobDetail"
+    />
   </div>
 </template>

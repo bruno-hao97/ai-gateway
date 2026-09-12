@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vitepress';
+import { computed, onMounted, ref } from 'vue';
+import { useVitepressUrlSync } from '../composables/use-vitepress-url-sync';
 import { fetchUsageLogs, fetchUsageModelAggregate, fetchUsageStats, formatCredits } from '../models/user-api';
 import { formatUsageTime } from '../models/usage-history';
 import {
@@ -41,8 +41,6 @@ const emit = defineEmits<{
   refresh: [];
 }>();
 
-const route = useRoute();
-
 const trendsRef = ref<InstanceType<typeof ProfileUsagePanel> | null>(null);
 const exploreRef = ref<InstanceType<typeof ProfileUsagePanel> | null>(null);
 
@@ -55,7 +53,13 @@ function readPeriodFromLocation(): UsageStatsPeriod {
   return '30d';
 }
 
+function readModelFromLocation(): string {
+  if (typeof window === 'undefined') return '';
+  return new URLSearchParams(window.location.search).get('model')?.trim() || '';
+}
+
 const sharedPeriod = ref<UsageStatsPeriod>(readPeriodFromLocation());
+const sharedModel = ref(readModelFromLocation());
 const overviewLoading = ref(true);
 const overviewError = ref('');
 const statsData = ref<UsageStatsData | null>(null);
@@ -143,19 +147,37 @@ const topModelsHint = computed(() => {
     : `From ${scanned} jobs`;
 });
 
-function syncPeriodToUrl() {
+function syncQueryToUrl() {
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
+  if (activeTab.value === 'overview') url.searchParams.delete('tab');
+  else url.searchParams.set('tab', activeTab.value);
   if (sharedPeriod.value === '30d') url.searchParams.delete('period');
   else url.searchParams.set('period', sharedPeriod.value);
+  if (activeTab.value === 'explore' && sharedModel.value) {
+    url.searchParams.set('model', sharedModel.value);
+  } else {
+    url.searchParams.delete('model');
+  }
   window.history.replaceState({}, '', url.toString());
+}
+
+function syncPeriodToUrl() {
+  syncQueryToUrl();
 }
 
 function setSharedPeriod(period: UsageStatsPeriod) {
   if (sharedPeriod.value === period) return;
   sharedPeriod.value = period;
-  syncPeriodToUrl();
+  syncQueryToUrl();
   if (activeTab.value === 'overview') void loadOverview();
+}
+
+function setSharedModel(model: string) {
+  const next = model.trim();
+  if (sharedModel.value === next) return;
+  sharedModel.value = next;
+  syncQueryToUrl();
 }
 
 const showEmptyOverview = computed(
@@ -166,13 +188,19 @@ const showEmptyOverview = computed(
     recentJobs.value.length === 0,
 );
 
-function tabHref(tab: ActivityTab): string {
+function tabHref(tab: ActivityTab, model?: string): string {
   const params = new URLSearchParams();
   if (tab !== 'overview') params.set('tab', tab);
   if (sharedPeriod.value !== '30d') params.set('period', sharedPeriod.value);
+  const modelParam = model?.trim() || (tab === 'explore' ? sharedModel.value : '');
+  if (modelParam) params.set('model', modelParam);
   const query = params.toString();
   const base = `${props.prefix}/app/activity/`;
   return query ? `${base}?${query}` : base;
+}
+
+function exploreModelHref(model: string): string {
+  return tabHref('explore', model);
 }
 
 function statusLabel(status: ReturnType<typeof listItemStatus>): string {
@@ -263,19 +291,25 @@ async function reloadAll() {
   emit('refresh');
 }
 
+function syncFromLocation() {
+  const nextTab = readActivityTab();
+  const nextPeriod = readPeriodFromLocation();
+  const nextModel = nextTab === 'explore' ? readModelFromLocation() : '';
+  const tabChanged = nextTab !== activeTab.value;
+  const periodChanged = nextPeriod !== sharedPeriod.value;
+  const modelChanged = nextModel !== sharedModel.value;
+  if (!tabChanged && !periodChanged && !modelChanged) return;
+  activeTab.value = nextTab;
+  sharedPeriod.value = nextPeriod;
+  sharedModel.value = nextModel;
+  void reloadActiveTab();
+}
+
 onMounted(() => {
   void reloadActiveTab();
 });
 
-watch(
-  () => route.fullPath,
-  () => {
-    activeTab.value = readActivityTab();
-    const nextPeriod = readPeriodFromLocation();
-    if (nextPeriod !== sharedPeriod.value) sharedPeriod.value = nextPeriod;
-    void reloadActiveTab();
-  },
-);
+useVitepressUrlSync(syncFromLocation);
 
 defineExpose({ reload: reloadAll });
 </script>
@@ -515,7 +549,12 @@ defineExpose({ reload: reloadAll });
             {{ isVi ? 'Chưa có model.' : 'No models yet.' }}
           </p>
           <div v-else class="or-usage-type-bars">
-            <div v-for="row in topModels" :key="row.model" class="or-usage-type-row or-activity-top-model-row">
+            <a
+              v-for="row in topModels"
+              :key="row.model"
+              :href="exploreModelHref(row.model)"
+              class="or-usage-type-row or-activity-top-model-row or-activity-top-model-link"
+            >
               <code class="or-usage-model or-activity-top-model-name">{{ row.model }}</code>
               <div class="or-usage-type-track" role="presentation">
                 <div class="or-usage-type-fill or-activity-top-model-fill" :style="{ width: `${row.percent}%` }" />
@@ -524,7 +563,7 @@ defineExpose({ reload: reloadAll });
                 {{ row.count }}
                 <template v-if="row.credit > 0"> · {{ formatCredits(row.credit) }}</template>
               </span>
-            </div>
+            </a>
           </div>
         </div>
 
@@ -555,7 +594,17 @@ defineExpose({ reload: reloadAll });
                   <td class="or-usage-td-time">
                     {{ formatUsageTime(listItemCreatedAt(row) || '', isVi) }}
                   </td>
-                  <td><code class="or-usage-model">{{ row.model || '—' }}</code></td>
+                  <td>
+                    <a
+                      v-if="row.model"
+                      :href="exploreModelHref(row.model)"
+                      class="or-usage-model or-activity-recent-model-link"
+                      @click.stop
+                    >
+                      {{ row.model }}
+                    </a>
+                    <code v-else class="or-usage-model">—</code>
+                  </td>
                   <td class="or-usage-td-prompt">
                     <span :title="row.prompt">{{ promptPreview(row.prompt) }}</span>
                   </td>
@@ -590,10 +639,12 @@ defineExpose({ reload: reloadAll });
         ref="exploreRef"
         mode="logs"
         :initial-period="sharedPeriod"
+        :initial-model-filter="sharedModel"
         :credits="credits"
         :is-vi="isVi"
         :prefix="prefix"
         @period-change="setSharedPeriod"
+        @model-filter-change="setSharedModel"
       />
     </div>
 

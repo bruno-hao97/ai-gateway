@@ -143,9 +143,9 @@ export function tryHybridLocaleSwitch(to: string, fromPath?: string): boolean {
   if (!targetLocale) return false;
 
   const currentLocale = playgroundLocaleFromPath(window.location.pathname);
-  if (targetLocale !== currentLocale) {
-    applyPlaygroundHybridLocale(targetLocale);
-  }
+  if (targetLocale === currentLocale) return false;
+
+  applyPlaygroundHybridLocale(targetLocale);
   return true;
 }
 

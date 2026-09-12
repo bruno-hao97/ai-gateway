@@ -5,7 +5,7 @@ description: Thống kê và log job từ Gommo usage-history
 
 # Lịch sử usage
 
-Dashboard docs **Profile → Usage** đọc `POST /api/v2/usage-history` qua gateway — cùng nguồn với lịch sử 79ai.
+Portal **[Activity hub](/vi/app/activity/)** (và preview usage trên Profile) đọc `POST /api/v2/usage-history` qua gateway — cùng nguồn với lịch sử 79ai.
 
 ## Endpoints
 
@@ -64,11 +64,13 @@ Response: `scanned_jobs`, `truncated`, `items[]` (`model`, `count`, `credit`, `p
 
 ## Map UI
 
-| Card | Nguồn |
-|------|--------|
+| UI | Nguồn |
+|----|--------|
+| KPI Overview (Activity) | `action=stats` → `summary` |
+| Top models (Overview) | `POST /gateway/usage/aggregate` |
+| Biểu đồ / bảng ngày (Trends) | `action=stats` → `chart`, `table[]` |
+| Danh sách job (Explore) | `action=logs` |
 | Credit thực | `summary.credit_net` |
 | Credits khả dụng | `/ai/me` → `balancesInfo.credits_ai` |
-| Lịch sử job | `action=logs` |
-| Tổng hợp ngày | `action=stats` → `table[]` |
 
-Xem thêm [OpenAPI](./openapi.md) và [Authentication](../authentication.md).
+Xem [Activity hub](../guides/activity-hub.md), [OpenAPI](./openapi.md) và [Authentication](../authentication.md).

@@ -5,7 +5,7 @@ description: Aggregated stats and per-job logs from Gommo usage-history
 
 # Usage history
 
-The docs dashboard **Profile → Usage** reads Gommo `POST /api/v2/usage-history` via gateway wrappers. Same data as 79ai usage history.
+The docs portal **[Activity hub](/app/activity/)** (and Profile usage preview) reads Gommo `POST /api/v2/usage-history` via gateway wrappers. Same data as 79ai usage history.
 
 ## Endpoints
 
@@ -74,11 +74,13 @@ Response `data`: `scanned_jobs`, `pages_scanned`, `truncated`, `items[]` (`model
 
 ## Dashboard mapping
 
-| UI card | Source |
-|---------|--------|
+| UI | Source |
+|----|--------|
+| Activity Overview KPIs | `action=stats` → `summary` |
+| Top models (Overview) | `POST /gateway/usage/aggregate` |
+| Trends charts / daily table | `action=stats` → `chart`, `table[]` |
+| Explore job list | `action=logs` items |
 | Net credits | `summary.credit_net` |
 | Available credits | `POST /ai/me` → `balancesInfo.credits_ai` |
-| Job history table | `action=logs` items |
-| Daily summary | `action=stats` → `table[]` |
 
-See also [OpenAPI](./openapi.md) and [Authentication](../authentication.md).
+See [Activity hub](../guides/activity-hub.md), [OpenAPI](./openapi.md), and [Authentication](../authentication.md).

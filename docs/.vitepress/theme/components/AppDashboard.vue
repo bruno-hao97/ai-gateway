@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vitepress';
+import { useVitepressUrlSync } from '../composables/use-vitepress-url-sync';
 import type { PlaygroundPortalLocale } from '../models/playground-locale-bridge';
 import { useHybridLocale } from '../composables/use-hybrid-locale';
 import { getStoredToken, getStoredDomain, importSessionFromUrl, loginUrlWithRedirect } from '../models/auth-api';
@@ -500,23 +501,22 @@ onMounted(async () => {
   ready.value = true;
 });
 
-watch(
-  () => route.fullPath,
-  () => {
-    if (props.view === 'profile') {
-      profileSection.value = readProfileSectionFromLocation();
-      if (redirectLegacyProfileSection(profileSection.value)) return;
-      if (profileSection.value === 'general') {
-        void loadTopupOrders();
-      }
-      void reloadUsagePanels();
-      scrollProfileHash();
+function syncDashboardFromLocation() {
+  if (props.view === 'profile') {
+    profileSection.value = readProfileSectionFromLocation();
+    if (redirectLegacyProfileSection(profileSection.value)) return;
+    if (profileSection.value === 'general') {
+      void loadTopupOrders();
     }
-    if (props.view === 'activity') {
-      void refreshActivityView();
-    }
-  },
-);
+    void reloadUsagePanels();
+    scrollProfileHash();
+  }
+  if (props.view === 'activity') {
+    void refreshActivityView();
+  }
+}
+
+useVitepressUrlSync(syncDashboardFromLocation);
 </script>
 
 <template>

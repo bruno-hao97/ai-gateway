@@ -58,6 +58,7 @@ const overviewSidebarEn = [
   { text: 'Principles', link: '/principles' },
   { text: 'MCP & agents', link: '/mcp' },
   { text: 'Billing & credits', link: '/guides/billing-credits' },
+  { text: 'Activity hub', link: '/guides/activity-hub' },
   { text: 'FAQ', link: '/faq' },
   { text: 'Report feedback', link: '/report-feedback' },
 ];
@@ -70,6 +71,7 @@ const overviewSidebarVi = [
   { text: 'Nguyên tắc', link: '/vi/principles' },
   { text: 'MCP & agents', link: '/vi/mcp' },
   { text: 'Billing & credits', link: '/vi/guides/billing-credits' },
+  { text: 'Activity hub', link: '/vi/guides/activity-hub' },
   { text: 'FAQ', link: '/vi/faq' },
   { text: 'Góp ý', link: '/vi/report-feedback' },
 ];
