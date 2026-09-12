@@ -87,7 +87,7 @@ Khi gateway set `BYOK_PLATFORM_FEE_PERCENT` và/hoặc `BYOK_PLATFORM_FEE_PER_RE
 
 - Request chat BYOK thành công **tích lũy** phí vào `data/byok-fee-ledger.json`
 - Trước BYOK, gateway kiểm **phí tích lũy + ước tính** với **credit Gommo session** trên domain request
-- Không đủ → **`402 INSUFFICIENT_CREDITS`** — nạp tại [Credits](/vi/app/billing/)
+- Không đủ → **`402 INSUFFICIENT_CREDITS`** — nạp tại [Credits](/vi/app/credits/)
 
 Trang BYOK hiển thị **Phí platform %**, **Phí tích lũy**, **Credit platform** (số dư session). Phí tích lũy là **ledger trên host** — chưa settlement đầy đủ như billing production.
 

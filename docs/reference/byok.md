@@ -87,7 +87,7 @@ When `BYOK_PLATFORM_FEE_PERCENT` and/or `BYOK_PLATFORM_FEE_PER_REQUEST` is set o
 
 - Successful BYOK chat requests **accrue** fee credits in `data/byok-fee-ledger.json`
 - Before BYOK, gateway checks **outstanding accrued fees + estimated fee** against your **session** Gommo credits on the request domain
-- If insufficient → **`402 INSUFFICIENT_CREDITS`** — top up on [Credits](/app/billing/) (same as other gateway credit checks)
+- If insufficient → **`402 INSUFFICIENT_CREDITS`** — top up on [Credits](/app/credits/) (same as other gateway credit checks)
 
 The BYOK page shows **Platform fee %**, **Accrued fees**, and **Platform credits** (session balance). Accrued fees are **ledger tracking** on the gateway host until settlement logic is expanded.
 
