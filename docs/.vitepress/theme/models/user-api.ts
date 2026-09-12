@@ -5,6 +5,7 @@ import type { UsageRecord } from './usage-history';
 import type {
   UsageListData,
   UsageLogsData,
+  UsageModelAggregateData,
   UsageStatsData,
   UsageStatsPeriod,
   UsageStatsType,
@@ -391,7 +392,7 @@ function usageFormBase(opts: {
   return form;
 }
 
-async function postUsage<T>(path: 'stats' | 'logs', form: URLSearchParams): Promise<T> {
+async function postUsage<T>(path: 'stats' | 'logs' | 'aggregate', form: URLSearchParams): Promise<T> {
   const res = await fetch(`${apiBase()}/gateway/usage/${path}`, {
     method: 'POST',
     headers: {
@@ -434,6 +435,22 @@ export async function fetchUsageLogs(opts?: {
     limit: opts?.limit ?? 30,
   });
   return postUsage<UsageLogsData>('logs', form);
+}
+
+export async function fetchUsageModelAggregate(opts?: {
+  period?: UsageStatsPeriod;
+  type?: UsageStatsType;
+  language?: string;
+  top?: number;
+}): Promise<UsageModelAggregateData> {
+  const form = usageFormBase({
+    period: opts?.period,
+    type: opts?.type,
+    language: opts?.language || 'VI',
+  });
+  form.set('groupBy', 'model');
+  if (opts?.top != null) form.set('top', String(opts.top));
+  return postUsage<UsageModelAggregateData>('aggregate', form);
 }
 
 /** @deprecated Use fetchUsageLogs */

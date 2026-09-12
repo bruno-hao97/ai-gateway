@@ -155,6 +155,16 @@ export interface TopModelRow {
   percent: number;
 }
 
+export interface UsageModelAggregateData {
+  period: UsageStatsPeriod;
+  type: UsageStatsType;
+  group_by: 'model';
+  scanned_jobs: number;
+  pages_scanned: number;
+  truncated: boolean;
+  items: TopModelRow[];
+}
+
 export function chartDaysForPeriod(period: UsageStatsPeriod): number {
   if (period === '7d') return 7;
   if (period === '30d') return 14;

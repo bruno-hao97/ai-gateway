@@ -15,6 +15,8 @@ The docs dashboard **Profile → Usage** reads Gommo `POST /api/v2/usage-history
 | GET | `/gateway/usage/stats` | Bearer (query params) |
 | POST | `/gateway/usage/logs` | Bearer |
 | GET | `/gateway/usage/logs` | Bearer (query params) |
+| POST | `/gateway/usage/aggregate` | Bearer |
+| GET | `/gateway/usage/aggregate` | Bearer (query params) |
 
 Upstream: `action=stats` or `action=logs` on `https://api.gommo.net/api/v2/usage-history`.
 
@@ -50,6 +52,25 @@ curl.exe -X POST "http://localhost:3001/gateway/usage/logs" ^
 |-------|--------|
 | `language` | `VI` for logs (uppercase) |
 | `page` / `limit` | Pagination; `has_more` in response |
+
+## POST aggregate (top models)
+
+Server paginates `action=logs` and groups by `model` (up to 50 pages × 100 rows).
+
+```bash
+curl.exe -X POST "http://localhost:3001/gateway/usage/aggregate" ^
+  -H "Authorization: Bearer USER_TOKEN" ^
+  -H "Content-Type: application/x-www-form-urlencoded" ^
+  -d "domain=79ai.net&period=30d&type=all&groupBy=model&top=5&device_id=..."
+```
+
+| Field | Notes |
+|-------|--------|
+| `groupBy` | `model` (required) |
+| `top` | 1–20, default `5` |
+| `maxPages` | 1–100, default `50` (scan cap) |
+
+Response `data`: `scanned_jobs`, `pages_scanned`, `truncated`, `items[]` (`model`, `count`, `credit`, `percent`).
 
 ## Dashboard mapping
 

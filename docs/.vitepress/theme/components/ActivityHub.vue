@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vitepress';
-import { fetchUsageLogs, fetchUsageStats, formatCredits } from '../models/user-api';
+import { fetchUsageLogs, fetchUsageModelAggregate, fetchUsageStats, formatCredits } from '../models/user-api';
 import { formatUsageTime } from '../models/usage-history';
 import {
   chartDaysForPeriod,
@@ -12,7 +12,6 @@ import {
   listItemStatus,
   sparklineSvgPath,
   sparklineValuesFromChart,
-  topModelsFromLogs,
   typeBreakdownFromSummary,
   type TopModelRow,
   type UsageListItem,
@@ -62,6 +61,8 @@ const overviewError = ref('');
 const statsData = ref<UsageStatsData | null>(null);
 const recentJobs = ref<UsageListItem[]>([]);
 const topModels = ref<TopModelRow[]>([]);
+const topModelsScanned = ref(0);
+const topModelsTruncated = ref(false);
 const chartDays = ref(14);
 
 function readActivityTab(): ActivityTab {
@@ -129,6 +130,19 @@ const periodLabel = computed(() => {
   return opt?.label ?? sharedPeriod.value;
 });
 
+const topModelsHint = computed(() => {
+  if (topModelsScanned.value <= 0) return '';
+  const scanned = topModelsScanned.value.toLocaleString();
+  if (props.isVi) {
+    return topModelsTruncated.value
+      ? `Từ ${scanned}+ job (giới hạn scan)`
+      : `Từ ${scanned} job`;
+  }
+  return topModelsTruncated.value
+    ? `From ${scanned}+ jobs (scan cap)`
+    : `From ${scanned} jobs`;
+});
+
 function syncPeriodToUrl() {
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
@@ -191,29 +205,38 @@ async function loadOverview() {
   chartDays.value = chartDaysForPeriod(sharedPeriod.value);
 
   try {
-    statsData.value = await fetchUsageStats({
-      period: sharedPeriod.value,
-      type: 'all',
-      language: props.isVi ? 'vi' : 'en',
-    });
+    const [stats, aggregate, logs] = await Promise.all([
+      fetchUsageStats({
+        period: sharedPeriod.value,
+        type: 'all',
+        language: props.isVi ? 'vi' : 'en',
+      }),
+      fetchUsageModelAggregate({
+        period: sharedPeriod.value,
+        type: 'all',
+        language: 'VI',
+        top: 5,
+      }),
+      fetchUsageLogs({
+        period: sharedPeriod.value,
+        type: 'all',
+        language: 'VI',
+        page: 1,
+        limit: 5,
+      }),
+    ]);
+    statsData.value = stats;
+    topModels.value = aggregate.items;
+    topModelsScanned.value = aggregate.scanned_jobs;
+    topModelsTruncated.value = aggregate.truncated;
+    recentJobs.value = logs.items.slice(0, 5);
   } catch (e) {
     statsData.value = null;
-    overviewError.value = e instanceof Error ? e.message : String(e);
-  }
-
-  try {
-    const logs = await fetchUsageLogs({
-      period: sharedPeriod.value,
-      type: 'all',
-      language: 'VI',
-      page: 1,
-      limit: 100,
-    });
-    topModels.value = topModelsFromLogs(logs.items, 5);
-    recentJobs.value = logs.items.slice(0, 5);
-  } catch {
     topModels.value = [];
+    topModelsScanned.value = 0;
+    topModelsTruncated.value = false;
     recentJobs.value = [];
+    overviewError.value = e instanceof Error ? e.message : String(e);
   }
 
   overviewLoading.value = false;
@@ -483,8 +506,8 @@ defineExpose({ reload: reloadAll });
         <div class="or-app-panel or-activity-overview-widget">
           <div class="or-activity-hub-widget-head">
             <h3 class="or-app-panel-title">{{ isVi ? 'Top models' : 'Top models' }}</h3>
-            <span class="or-app-muted or-activity-overview-hint">
-              {{ isVi ? 'Từ 100 job gần nhất' : 'From last 100 jobs' }}
+            <span v-if="topModelsHint" class="or-app-muted or-activity-overview-hint">
+              {{ topModelsHint }}
             </span>
           </div>
           <div v-if="overviewLoading" class="or-activity-skeleton or-activity-skeleton--bars" aria-hidden="true" />

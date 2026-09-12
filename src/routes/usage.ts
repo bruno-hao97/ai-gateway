@@ -1,5 +1,9 @@
 import { Router } from 'express';
 import {
+  fetchTopModelAggregate,
+  normalizeAggregateGroupBy,
+} from '../services/usageAggregateApi.js';
+import {
   UsageStatsApi,
   normalizeUsagePeriod,
   normalizeUsageType,
@@ -77,6 +81,35 @@ async function handleLogs(req: import('express').Request, res: import('express')
   res.json({ success: true, data });
 }
 
+function readAggregateParams(req: import('express').Request) {
+  const { period, type, language, projectId, device } = readUsageParams(req, true);
+  const groupBy = normalizeAggregateGroupBy(readField(req, 'groupBy') || readField(req, 'group_by'));
+  const top = Math.min(Math.max(Number(readField(req, 'top')) || 5, 1), 20);
+  const maxPages = Math.min(Math.max(Number(readField(req, 'maxPages')) || 50, 1), 100);
+  return { period, type, language, projectId, device, groupBy, top, maxPages };
+}
+
+async function handleAggregate(req: import('express').Request, res: import('express').Response) {
+  const { period, type, language, projectId, device, groupBy, top, maxPages } = readAggregateParams(req);
+  if (groupBy !== 'model') {
+    res.status(400).json({
+      success: false,
+      message: 'groupBy must be "model"',
+    });
+    return;
+  }
+
+  const data = await fetchTopModelAggregate(statsClient(req, projectId), {
+    period,
+    type,
+    language,
+    device,
+    top,
+    maxPages,
+  });
+  res.json({ success: true, data });
+}
+
 /** POST /gateway/usage/stats — preferred (device in form body, like 79ai) */
 router.post('/usage/stats', async (req, res) => {
   try {
@@ -108,6 +141,24 @@ router.post('/usage/logs', async (req, res) => {
 router.get('/usage/logs', async (req, res) => {
   try {
     await handleLogs(req, res);
+  } catch (err) {
+    sendGommoError(res, err);
+  }
+});
+
+/** POST /gateway/usage/aggregate — server-side top models (paginated logs) */
+router.post('/usage/aggregate', async (req, res) => {
+  try {
+    await handleAggregate(req, res);
+  } catch (err) {
+    sendGommoError(res, err);
+  }
+});
+
+/** GET /gateway/usage/aggregate */
+router.get('/usage/aggregate', async (req, res) => {
+  try {
+    await handleAggregate(req, res);
   } catch (err) {
     sendGommoError(res, err);
   }
