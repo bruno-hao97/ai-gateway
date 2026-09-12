@@ -3,10 +3,14 @@ import {
   clientFromReq,
   gatewayAuth,
   gatewayAuthOptional,
+  getGatewayAuth,
   readDomain,
   readOptionalBearerToken,
   sendGommoError,
 } from '../middleware/gatewayAuth.js';
+import { dispatchObservabilityEvent } from '../services/observabilityWebhook.js';
+import { extractPollSnapshot } from '../services/mediaGenerationStatus.js';
+import { byokMediaAuthMiddleware } from '../middleware/byokMediaAuth.js';
 import { fetchModelsCatalog } from '../services/gommoClient.js';
 import { enrichModelsCatalogLanguage } from '../services/catalogLang.js';
 import { loginGommoUser, GommoAuthError } from '../services/gommoAuth.js';
@@ -120,6 +124,7 @@ router.get('/models', gatewayAuthOptional, async (req, res) => {
 });
 
 router.use(gatewayAuth);
+router.use(byokMediaAuthMiddleware);
 
 /** POST /gateway/jobs/:type — body: { modelSlug, fields, wait?: boolean, domain?: string } */
 router.post('/jobs/:type', async (req, res) => {
@@ -143,15 +148,49 @@ router.post('/jobs/:type', async (req, res) => {
     const client = clientFromReq(req);
     const jobFields = (fields ?? {}) as Record<string, unknown>;
 
+    const auth = getGatewayAuth(req);
+    const domain = readDomain(req);
+
     if (!wait) {
       const envelope = await client.createJob(type, modelSlug, jobFields);
+      const snap = extractPollSnapshot(envelope);
+      if (snap.resultUrl) {
+        void dispatchObservabilityEvent({
+          accessToken: auth.accessToken,
+          domain,
+          type: 'job.completed',
+          data: {
+            jobType: type,
+            modelSlug,
+            jobId: snap.idBase,
+            resultUrl: snap.resultUrl,
+            coverUrl: snap.coverUrl,
+            status: 'success',
+          },
+        });
+      }
       res.json(envelope);
       return;
     }
 
     const result = await createJobAndPoll(client, type, modelSlug, jobFields);
+    const succeeded = result.pollResult?.success !== false || Boolean(result.resultUrl);
+    void dispatchObservabilityEvent({
+      accessToken: auth.accessToken,
+      domain,
+      type: succeeded ? 'job.completed' : 'job.failed',
+      data: {
+        jobType: type,
+        modelSlug,
+        jobId: result.providerJobId,
+        resultUrl: result.resultUrl,
+        coverUrl: result.coverUrl,
+        status: succeeded ? 'success' : 'failed',
+        error: result.pollResult?.error,
+      },
+    });
     res.json({
-      success: result.pollResult?.success !== false || Boolean(result.resultUrl),
+      success: succeeded,
       data: result,
       message: result.pollResult?.error,
     });

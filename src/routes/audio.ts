@@ -2,10 +2,10 @@ import { Router } from 'express';
 import { AudioApi, type VoiceProvider } from '../services/audioApi.js';
 import {
   gatewayAuth,
-  getGatewayAuth,
   readDomain,
   sendGommoError,
 } from '../middleware/gatewayAuth.js';
+import { byokMediaAuthMiddleware, getMediaGatewayAuth } from '../middleware/byokMediaAuth.js';
 import { sendError } from '../utils/errors.js';
 
 const VOICE_SERVERS = new Set<VoiceProvider>([
@@ -15,7 +15,7 @@ const VOICE_SERVERS = new Set<VoiceProvider>([
 ]);
 
 function audioClient(req: import('express').Request, projectId?: string): AudioApi {
-  const auth = getGatewayAuth(req);
+  const auth = getMediaGatewayAuth(req);
   const bodyProjectId =
     req.body && typeof req.body.projectId === 'string' ? req.body.projectId : undefined;
   const queryProjectId =
@@ -29,6 +29,7 @@ function audioClient(req: import('express').Request, projectId?: string): AudioA
 
 const router = Router();
 router.use(gatewayAuth);
+router.use(byokMediaAuthMiddleware);
 
 /** POST /gateway/audio/voices */
 router.post('/audio/voices', async (req, res) => {

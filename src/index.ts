@@ -9,7 +9,17 @@ import adminRoutes from './routes/admin.js';
 import billingRoutes from './routes/billing.js';
 import portalRoutes from './routes/portal.js';
 import openaiRoutes from './routes/openai.js';
-import { config, isAdminConfigured, isGommoMerchantConfigured, isPayOsConfigured, isPortalEnabled } from './config.js';
+import byokRoutes from './routes/byok.js';
+import observabilityRoutes from './routes/observability.js';
+import {
+  config,
+  isAdminConfigured,
+  isByokEnabled,
+  isByokBeta,
+  isGommoMerchantConfigured,
+  isPayOsConfigured,
+  isPortalEnabled,
+} from './config.js';
 import { gatewayCors } from './middleware/cors.js';
 import { adminRateLimit, billingRateLimit, gatewayRateLimit } from './middleware/rateLimit.js';
 import { sendError } from './utils/errors.js';
@@ -43,6 +53,8 @@ app.get('/health', (_req, res) => {
       merchantConfigured: isGommoMerchantConfigured(),
       adminConfigured: isAdminConfigured(),
       payosConfigured: isPayOsConfigured(),
+      byokEnabled: isByokEnabled(),
+      byokBeta: isByokBeta(),
     },
   });
 });
@@ -53,6 +65,8 @@ gatewayMount.use(uploadRoutes);
 gatewayMount.use(chatRoutes);
 gatewayMount.use(audioRoutes);
 gatewayMount.use(usageRoutes);
+gatewayMount.use('/byok', byokRoutes);
+gatewayMount.use('/observability', observabilityRoutes);
 app.use('/gateway', gatewayRateLimit, gatewayMount);
 
 app.use('/admin', adminRateLimit, adminRoutes);

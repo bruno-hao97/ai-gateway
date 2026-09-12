@@ -148,6 +148,138 @@ export function chartPointsFromStats(
   return out;
 }
 
+export interface TopModelRow {
+  model: string;
+  count: number;
+  credit: number;
+  percent: number;
+}
+
+export function chartDaysForPeriod(period: UsageStatsPeriod): number {
+  if (period === '7d') return 7;
+  if (period === '30d') return 14;
+  return 30;
+}
+
+export function sparklineValuesFromChart(
+  chart: UsageStatsChart | undefined,
+  days: number,
+  metric: 'jobs' | 'credits' | 'success',
+): number[] {
+  if (!chart?.labels?.length) return [];
+
+  const len = chart.labels.length;
+  const start = Math.max(0, len - days);
+  const out: number[] = [];
+
+  for (let i = start; i < len; i++) {
+    if (metric === 'credits') {
+      out.push(chart.credit[i] || 0);
+      continue;
+    }
+    if (metric === 'success') {
+      out.push(chart.success[i] || 0);
+      continue;
+    }
+    out.push(
+      (chart.image[i] || 0) +
+        (chart.video[i] || 0) +
+        (chart.audio[i] || 0) +
+        (chart.music[i] || 0),
+    );
+  }
+
+  return out;
+}
+
+export function sparklineSvgPath(values: number[], width = 72, height = 28): string {
+  if (values.length === 0) return '';
+  const max = Math.max(1, ...values);
+  const step = values.length > 1 ? width / (values.length - 1) : 0;
+  const pts = values.map((v, i) => {
+    const x = Math.round(i * step * 10) / 10;
+    const y = Math.round((height - (v / max) * (height - 4) - 2) * 10) / 10;
+    return `${x},${y}`;
+  });
+  return `M ${pts.join(' L ')}`;
+}
+
+export interface OutcomeChartPoint {
+  label: string;
+  success: number;
+  error: number;
+  total: number;
+}
+
+export function outcomeSeriesFromChart(
+  chart: UsageStatsChart | undefined,
+  days: number,
+): OutcomeChartPoint[] {
+  if (!chart?.labels?.length) return [];
+
+  const len = chart.labels.length;
+  const start = Math.max(0, len - days);
+  const out: OutcomeChartPoint[] = [];
+
+  for (let i = start; i < len; i++) {
+    const success = chart.success[i] || 0;
+    const error = chart.error[i] || 0;
+    out.push({
+      label: chart.labels[i] || '',
+      success,
+      error,
+      total: success + error,
+    });
+  }
+
+  return out;
+}
+
+export function areaSvgPaths(
+  values: number[],
+  width = 280,
+  height = 72,
+): { line: string; area: string } {
+  if (values.length === 0) return { line: '', area: '' };
+
+  const max = Math.max(1, ...values);
+  const step = values.length > 1 ? width / (values.length - 1) : 0;
+  const pts = values.map((v, i) => ({
+    x: Math.round(i * step * 10) / 10,
+    y: Math.round((height - (v / max) * (height - 10) - 5) * 10) / 10,
+  }));
+
+  const line = `M ${pts.map((p) => `${p.x},${p.y}`).join(' L ')}`;
+  const area = `${line} L ${width},${height} L 0,${height} Z`;
+  return { line, area };
+}
+
+export function rangeToStatsPeriod(range: '7d' | '30d' | '90d' | 'all'): UsageStatsPeriod {
+  if (range === '7d' || range === '30d' || range === '90d') return range;
+  return '90d';
+}
+
+export function topModelsFromLogs(items: UsageListItem[], limit = 5): TopModelRow[] {
+  const map = new Map<string, { count: number; credit: number }>();
+  for (const item of items) {
+    const model = (item.model || '').trim() || '—';
+    const row = map.get(model) || { count: 0, credit: 0 };
+    row.count += 1;
+    row.credit += listItemCredit(item);
+    map.set(model, row);
+  }
+  const total = [...map.values()].reduce((sum, row) => sum + row.count, 0) || 1;
+  return [...map.entries()]
+    .map(([model, row]) => ({
+      model,
+      count: row.count,
+      credit: row.credit,
+      percent: Math.round((row.count / total) * 100),
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+}
+
 export function chartSeriesFromStats(
   chart: UsageStatsChart | undefined,
   days: number,

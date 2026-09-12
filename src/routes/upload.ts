@@ -5,6 +5,7 @@ import {
   gatewayAuth,
   sendGommoError,
 } from '../middleware/gatewayAuth.js';
+import { byokMediaAuthMiddleware } from '../middleware/byokMediaAuth.js';
 import { sendError } from '../utils/errors.js';
 
 const upload = multer({
@@ -14,6 +15,7 @@ const upload = multer({
 
 const router = Router();
 router.use(gatewayAuth);
+router.use(byokMediaAuthMiddleware);
 
 /** POST /gateway/upload/image — multipart field `file`, optional fileName */
 router.post('/upload/image', upload.single('file'), async (req, res) => {

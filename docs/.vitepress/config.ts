@@ -142,6 +142,8 @@ const referenceSidebarEn = [
   { text: 'Audio', link: '/reference/audio' },
   { text: 'Billing', link: '/reference/billing' },
   { text: 'Usage history', link: '/reference/usage' },
+  { text: 'Observability (beta)', link: '/reference/observability' },
+  { text: 'BYOK (beta)', link: '/reference/byok' },
   { text: 'Admin (server-only)', link: '/reference/admin' },
 ];
 
@@ -155,6 +157,8 @@ const referenceSidebarVi = [
   { text: 'Audio', link: '/vi/reference/audio' },
   { text: 'Billing', link: '/vi/reference/billing' },
   { text: 'Lịch sử usage', link: '/vi/reference/usage' },
+  { text: 'Observability (beta)', link: '/vi/reference/observability' },
+  { text: 'BYOK (beta)', link: '/vi/reference/byok' },
   { text: 'Admin (server-only)', link: '/vi/reference/admin' },
 ];
 

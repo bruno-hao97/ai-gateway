@@ -63,7 +63,42 @@ export const config = {
     /** Live translate cache misses on GET /gateway/models?lang=en (default off — warm cache offline) */
     translateOnRequest: process.env.CATALOG_TRANSLATE_ON_REQUEST === 'true',
   },
+  byok: {
+    enabled: process.env.BYOK_ENABLED !== 'false',
+    storeFile: process.env.BYOK_STORE_FILE || path.join(process.cwd(), 'data', 'byok-store.json'),
+    usageFile: process.env.BYOK_USAGE_FILE || path.join(process.cwd(), 'data', 'byok-usage.jsonl'),
+    encryptionKey: (process.env.BYOK_ENCRYPTION_KEY || '').trim(),
+    modelMapFile:
+      process.env.BYOK_MODEL_MAP_FILE || path.join(process.cwd(), 'config', 'byok-model-map.json'),
+    platformFeePercent: Number(process.env.BYOK_PLATFORM_FEE_PERCENT) || 0,
+    platformFeeMinCredits: Number(process.env.BYOK_PLATFORM_FEE_MIN_CREDITS) || 0,
+    platformFeePerRequest: Number(process.env.BYOK_PLATFORM_FEE_PER_REQUEST) || 0,
+    feeLedgerFile:
+      process.env.BYOK_FEE_LEDGER_FILE || path.join(process.cwd(), 'data', 'byok-fee-ledger.json'),
+    defaultSharedFallback: process.env.BYOK_DEFAULT_SHARED_FALLBACK !== 'false',
+    providers: (process.env.BYOK_PROVIDERS || 'openai,anthropic')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+    /** Show beta labels in portal/API until BYOK is production-ready */
+    beta: process.env.BYOK_BETA !== 'false',
+  },
+  observability: {
+    storeFile:
+      process.env.OBSERVABILITY_STORE_FILE ||
+      path.join(process.cwd(), 'data', 'observability-webhooks.json'),
+    maxWebhooksPerOwner: Number(process.env.OBSERVABILITY_MAX_WEBHOOKS) || 5,
+    deliveryTimeoutMs: Number(process.env.OBSERVABILITY_DELIVERY_TIMEOUT_MS) || 10_000,
+  },
 };
+
+export function isByokEnabled(): boolean {
+  return config.byok.enabled;
+}
+
+export function isByokBeta(): boolean {
+  return config.byok.enabled && config.byok.beta;
+}
 
 export function isGommoMerchantConfigured(): boolean {
   return Boolean(config.gommo.accessToken && config.gommo.apiDomain);

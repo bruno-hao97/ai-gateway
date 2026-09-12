@@ -20,6 +20,7 @@ import {
   type SaveMessageRequest,
 } from '../services/gommoChat.js';
 import { chatModelsCatalogResponse } from '../services/chatModels.js';
+import { recordPlatformChatUsage, tryByokGatewayChat } from '../services/byokGatewayChat.js';
 import { sendError } from '../utils/errors.js';
 
 const CHAT_ACTIONS = new Set<ChatAction>(['chat', 'stream', 'set_model']);
@@ -164,8 +165,39 @@ router.post('/chat', async (req, res) => {
     }
 
     const chatReq = buildChatRequest(req, action);
+
+    const byokOutcome = await tryByokGatewayChat({ chatReq, res, action });
+    if (byokOutcome === 'handled') return;
+
+    const platformStarted = Date.now();
     const form = buildChatForm(chatReq);
     const upstream = await forwardChat(form, AbortSignal.timeout(120_000));
+
+    if (!upstream.ok) {
+      await recordPlatformChatUsage({
+        accessToken: chatReq.accessToken,
+        domain: chatReq.domain,
+        model: chatReq.model,
+        started: platformStarted,
+        ok: false,
+        errorCode: String(upstream.status),
+      });
+      const text = await upstream.text();
+      sendError(res, upstream.status, text || `Upstream chat HTTP ${upstream.status}`, 'UPSTREAM_ERROR');
+      return;
+    }
+
+    const contentType = upstream.headers.get('content-type') ?? '';
+    if (action !== 'stream' && !contentType.includes('text/event-stream')) {
+      await recordPlatformChatUsage({
+        accessToken: chatReq.accessToken,
+        domain: chatReq.domain,
+        model: chatReq.model,
+        started: platformStarted,
+        ok: true,
+      });
+    }
+
     await pipeUpstreamResponse(res, upstream, action);
   } catch (err) {
     sendGommoError(res, err);

@@ -27,13 +27,15 @@ import AppNavIcon from './AppNavIcon.vue';
 import AppChatPanel from './AppChatPanel.vue';
 import ApiPlaygroundEmbed from './ApiPlaygroundEmbed.vue';
 import CreditsCheckoutModal from './CreditsCheckoutModal.vue';
-import ProfileUsagePanel from './ProfileUsagePanel.vue';
-import ProfileActivityPanel from './ProfileActivityPanel.vue';
+import ProfileLandingPanel from './ProfileLandingPanel.vue';
+import ActivityHub from './ActivityHub.vue';
 import OverviewUsageSection from './OverviewUsageSection.vue';
 import OverviewRecentTopups from './OverviewRecentTopups.vue';
 import OverviewOnboardingCard from './OverviewOnboardingCard.vue';
 import AccessTokenPanel from './AccessTokenPanel.vue';
+import ByokPanel from './ByokPanel.vue';
 import FilesPanel from './FilesPanel.vue';
+import ObservabilityPanel from './ObservabilityPanel.vue';
 import { formatApproxUsd, formatPayTotalLine } from '../models/invoice-buyer';
 
 const TOKEN_COPIED_STORAGE_KEY = 'gateway_token_copied';
@@ -60,7 +62,17 @@ type OverviewUsageStats = {
 };
 
 const props = defineProps<{
-  view: 'overview' | 'profile' | 'playground' | 'chat' | 'token' | 'credits' | 'files';
+  view:
+    | 'overview'
+    | 'profile'
+    | 'playground'
+    | 'chat'
+    | 'token'
+    | 'credits'
+    | 'files'
+    | 'byok'
+    | 'observability'
+    | 'activity';
 }>();
 
 const route = useRoute();
@@ -103,11 +115,13 @@ const checkoutOpen = ref(false);
 const checkoutPackage = ref<CreditPackage | null>(null);
 const checkoutToast = ref('');
 let checkoutToastTimer: ReturnType<typeof setTimeout> | null = null;
-const usagePanelRef = ref<InstanceType<typeof ProfileUsagePanel> | null>(null);
-const logsPanelRef = ref<InstanceType<typeof ProfileUsagePanel> | null>(null);
+const profileLandingRef = ref<InstanceType<typeof ProfileLandingPanel> | null>(null);
+const activityHubRef = ref<InstanceType<typeof ActivityHub> | null>(null);
 const overviewUsageRef = ref<InstanceType<typeof OverviewUsageSection> | null>(null);
 const accessTokenRef = ref<InstanceType<typeof AccessTokenPanel> | null>(null);
+const byokPanelRef = ref<InstanceType<typeof ByokPanel> | null>(null);
 const filesPanelRef = ref<InstanceType<typeof FilesPanel> | null>(null);
+const observabilityPanelRef = ref<InstanceType<typeof ObservabilityPanel> | null>(null);
 const tokenCopiedEver = ref(false);
 
 const playgroundLocale = computed((): PlaygroundPortalLocale => uiLocale.value);
@@ -168,6 +182,20 @@ const navDeveloper = computed((): AppNavItem[] => [
     icon: 'folder',
     badge: 'beta',
   },
+  {
+    id: 'observability',
+    label: 'Observability',
+    href: `${prefix.value}/app/observability/`,
+    icon: 'observability',
+    badge: 'beta',
+  },
+  {
+    id: 'byok',
+    label: 'BYOK',
+    href: `${prefix.value}/app/byok/`,
+    icon: 'key',
+    badge: 'beta',
+  },
   { label: isVi.value ? 'Models' : 'Models', href: `${prefix.value}/models/`, icon: 'grid' },
   { label: isVi.value ? 'So sánh' : 'Compare', href: `${prefix.value}/models/compare/`, icon: 'compare' },
   {
@@ -183,13 +211,13 @@ const navAccount = computed((): AppNavItem[] => [
   {
     id: 'activity',
     label: 'Activity',
-    href: `${prefix.value}/app/profile/?section=activity`,
+    href: `${prefix.value}/app/activity/`,
     icon: 'activity',
   },
   {
     id: 'logs',
     label: isVi.value ? 'Nhật ký' : 'Logs',
-    href: `${prefix.value}/app/profile/?section=logs`,
+    href: `${prefix.value}/app/activity/?tab=explore`,
     icon: 'logs',
   },
 ]);
@@ -203,20 +231,8 @@ function readProfileSectionFromLocation(): ProfileSection {
 
 const profileSection = ref<ProfileSection>(readProfileSectionFromLocation());
 
-const profileTabs = computed(() => [
-  { id: 'general' as const, label: isVi.value ? 'Chung' : 'General' },
-  { id: 'usage' as const, label: 'Usage' },
-  { id: 'logs' as const, label: isVi.value ? 'Nhật ký' : 'Logs' },
-  { id: 'api' as const, label: isVi.value ? 'API access' : 'API access' },
-  { id: 'activity' as const, label: 'Activity' },
-]);
-
 function profileSectionHref(section: ProfileSection): string {
   return `${prefix.value}/app/profile/?section=${section}`;
-}
-
-function isProfileSectionActive(section: ProfileSection): boolean {
-  return profileSection.value === section;
 }
 
 const curlSnippet = computed(() => {
@@ -247,23 +263,59 @@ function isPublicAppView(): boolean {
   return props.view === 'playground' || props.view === 'chat';
 }
 
-function isAccountNavActive(item: AppNavItem): boolean {
-  if (!item.id) return false;
-  if (item.id === 'credits') return props.view === 'credits';
-  if (props.view !== 'profile') return false;
-  const section = profileSection.value;
-  if (item.id === 'activity') return section === 'activity';
-  if (item.id === 'logs') return section === 'logs';
-  if (item.id === 'profile') return section === 'general' || section === 'api' || section === 'usage';
+function readProfileHash(): string {
+  if (typeof window === 'undefined') return '';
+  return window.location.hash;
+}
+
+function readActivityTab(): string {
+  if (typeof window === 'undefined') return 'overview';
+  return new URLSearchParams(window.location.search).get('tab') || 'overview';
+}
+
+function redirectLegacyProfileSection(section: ProfileSection): boolean {
+  if (typeof window === 'undefined') return false;
+  if (section === 'usage') {
+    window.location.replace(`${prefix.value}/app/activity/?tab=trends`);
+    return true;
+  }
+  if (section === 'logs') {
+    window.location.replace(`${prefix.value}/app/activity/?tab=explore`);
+    return true;
+  }
+  if (section === 'activity') {
+    window.location.replace(`${prefix.value}/app/activity/`);
+    return true;
+  }
   return false;
 }
 
-async function reloadUsagePanels() {
-  if (profileSection.value === 'usage') {
-    await usagePanelRef.value?.reloadRecords();
+function isAccountNavActive(item: AppNavItem): boolean {
+  if (!item.id) return false;
+  if (item.id === 'credits') return props.view === 'credits';
+  if (item.id === 'activity') {
+    return props.view === 'activity' && readActivityTab() !== 'explore';
   }
-  if (profileSection.value === 'logs') {
-    await logsPanelRef.value?.reloadRecords();
+  if (item.id === 'logs') {
+    return props.view === 'activity' && readActivityTab() === 'explore';
+  }
+  if (props.view !== 'profile') return false;
+  if (item.id === 'profile') return profileSection.value === 'general';
+  return false;
+}
+
+function scrollProfileHash() {
+  if (profileSection.value !== 'general' || typeof window === 'undefined') return;
+  const hash = window.location.hash;
+  if (!hash) return;
+  requestAnimationFrame(() => {
+    document.querySelector(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
+async function reloadUsagePanels() {
+  if (profileSection.value === 'general') {
+    await profileLandingRef.value?.reload();
   }
 }
 
@@ -302,6 +354,22 @@ async function refreshTokenView() {
 async function refreshFilesView() {
   await refreshProfile();
   await filesPanelRef.value?.reload();
+}
+
+async function refreshByokView() {
+  await refreshProfile();
+  await byokPanelRef.value?.reload();
+}
+
+async function refreshObservabilityView() {
+  await refreshProfile();
+  await observabilityPanelRef.value?.reload();
+}
+
+async function refreshActivityView() {
+  await refreshProfile();
+  await loadTopupOrders();
+  await activityHubRef.value?.reload();
 }
 
 async function loadTopupOrders() {
@@ -397,9 +465,11 @@ async function copySnippet() {
 
 async function loadProfileView() {
   profileSection.value = readProfileSectionFromLocation();
+  if (redirectLegacyProfileSection(profileSection.value)) return;
   await refreshProfile();
   await loadTopupOrders();
   await reloadUsagePanels();
+  scrollProfileHash();
 }
 
 onMounted(async () => {
@@ -421,6 +491,9 @@ onMounted(async () => {
   if (props.view === 'profile') {
     await loadProfileView();
   }
+  if (props.view === 'activity') {
+    await refreshActivityView();
+  }
   if (props.view === 'overview') {
     await loadTopupOrders();
   }
@@ -432,10 +505,15 @@ watch(
   () => {
     if (props.view === 'profile') {
       profileSection.value = readProfileSectionFromLocation();
-      if (profileSection.value === 'activity') {
+      if (redirectLegacyProfileSection(profileSection.value)) return;
+      if (profileSection.value === 'general') {
         void loadTopupOrders();
       }
       void reloadUsagePanels();
+      scrollProfileHash();
+    }
+    if (props.view === 'activity') {
+      void refreshActivityView();
     }
   },
 );
@@ -515,6 +593,13 @@ watch(
               Files <span class="or-app-title-badge">beta</span>
             </template>
             <template v-else-if="view === 'credits'">{{ isVi ? 'Credits' : 'Credits' }}</template>
+            <template v-else-if="view === 'byok'">
+              BYOK <span class="or-app-title-badge">beta</span>
+            </template>
+            <template v-else-if="view === 'observability'">
+              Observability <span class="or-app-title-badge">beta</span>
+            </template>
+            <template v-else-if="view === 'activity'">Activity</template>
           </h1>
           <p v-if="view !== 'playground'" class="or-app-subtitle">
             <template v-if="view === 'overview'">
@@ -525,20 +610,14 @@ watch(
               }}
             </template>
             <template v-else-if="view === 'profile'">
-              <template v-if="profileSection === 'usage'">
-                {{ isVi ? 'Thống kê usage và credit từ Gommo.' : 'Usage stats and credits from Gommo.' }}
-              </template>
-              <template v-else-if="profileSection === 'logs'">
-                {{ isVi ? 'Nhật ký từng job từ usage-history.' : 'Per-job logs from usage-history.' }}
-              </template>
-              <template v-else-if="profileSection === 'activity'">
-                {{ isVi ? 'Hoạt động tài khoản và nạp credit.' : 'Account activity and top-ups.' }}
+              <template v-if="profileSection === 'api'">
+                {{ isVi ? 'Bearer token và liên kết Access token.' : 'Bearer token and Access token shortcuts.' }}
               </template>
               <template v-else>
                 {{
                   isVi
-                    ? 'Thông tin tài khoản Gommo từ /ai/me.'
-                    : 'Your Gommo account details from /ai/me.'
+                    ? 'Xem trước usage, activity và API access — mở Activity để phân tích đầy đủ.'
+                    : 'Usage preview, activity summary, and API access — open Activity for full analytics.'
                 }}
               </template>
             </template>
@@ -563,6 +642,27 @@ watch(
                   : 'Top up via Gommo (VietQR) — credits apply automatically after bank transfer.'
               }}
             </template>
+            <template v-else-if="view === 'byok'">
+              {{
+                isVi
+                  ? 'Beta — mang key provider cho chat; Gommo account cho media. Map model và phí platform có thể thay đổi.'
+                  : 'Beta — bring provider keys for chat; Gommo accounts for media. Model map and platform fees may change.'
+              }}
+            </template>
+            <template v-else-if="view === 'observability'">
+              {{
+                isVi
+                  ? 'Beta — usage Gommo, mirror local và webhook job (giới hạn; xem ghi chú trên trang).'
+                  : 'Beta — Gommo usage, local mirror, and job webhooks (limited scope; see on-page notes).'
+              }}
+            </template>
+            <template v-else-if="view === 'activity'">
+              {{
+                isVi
+                  ? 'Job và credit trên gateway — Overview, Trends, Explore, Billing.'
+                  : 'Jobs and credits on the gateway — Overview, Trends, Explore, Billing.'
+              }}
+            </template>
           </p>
           <p v-else class="or-app-subtitle">
             {{
@@ -573,15 +673,6 @@ watch(
           </p>
         </div>
         <div class="or-app-header-actions">
-          <button
-            v-if="view === 'profile'"
-            type="button"
-            class="or-app-btn or-app-btn-ghost"
-            disabled
-            title="Gommo profile is read-only via /ai/me"
-          >
-            {{ isVi ? 'Lưu thay đổi' : 'Save edits' }}
-          </button>
           <span class="or-app-credits-pill">{{ formatCredits(credits) }} credits</span>
           <button
             type="button"
@@ -595,7 +686,13 @@ watch(
                     ? refreshTokenView()
                     : view === 'files'
                       ? refreshFilesView()
-                      : refreshProfile()
+                      : view === 'byok'
+                        ? refreshByokView()
+                        : view === 'observability'
+                          ? refreshObservabilityView()
+                          : view === 'activity'
+                            ? refreshActivityView()
+                            : refreshProfile()
             "
           >
             {{ isVi ? 'Làm mới' : 'Refresh' }}
@@ -756,63 +853,29 @@ watch(
             </div>
           </div>
 
-          <nav class="or-app-profile-tabs" aria-label="Profile sections">
-            <a
-              v-for="tab in profileTabs"
-              :key="tab.id"
-              :href="profileSectionHref(tab.id)"
-              class="or-app-profile-tab"
-              :class="{ active: isProfileSectionActive(tab.id) }"
-            >
-              {{ tab.label }}
+          <ProfileLandingPanel
+            v-if="profileSection === 'general'"
+            ref="profileLandingRef"
+            :is-vi="isVi"
+            :prefix="prefix"
+            :credits="credits"
+            :email="email"
+            :username="username"
+            :display-name="displayName"
+            :login-domain="loginDomain"
+            :masked-token="maskedToken"
+            :copied="copied"
+            :topup-orders="topupOrders"
+            :orders-loading="ordersLoading"
+            @copy-token="copyToken"
+          />
+
+          <div v-else-if="profileSection === 'api'" class="or-profile-detail">
+            <a :href="profileSectionHref('general')" class="or-profile-back">
+              ← {{ isVi ? 'Hồ sơ' : 'Profile' }}
             </a>
-          </nav>
 
-          <!-- General -->
-          <div v-if="profileSection === 'general'" class="or-app-profile-panel">
-            <dl class="or-app-profile-dl">
-              <div class="or-app-profile-row">
-                <dt>{{ isVi ? 'Email' : 'Email' }}</dt>
-                <dd>{{ email || '—' }}</dd>
-              </div>
-              <div class="or-app-profile-row">
-                <dt>{{ isVi ? 'Username' : 'Username' }}</dt>
-                <dd>{{ username || '—' }}</dd>
-              </div>
-              <div class="or-app-profile-row">
-                <dt>{{ isVi ? 'Tên hiển thị' : 'Display name' }}</dt>
-                <dd>{{ displayName }}</dd>
-              </div>
-              <div class="or-app-profile-row">
-                <dt>{{ isVi ? 'Domain Gommo' : 'Gommo domain' }}</dt>
-                <dd><code>{{ loginDomain }}</code></dd>
-              </div>
-            </dl>
-            <div class="or-app-profile-actions">
-              <a :href="`${prefix}/app/credits/`" class="or-app-btn or-app-btn-primary">
-                {{ isVi ? 'Nạp credits' : 'Top up credits' }}
-              </a>
-              <a :href="profileSectionHref('api')" class="or-app-btn or-app-btn-ghost">
-                {{ isVi ? 'API access' : 'API access' }}
-              </a>
-              <a :href="`${prefix}/authentication`" class="or-app-btn or-app-btn-ghost">
-                {{ isVi ? 'Tài liệu auth' : 'Auth docs' }}
-              </a>
-            </div>
-          </div>
-
-          <!-- Usage -->
-          <div v-else-if="profileSection === 'usage'" class="or-app-profile-panel">
-            <ProfileUsagePanel
-              ref="usagePanelRef"
-              :credits="credits"
-              :is-vi="isVi"
-              :prefix="prefix"
-            />
-          </div>
-
-          <!-- API access -->
-          <div v-else-if="profileSection === 'api'" class="or-app-profile-panel">
+          <div class="or-app-profile-panel">
             <div class="or-app-panel or-token-profile-shortcut">
               <h3 class="or-app-panel-title">{{ isVi ? 'Gommo Bearer token' : 'Gommo Bearer token' }}</h3>
               <p class="or-app-panel-desc">
@@ -838,34 +901,6 @@ watch(
               </div>
             </div>
           </div>
-
-          <!-- Logs -->
-          <div v-else-if="profileSection === 'logs'" class="or-app-profile-panel">
-            <ProfileUsagePanel
-              ref="logsPanelRef"
-              mode="logs"
-              :credits="credits"
-              :is-vi="isVi"
-              :prefix="prefix"
-            />
-          </div>
-
-          <!-- Activity -->
-          <div v-else-if="profileSection === 'activity'" class="or-app-profile-panel">
-            <ProfileActivityPanel
-              :is-vi="isVi"
-              :prefix="prefix"
-              :credits="credits"
-              :topup-orders="topupOrders"
-              :orders-loading="ordersLoading"
-              @refresh="loadTopupOrders"
-            />
-          </div>
-
-          <div v-else class="or-app-profile-panel or-app-profile-panel--fallback">
-            <p class="or-app-muted">
-              <a :href="profileSectionHref('general')">{{ isVi ? 'Về tab Chung' : 'Go to General' }}</a>
-            </p>
           </div>
         </section>
 
@@ -885,9 +920,42 @@ watch(
           />
         </section>
 
+        <!-- BYOK -->
+        <section v-else-if="view === 'byok'" class="or-app-section or-app-section--byok">
+          <ByokPanel
+            ref="byokPanelRef"
+            :is-vi="isVi"
+            :prefix="prefix"
+            :session-domain="loginDomain"
+          />
+        </section>
+
         <!-- Files -->
         <section v-else-if="view === 'files'" class="or-app-section or-app-section--files">
           <FilesPanel ref="filesPanelRef" :is-vi="isVi" :prefix="prefix" />
+        </section>
+
+        <!-- Activity hub -->
+        <section v-else-if="view === 'activity'" class="or-app-section or-app-section--activity">
+          <ActivityHub
+            ref="activityHubRef"
+            :is-vi="isVi"
+            :prefix="prefix"
+            :credits="credits"
+            :topup-orders="topupOrders"
+            :orders-loading="ordersLoading"
+            @refresh="loadTopupOrders"
+          />
+        </section>
+
+        <!-- Observability -->
+        <section v-else-if="view === 'observability'" class="or-app-section or-app-section--observability">
+          <ObservabilityPanel
+            ref="observabilityPanelRef"
+            :is-vi="isVi"
+            :prefix="prefix"
+            :credits="credits"
+          />
         </section>
 
         <!-- Credits -->

@@ -13,11 +13,17 @@ import {
   type UsageStatsType,
 } from '../models/usage-stats';
 
+type MetricView = 'jobs' | 'credits' | 'success';
+
 const props = defineProps<{
   credits: number;
   isVi: boolean;
   prefix: string;
+  /** OpenRouter-style Jobs / Credits / Success toggle on profile */
+  showMetricToggle?: boolean;
 }>();
+
+const metricView = ref<MetricView>('jobs');
 
 const emit = defineEmits<{
   statsLoaded: [payload: { totalJobs: number; hasError: boolean }];
@@ -39,13 +45,44 @@ const successRate = computed(() => {
 
 const chartSeries = computed(() => chartSeriesFromStats(statsData.value?.chart, 7));
 
-const chartMax = computed(() => Math.max(1, ...chartSeries.value.map((p) => p.total)));
+const chartBarValues = computed(() => {
+  if (metricView.value === 'credits') {
+    return chartSeries.value.map((p) => p.credit);
+  }
+  return chartSeries.value.map((p) => p.total);
+});
 
-const usageHref = computed(() => `${props.prefix}/app/profile/?section=usage`);
-const logsHref = computed(() => `${props.prefix}/app/profile/?section=logs`);
+const chartMax = computed(() => Math.max(1, ...chartBarValues.value));
 
-function colHeight(total: number): number {
-  return Math.round((total / chartMax.value) * 100);
+const heroMetricValue = computed(() => {
+  const s = summary.value;
+  if (!s) return '0';
+  if (metricView.value === 'jobs') return (s.total ?? 0).toLocaleString();
+  if (metricView.value === 'credits') return formatCredits(s.credit_net ?? 0);
+  return `${successRate.value}%`;
+});
+
+const heroMetricLabel = computed(() => {
+  if (metricView.value === 'jobs') {
+    return props.isVi ? 'Jobs (7 ngày)' : 'Jobs (7 days)';
+  }
+  if (metricView.value === 'credits') {
+    return props.isVi ? 'Credit thực (7 ngày)' : 'Net credits (7 days)';
+  }
+  return props.isVi ? 'Tỷ lệ thành công' : 'Success rate';
+});
+
+const metricOptions = computed(() => [
+  { id: 'jobs' as const, label: props.isVi ? 'Jobs' : 'Jobs' },
+  { id: 'credits' as const, label: props.isVi ? 'Credits' : 'Credits' },
+  { id: 'success' as const, label: props.isVi ? 'Thành công' : 'Success' },
+]);
+
+const usageHref = computed(() => `${props.prefix}/app/activity/?tab=trends`);
+const logsHref = computed(() => `${props.prefix}/app/activity/?tab=explore`);
+
+function colHeight(value: number): number {
+  return Math.round((value / chartMax.value) * 100);
 }
 
 function segFlex(value: number): number {
@@ -131,7 +168,24 @@ defineExpose({ reload: load });
     <template v-else>
       <p v-if="statsError" class="or-app-error or-overview-usage-note">{{ statsError }}</p>
 
-      <div class="or-overview-kpi-row">
+      <div v-if="showMetricToggle" class="or-usage-metric-hero">
+        <div class="or-usage-metric-toggle" role="group" :aria-label="isVi ? 'Chỉ số usage' : 'Usage metric'">
+          <button
+            v-for="opt in metricOptions"
+            :key="opt.id"
+            type="button"
+            class="or-usage-metric-btn"
+            :class="{ active: metricView === opt.id }"
+            @click="metricView = opt.id"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+        <p class="or-usage-metric-value">{{ heroMetricValue }}</p>
+        <p class="or-usage-metric-label">{{ heroMetricLabel }}</p>
+      </div>
+
+      <div v-if="!showMetricToggle" class="or-overview-kpi-row">
         <div class="or-overview-kpi">
           <p class="or-overview-kpi-value">{{ (summary?.total ?? 0).toLocaleString() }}</p>
           <p class="or-overview-kpi-label">{{ isVi ? 'Jobs' : 'Jobs' }}</p>
@@ -147,7 +201,7 @@ defineExpose({ reload: load });
       </div>
 
       <div class="or-app-panel or-overview-chart-panel">
-        <div v-if="chartSeries.every((p) => p.total === 0)" class="or-usage-chart-empty or-app-muted">
+        <div v-if="chartBarValues.every((v) => v === 0)" class="or-usage-chart-empty or-app-muted">
           {{ isVi ? 'Chưa có job trong 7 ngày — thử Playground.' : 'No jobs in the last 7 days — try Playground.' }}
         </div>
         <div
@@ -160,8 +214,8 @@ defineExpose({ reload: load });
             <div class="or-usage-chart-bar-track or-overview-chart-track">
               <div
                 class="or-usage-chart-stack"
-                :style="{ height: `${colHeight(point.total)}%` }"
-                :title="`${point.total} · ${formatCredits(point.credit)}`"
+                :style="{ height: `${colHeight(chartBarValues[idx] ?? 0)}%` }"
+                :title="`${point.total} jobs · ${formatCredits(point.credit)}`"
               >
                 <div
                   v-if="point.image > 0"
@@ -190,7 +244,7 @@ defineExpose({ reload: load });
         </div>
       </div>
 
-      <div class="or-overview-recent">
+      <div id="profile-recent-jobs" class="or-overview-recent">
         <div class="or-overview-recent-head">
           <h3 class="or-app-panel-title">{{ isVi ? 'Job gần đây' : 'Recent jobs' }}</h3>
           <a :href="logsHref" class="or-overview-usage-link or-overview-usage-link--sm">

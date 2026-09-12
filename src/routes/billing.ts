@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { config, isGommoMerchantConfigured, isPayOsConfigured } from '../config.js';
+import { config, isGommoMerchantConfigured, isPayOsConfigured, isByokEnabled } from '../config.js';
 import { CREDIT_PACKAGES } from '../services/creditPackages.js';
 import { listCreditPackages, resolveCreditPackage } from '../services/gommoCreditPlans.js';
 import {
@@ -41,6 +41,7 @@ router.get('/status', (_req, res) => {
       billingMode: 'gommo',
       payosConfigured: isPayOsConfigured(),
       merchantReady: isGommoMerchantConfigured(),
+      byokEnabled: isByokEnabled(),
       webhookUrl: config.payos.webhookUrl || null,
       returnUrl: config.payos.returnUrl,
     },

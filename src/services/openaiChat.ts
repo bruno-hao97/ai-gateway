@@ -1,12 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import type { Response } from 'express';
-import { config } from '../config.js';
+import { config, isByokEnabled } from '../config.js';
 import {
   buildChatForm,
   forwardChat,
   type ChatGatewayRequest,
   type ChatMessage,
 } from './gommoChat.js';
+import { resolveByokOwner } from './byokIdentity.js';
+import { attemptByokProviderChat, ensureByokPlatformFeeAllowance, PlatformFeeError } from './byokChatHandler.js';
+import { resolveByokChatRoute } from './byokResolver.js';
+import { recordByokUsage } from './byokUsage.js';
 
 export interface OpenAiChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool' | 'developer';
@@ -251,12 +255,74 @@ export async function handleOpenAiChatCompletion(
 ): Promise<void> {
   const model = String(body.model || config.gommo.chatModel).trim();
   const stream = Boolean(body.stream);
+
+  if (isByokEnabled()) {
+    try {
+      const owner = await resolveByokOwner(accessToken, domain);
+      const route = await resolveByokChatRoute({ ownerId: owner.ownerId, modelField: body.model });
+      if (route.mode === 'byok') {
+        try {
+          await ensureByokPlatformFeeAllowance({
+            ownerId: owner.ownerId,
+            accessToken,
+            domain,
+          });
+        } catch (err) {
+          if (err instanceof PlatformFeeError) {
+            res.status(err.status).json({
+              error: {
+                message: err.message,
+                type: 'insufficient_quota',
+                param: null,
+                code: err.code,
+              },
+            });
+            return;
+          }
+          throw err;
+        }
+
+        const attempt = await attemptByokProviderChat({
+          route,
+          ownerId: owner.ownerId,
+          messages: Array.isArray(body.messages) ? body.messages : [],
+          stream,
+          temperature: body.temperature,
+          max_tokens: body.max_tokens,
+          usageRoute: 'openai',
+          res,
+        });
+        if (attempt === 'success' || attempt === 'failed') return;
+      }
+    } catch {
+      /* invalid session — fall through to platform chat */
+    }
+  }
+
   const chatReq = buildGommoRequest(body, accessToken, domain, stream);
   const form = buildChatForm(chatReq);
+  const platformStarted = Date.now();
   const upstream = await forwardChat(form, AbortSignal.timeout(120_000));
 
   if (!upstream.ok) {
     const text = await upstream.text();
+    if (isByokEnabled()) {
+      try {
+        const owner = await resolveByokOwner(accessToken, domain);
+        await recordByokUsage({
+          ownerId: owner.ownerId,
+          source: 'platform',
+          route: 'openai',
+          provider: 'gommo',
+          model,
+          latencyMs: Date.now() - platformStarted,
+          ok: false,
+          errorCode: String(upstream.status),
+        });
+      } catch {
+        /* ignore usage errors */
+      }
+    }
     res.status(upstream.status).json({
       error: {
         message: text || `Upstream chat HTTP ${upstream.status}`,
@@ -321,6 +387,22 @@ export async function handleOpenAiChatCompletion(
 
   const text = await upstream.text();
   const content = extractGommoChatText(text, contentType);
+  if (isByokEnabled()) {
+    try {
+      const owner = await resolveByokOwner(accessToken, domain);
+      await recordByokUsage({
+        ownerId: owner.ownerId,
+        source: 'platform',
+        route: 'openai',
+        provider: 'gommo',
+        model,
+        latencyMs: Date.now() - platformStarted,
+        ok: true,
+      });
+    } catch {
+      /* ignore usage errors */
+    }
+  }
   res.status(200).json(buildOpenAiCompletion(model, content));
 }
 

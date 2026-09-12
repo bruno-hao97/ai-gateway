@@ -25,6 +25,7 @@ const client = new GatewayClient({
 | `client.upload` | `image()`, `video()` |
 | `client.audio` | `searchVoices()`, `tts()`, `lists()` |
 | `client.billing` | `status()`, `packages()`, `createTopup()`, `getOrder()` |
+| `client.byok` | `status()`, `listCredentials()`, `createCredential()`, `linkGommoAccount()`, `usage()` *(beta)* — see [BYOK reference](/reference/byok) |
 | `client` | `health()`, `setAccessToken()`, `getAccessToken()`, `baseUrl` |
 
 Helpers exported from package root:

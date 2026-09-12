@@ -448,7 +448,7 @@ watch(
     <p class="or-pg-foot">
       <a :href="`${prefix}/models/`">{{ isVi ? 'Xem catalog' : 'Browse catalog' }}</a>
       ·
-      <a :href="`${prefix}/app/profile/?section=usage`">{{ isVi ? 'Usage' : 'Usage' }}</a>
+      <a :href="`${prefix}/app/activity/?tab=trends`">{{ isVi ? 'Activity' : 'Activity' }}</a>
     </p>
   </div>
 </template>

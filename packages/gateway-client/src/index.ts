@@ -13,6 +13,15 @@ export {
   modelSlug,
   pickFirstRatio,
 } from './resources/models.js';
+export { ByokResource } from './resources/byok.js';
+export type {
+  ByokCredential,
+  ByokPrimaryGommo,
+  ByokProviderInfo,
+  ByokStatus,
+  ByokUsageEvent,
+  ByokUsageSummary,
+} from './resources/byok.js';
 export type {
   BillingStatus,
   ChatAction,

@@ -3,23 +3,28 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { fetchUsageLogs, fetchUsageStats, formatCredits } from '../models/user-api';
 import { formatUsageTime } from '../models/usage-history';
 import {
+  chartDaysForPeriod,
   chartSeriesFromStats,
   exportListCsv,
   exportStatsTableCsv,
   filterListItems,
   filterStatsTable,
-  groupListItemsByDay,
   jobTypeLabel,
   listItemCredit,
   listItemCreatedAt,
   listItemStatus,
   periodFromRange,
+  rangeToStatsPeriod,
+  sparklineSvgPath,
+  sparklineValuesFromChart,
   typeBreakdownFromSummary,
   type UsageListItem,
   type UsageStatsData,
+  type UsageStatsPeriod,
   type UsageStatsType,
 } from '../models/usage-stats';
 import type { UsageRange } from '../models/usage-history';
+import ActivityUsageCharts from './ActivityUsageCharts.vue';
 
 const props = defineProps<{
   credits: number;
@@ -27,9 +32,20 @@ const props = defineProps<{
   prefix: string;
   /** full = stats + chart + logs; logs = job history only */
   mode?: 'full' | 'logs';
+  /** Activity hub: trends = chart + daily table only */
+  activityTab?: 'trends';
+  /** Sync period from Activity hub (?period=) */
+  initialPeriod?: UsageStatsPeriod;
+}>();
+
+const emit = defineEmits<{
+  periodChange: [period: UsageStatsPeriod];
 }>();
 
 const logsOnly = computed(() => props.mode === 'logs');
+const trendsOnly = computed(() => props.activityTab === 'trends');
+const showJobList = computed(() => !trendsOnly.value);
+const showStatsBlocks = computed(() => !logsOnly.value);
 
 const loading = ref(false);
 const listLoading = ref(false);
@@ -52,12 +68,41 @@ const typeOptions = computed(() => [
   { id: 'music' as const, label: props.isVi ? 'Nhạc' : 'Music' },
 ]);
 
-const rangeOptions = computed(() => [
-  { id: '7d' as const, label: props.isVi ? '7 ngày' : '7 days' },
-  { id: '30d' as const, label: props.isVi ? '30 ngày' : '30 days' },
-  { id: '90d' as const, label: props.isVi ? '90 ngày' : '90 days' },
-  { id: 'all' as const, label: props.isVi ? 'Tất cả' : 'All time' },
-]);
+const rangeOptions = computed(() => {
+  const opts = [
+    { id: '7d' as const, label: props.isVi ? '7 ngày' : '7 days' },
+    { id: '30d' as const, label: props.isVi ? '30 ngày' : '30 days' },
+    { id: '90d' as const, label: props.isVi ? '90 ngày' : '90 days' },
+    { id: 'all' as const, label: props.isVi ? 'Tất cả' : 'All time' },
+  ];
+  if (trendsOnly.value || logsOnly.value) return opts.filter((o) => o.id !== 'all');
+  return opts;
+});
+
+const periodLabel = computed(() => {
+  const opt = rangeOptions.value.find((o) => o.id === range.value);
+  return opt?.label ?? range.value;
+});
+
+const sparklineDays = computed(() => chartDaysForPeriod(periodFromRange(range.value)));
+
+const jobsSparkline = computed(() =>
+  sparklineSvgPath(
+    sparklineValuesFromChart(statsData.value?.chart, sparklineDays.value, 'jobs'),
+  ),
+);
+
+const creditsSparkline = computed(() =>
+  sparklineSvgPath(
+    sparklineValuesFromChart(statsData.value?.chart, sparklineDays.value, 'credits'),
+  ),
+);
+
+const successSparkline = computed(() =>
+  sparklineSvgPath(
+    sparklineValuesFromChart(statsData.value?.chart, sparklineDays.value, 'success'),
+  ),
+);
 
 const summary = computed(() => statsData.value?.summary);
 
@@ -95,7 +140,16 @@ const filteredListItems = computed(() =>
   }),
 );
 
-const groupedListItems = computed(() => groupListItemsByDay(filteredListItems.value, props.isVi));
+const exploreLogCount = computed(() => filteredListItems.value.length);
+
+const exploreLogSummary = computed(() => {
+  if (!logsOnly.value) return '';
+  const count = exploreLogCount.value;
+  if (props.isVi) {
+    return listHasMore.value ? `${count}+ job` : `${count} job`;
+  }
+  return listHasMore.value ? `${count}+ jobs` : `${count} jobs`;
+});
 
 const showTypeCols = computed(() => typeFilter.value === 'all');
 
@@ -141,7 +195,7 @@ async function loadList(reset = true) {
 async function reloadRecords() {
   loading.value = true;
   statsError.value = '';
-  if (!logsOnly.value) {
+  if (showStatsBlocks.value) {
     try {
       statsData.value = await fetchUsageStats({
         period: period.value,
@@ -160,7 +214,9 @@ async function reloadRecords() {
       statsData.value = null;
     }
   }
-  await loadList(true);
+  if (!trendsOnly.value) {
+    await loadList(true);
+  }
   loading.value = false;
 }
 
@@ -200,6 +256,35 @@ function statusLabel(status: ReturnType<typeof listItemStatus>): string {
   return props.isVi ? 'Đang xử lý' : 'Pending';
 }
 
+function promptPreview(prompt?: string): string {
+  const text = (prompt || '').trim();
+  if (!text) return '—';
+  return text.length > 72 ? `${text.slice(0, 72).trim()}…` : text;
+}
+
+function applyInitialPeriod(period?: UsageStatsPeriod) {
+  if (!period) return;
+  if (period === '7d' || period === '30d' || period === '90d') {
+    range.value = period;
+    chartDays.value = chartDaysForPeriod(period);
+  }
+}
+
+watch(
+  () => props.initialPeriod,
+  (period) => {
+    applyInitialPeriod(period);
+  },
+  { immediate: true },
+);
+
+watch(range, (value) => {
+  if (trendsOnly.value) {
+    chartDays.value = chartDaysForPeriod(periodFromRange(value));
+  }
+  emit('periodChange', rangeToStatsPeriod(value));
+});
+
 watch([range, typeFilter], () => {
   void reloadRecords();
 });
@@ -210,8 +295,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="or-usage-dashboard" :class="{ 'or-usage-dashboard--logs': logsOnly }">
-    <div v-if="!logsOnly" class="or-usage-banner" role="status">
+  <div
+    class="or-usage-dashboard"
+    :class="{ 'or-usage-dashboard--logs': logsOnly, 'or-usage-dashboard--trends': trendsOnly }"
+  >
+    <div v-if="showStatsBlocks && !trendsOnly" class="or-usage-banner" role="status">
       {{
         isVi
           ? 'Thống kê từ Gommo usage-history (cùng nguồn 79ai). Cần đăng nhập đúng tài khoản Gommo.'
@@ -219,7 +307,7 @@ onMounted(() => {
       }}
     </div>
 
-    <p v-if="!logsOnly && showZeroHint" class="or-app-muted or-usage-note">
+    <p v-if="showStatsBlocks && !trendsOnly && showZeroHint" class="or-app-muted or-usage-note">
       {{
         isVi
           ? 'Chưa có lượt dùng trong khoảng đã chọn — thử All time hoặc chạy job qua Playground.'
@@ -227,7 +315,56 @@ onMounted(() => {
       }}
     </p>
 
-    <div v-if="!logsOnly" class="or-usage-stats or-usage-stats--wide">
+    <div v-if="showStatsBlocks && trendsOnly" class="or-activity-overview-kpi-row or-usage-trends-kpi">
+      <div class="or-activity-hub-kpi or-activity-hub-kpi--spark">
+        <div class="or-activity-hub-kpi-main">
+          <span class="or-activity-hub-kpi-label">{{ isVi ? 'Jobs' : 'Jobs' }}</span>
+          <strong class="or-activity-hub-kpi-value">
+            <template v-if="loading"><span class="or-activity-skeleton or-activity-skeleton--text" /></template>
+            <template v-else>{{ (summary?.total ?? 0).toLocaleString() }}</template>
+          </strong>
+          <span class="or-activity-hub-kpi-sub">{{ periodLabel }}</span>
+        </div>
+        <svg v-if="jobsSparkline && !loading" class="or-activity-sparkline" viewBox="0 0 72 28" width="72" height="28" aria-hidden="true">
+          <path :d="jobsSparkline" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
+        </svg>
+      </div>
+      <div class="or-activity-hub-kpi or-activity-hub-kpi--spark">
+        <div class="or-activity-hub-kpi-main">
+          <span class="or-activity-hub-kpi-label">{{ isVi ? 'Credit thực' : 'Net credits' }}</span>
+          <strong class="or-activity-hub-kpi-value">
+            <template v-if="loading"><span class="or-activity-skeleton or-activity-skeleton--text" /></template>
+            <template v-else>{{ formatCredits(summary?.credit_net ?? 0) }}</template>
+          </strong>
+          <span class="or-activity-hub-kpi-sub">{{ periodLabel }}</span>
+        </div>
+        <svg v-if="creditsSparkline && !loading" class="or-activity-sparkline or-activity-sparkline--credits" viewBox="0 0 72 28" width="72" height="28" aria-hidden="true">
+          <path :d="creditsSparkline" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
+        </svg>
+      </div>
+      <div class="or-activity-hub-kpi or-activity-hub-kpi--spark">
+        <div class="or-activity-hub-kpi-main">
+          <span class="or-activity-hub-kpi-label">{{ isVi ? 'Thành công' : 'Success rate' }}</span>
+          <strong class="or-activity-hub-kpi-value">
+            <template v-if="loading"><span class="or-activity-skeleton or-activity-skeleton--text" /></template>
+            <template v-else>{{ successRate }}%</template>
+          </strong>
+          <span class="or-activity-hub-kpi-sub">
+            <template v-if="!loading && summary">{{ summary.success }}/{{ summary.total }}</template>
+          </span>
+        </div>
+        <svg v-if="successSparkline && !loading" class="or-activity-sparkline or-activity-sparkline--success" viewBox="0 0 72 28" width="72" height="28" aria-hidden="true">
+          <path :d="successSparkline" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
+        </svg>
+      </div>
+      <div class="or-activity-hub-kpi">
+        <span class="or-activity-hub-kpi-label">{{ isVi ? 'Số dư' : 'Balance' }}</span>
+        <strong class="or-activity-hub-kpi-value">{{ formatCredits(credits) }}</strong>
+        <span class="or-activity-hub-kpi-sub">{{ isVi ? 'Hiện tại' : 'Current' }}</span>
+      </div>
+    </div>
+
+    <div v-else-if="showStatsBlocks" class="or-usage-stats or-usage-stats--wide">
       <div class="or-usage-stat-card">
         <p class="or-usage-stat-value">{{ (summary?.total ?? 0).toLocaleString() }}</p>
         <p class="or-usage-stat-label">{{ isVi ? 'Tổng lượt' : 'Total calls' }}</p>
@@ -272,7 +409,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="!logsOnly && typeBreakdown.length > 0" class="or-usage-type-breakdown">
+    <div v-if="showStatsBlocks && !trendsOnly && typeBreakdown.length > 0" class="or-usage-type-breakdown">
       <h3 class="or-app-panel-title">{{ isVi ? 'Phân bổ theo loại' : 'Breakdown by type' }}</h3>
       <div class="or-usage-type-bars">
         <div v-for="row in typeBreakdown" :key="row.jobType" class="or-usage-type-row">
@@ -288,7 +425,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <div class="or-usage-toolbar">
+    <div class="or-usage-toolbar" :class="{ 'or-usage-toolbar--sticky': logsOnly }">
       <div class="or-usage-filters">
         <div class="or-usage-filter-group" role="group" :aria-label="isVi ? 'Khoảng thời gian' : 'Time range'">
           <button
@@ -317,6 +454,7 @@ onMounted(() => {
       </div>
       <div class="or-usage-toolbar-actions">
         <input
+          v-if="!trendsOnly"
           v-model="searchQuery"
           type="search"
           class="or-usage-search"
@@ -336,26 +474,30 @@ onMounted(() => {
       </div>
     </div>
 
-    <p v-if="logsOnly" class="or-app-muted or-usage-note">
-      {{
-        isVi
-          ? 'Lịch sử từng job từ Gommo usage-history. Xem thống kê đầy đủ tại tab Usage.'
-          : 'Per-job history from Gommo usage-history. See full stats on the Usage tab.'
-      }}
-      <a :href="`${prefix}/app/profile/?section=usage`">{{ isVi ? 'Mở Usage' : 'Open Usage' }}</a>
-    </p>
-
-    <p v-if="statsError" class="or-app-error or-usage-note">
+    <p v-if="statsError && showStatsBlocks" class="or-app-error or-usage-note">
       {{ isVi ? 'Stats:' : 'Stats:' }} {{ statsError }}
     </p>
     <p v-if="listError" class="or-app-error or-usage-note">
       {{ isVi ? 'Job logs:' : 'Job logs:' }} {{ listError }}
     </p>
 
-    <div v-if="!logsOnly" class="or-app-panel or-usage-chart-panel">
+    <ActivityUsageCharts
+      v-if="showStatsBlocks && trendsOnly"
+      :chart="statsData?.chart"
+      :chart-days="chartDays"
+      :is-vi="isVi"
+      :loading="loading"
+    />
+
+    <div v-if="showStatsBlocks" class="or-app-panel or-usage-chart-panel">
       <div class="or-usage-chart-head">
         <h3 class="or-app-panel-title">{{ isVi ? 'Biểu đồ theo thời gian' : 'Activity over time' }}</h3>
-        <select v-model.number="chartDays" class="or-usage-chart-select" aria-label="Chart range">
+        <select
+          v-if="!trendsOnly"
+          v-model.number="chartDays"
+          class="or-usage-chart-select"
+          aria-label="Chart range"
+        >
           <option :value="7">{{ isVi ? '7 ngày' : '7 days' }}</option>
           <option :value="14">{{ isVi ? '14 ngày' : '14 days' }}</option>
           <option :value="30">{{ isVi ? '30 ngày' : '30 days' }}</option>
@@ -367,7 +509,8 @@ onMounted(() => {
         <span class="or-usage-legend-item or-usage-legend-item--audio">Audio</span>
         <span class="or-usage-legend-item or-usage-legend-item--music">{{ isVi ? 'Nhạc' : 'Music' }}</span>
       </div>
-      <div v-if="chartSeries.every((p) => p.total === 0)" class="or-usage-chart-empty or-app-muted">
+      <div v-if="loading" class="or-activity-skeleton or-activity-skeleton--chart" aria-hidden="true" />
+      <div v-else-if="chartSeries.every((p) => p.total === 0)" class="or-usage-chart-empty or-app-muted">
         {{ isVi ? 'Chưa có dữ liệu trong khoảng đã chọn.' : 'No data in the selected range.' }}
       </div>
       <div v-else class="or-usage-chart" role="img" :aria-label="isVi ? 'Biểu đồ lượt gen' : 'Generation chart'">
@@ -401,15 +544,39 @@ onMounted(() => {
       </div>
     </div>
 
-    <div class="or-usage-table-wrap">
-      <h3 class="or-app-panel-title">{{ isVi ? 'Lịch sử từng job' : 'Job history' }}</h3>
-      <p v-if="!loading && !listLoading && filteredListItems.length === 0" class="or-app-muted or-usage-empty">
-        {{ isVi ? 'Chưa có bản ghi trong khoảng đã chọn.' : 'No records in the selected range.' }}
+    <div v-if="showJobList" class="or-usage-table-wrap" :class="{ 'or-usage-explore-wrap': logsOnly }">
+      <div class="or-usage-explore-head">
+        <div>
+          <h3 class="or-app-panel-title">{{ isVi ? 'Job logs' : 'Job logs' }}</h3>
+          <p v-if="logsOnly && exploreLogSummary" class="or-usage-explore-meta or-app-muted">
+            {{ exploreLogSummary }}
+            <span v-if="searchQuery.trim()"> · {{ isVi ? 'đã lọc' : 'filtered' }}</span>
+          </p>
+        </div>
+        <a
+          v-if="logsOnly"
+          :href="`${prefix}/app/activity/?tab=trends`"
+          class="or-profile-section-link or-profile-section-link--sm"
+        >
+          {{ isVi ? 'Trends' : 'Trends' }} →
+        </a>
+      </div>
+
+      <div v-if="listLoading && filteredListItems.length === 0" class="or-activity-skeleton or-activity-skeleton--table" aria-hidden="true" />
+      <p v-else-if="!listLoading && filteredListItems.length === 0" class="or-app-muted or-usage-empty">
+        {{
+          searchQuery.trim()
+            ? isVi
+              ? 'Không có job khớp tìm kiếm.'
+              : 'No jobs match your search.'
+            : isVi
+              ? 'Chưa có bản ghi trong khoảng đã chọn.'
+              : 'No records in the selected range.'
+        }}
       </p>
-      <div v-else class="or-usage-table-scroll">
-        <div v-for="group in groupedListItems" :key="group.dayKey" class="or-usage-day-group">
-          <h4 class="or-usage-day-title">{{ group.label }}</h4>
-          <table class="or-usage-table">
+      <div v-else class="or-app-panel or-usage-explore-panel">
+        <div class="or-usage-table-scroll">
+          <table class="or-usage-table or-usage-table--explore">
             <thead>
               <tr>
                 <th>{{ isVi ? 'Thời gian' : 'Time' }}</th>
@@ -421,16 +588,26 @@ onMounted(() => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in group.items" :key="row.id_base || `${row.created_at}-${row.model}`">
+              <tr
+                v-for="row in filteredListItems"
+                :key="row.id_base || `${row.created_at}-${row.model}`"
+                class="or-usage-explore-row"
+              >
                 <td class="or-usage-td-time">
                   {{ formatUsageTime(listItemCreatedAt(row) || '', isVi) }}
                 </td>
-                <td>{{ jobTypeLabel((row.type as UsageStatsType) || 'image', isVi) }}</td>
+                <td>
+                  <span class="or-usage-type-chip" :class="`or-usage-type-chip--${row.type || 'image'}`">
+                    {{ jobTypeLabel((row.type as UsageStatsType) || 'image', isVi) }}
+                  </span>
+                </td>
                 <td><code class="or-usage-model">{{ row.model || '—' }}</code></td>
                 <td class="or-usage-td-prompt">
-                  <span :title="row.prompt">{{ row.prompt || '—' }}</span>
+                  <span :title="row.prompt">{{ promptPreview(row.prompt) }}</span>
                 </td>
-                <td>{{ listItemCredit(row) > 0 ? formatCredits(listItemCredit(row)) : '—' }}</td>
+                <td class="or-usage-td-credit">
+                  {{ listItemCredit(row) > 0 ? formatCredits(listItemCredit(row)) : '—' }}
+                </td>
                 <td>
                   <span class="or-usage-status" :class="`or-usage-status--${listItemStatus(row)}`">
                     {{ statusLabel(listItemStatus(row)) }}
@@ -453,9 +630,10 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="!logsOnly && tableRows.length > 0" class="or-usage-table-wrap">
+    <div v-if="showStatsBlocks && (tableRows.length > 0 || (trendsOnly && loading))" class="or-usage-table-wrap">
       <h3 class="or-app-panel-title">{{ isVi ? 'Tổng hợp theo ngày' : 'Daily summary' }}</h3>
-      <div class="or-usage-table-scroll">
+      <div v-if="loading && tableRows.length === 0" class="or-activity-skeleton or-activity-skeleton--table" aria-hidden="true" />
+      <div v-else class="or-usage-table-scroll">
         <table class="or-usage-table or-usage-table--stats">
           <thead>
             <tr>

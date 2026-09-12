@@ -1,5 +1,24 @@
 export const USAGE_STORAGE_KEY = 'gw_usage_history';
+export const OBS_LOCAL_MIRROR_KEY = 'gw_obs_local_mirror';
 const MAX_RECORDS = 500;
+
+export function isLocalUsageMirrorEnabled(): boolean {
+  if (typeof window === 'undefined') return true;
+  try {
+    return localStorage.getItem(OBS_LOCAL_MIRROR_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+
+export function setLocalUsageMirrorEnabled(enabled: boolean): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(OBS_LOCAL_MIRROR_KEY, enabled ? '1' : '0');
+  } catch {
+    /* ignore */
+  }
+}
 
 export type UsageJobType = 'image' | 'video' | 'music' | 'audio' | 'chat' | 'tool' | 'upload' | 'other';
 export type UsageStatus = 'success' | 'failed' | 'pending';
@@ -72,6 +91,8 @@ export function appendUsageRecord(
     createdAt: input.createdAt || new Date().toISOString(),
     source: input.source || 'playground',
   };
+
+  if (!isLocalUsageMirrorEnabled()) return record;
 
   const list = loadUsageHistory();
   if (record.jobId) {

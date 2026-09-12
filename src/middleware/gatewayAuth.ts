@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { config } from '../config.js';
 import { GommoApiError, GommoClient } from '../services/gommoClient.js';
 import { sendError } from '../utils/errors.js';
+import { getMediaGatewayAuth } from './byokMediaAuth.js';
 
 export interface GatewayAuth {
   accessToken: string;
@@ -58,7 +59,7 @@ export function getGatewayAuth(req: Request): GatewayAuth {
 }
 
 export function clientFromReq(req: Request, projectId = 'default'): GommoClient {
-  const auth = getGatewayAuth(req);
+  const auth = getMediaGatewayAuth(req);
   return new GommoClient({
     accessToken: auth.accessToken,
     domain: auth.domain,

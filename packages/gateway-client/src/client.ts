@@ -7,6 +7,7 @@ import { ChatResource } from './resources/chat.js';
 import { JobsResource } from './resources/jobs.js';
 import { ModelsResource } from './resources/models.js';
 import { UploadResource } from './resources/upload.js';
+import { ByokResource } from './resources/byok.js';
 import type { GatewayClientOptions, GatewayEnvelope } from './types.js';
 
 export class GatewayClient {
@@ -19,6 +20,7 @@ export class GatewayClient {
   readonly upload: UploadResource;
   readonly audio: AudioResource;
   readonly billing: BillingResource;
+  readonly byok: ByokResource;
 
   constructor(options: GatewayClientOptions = {}) {
     this.ctx = createHttpContext(options);
@@ -29,6 +31,7 @@ export class GatewayClient {
     this.upload = new UploadResource(this.ctx);
     this.audio = new AudioResource(this.ctx);
     this.billing = new BillingResource(this.ctx);
+    this.byok = new ByokResource(this.ctx);
   }
 
   /** GET /health */

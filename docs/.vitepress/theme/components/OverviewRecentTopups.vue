@@ -15,7 +15,7 @@ const props = defineProps<{
   prefix: string;
 }>();
 
-const activityHref = computed(() => `${props.prefix}/app/profile/?section=activity`);
+const activityHref = computed(() => `${props.prefix}/app/activity/`);
 
 function orderStatusClass(status: TopupOrderStatus): string {
   return `or-app-order-status--${status}`;

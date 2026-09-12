@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "gatewayModelId": "gpt-4o",
+      "gommoServer": "cheap",
+      "gommoModel": "gpt-4o",
+      "byokProvider": "openai",
+      "upstreamModel": "gpt-4o"
+    },
+    {
+      "gatewayModelId": "gpt-4o-mini",
+      "gommoServer": "cheap",
+      "gommoModel": "gpt-4o-mini",
+      "byokProvider": "openai",
+      "upstreamModel": "gpt-4o-mini"
+    },
+    {
+      "gatewayModelId": "gpt-5.5",
+      "gommoServer": "cheap",
+      "gommoModel": "gpt-5.5",
+      "byokProvider": "openai",
+      "upstreamModel": "gpt-4o"
+    },
+    {
+      "gatewayModelId": "claude-3-5-sonnet",
+      "gommoServer": "cheap",
+      "gommoModel": "claude-3-5-sonnet",
+      "byokProvider": "anthropic",
+      "upstreamModel": "claude-3-5-sonnet-20241022"
+    },
+    {
+      "gatewayModelId": "claude-3-5-haiku",
+      "gommoServer": "cheap",
+      "gommoModel": "claude-3-5-haiku",
+      "byokProvider": "anthropic",
+      "upstreamModel": "claude-3-5-haiku-20241022"
+    }
+  ]
+}
