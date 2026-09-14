@@ -180,6 +180,13 @@ const topModelsHint = computed(() => {
   return props.isVi ? `${base} · cache` : `${base} · cached`;
 });
 
+const topModelsCacheTitle = computed(() => {
+  if (!topModelsFromCache.value) return '';
+  return props.isVi
+    ? 'Cache gateway ~10 phút. Bấm Làm mới để quét lại từ Gommo.'
+    : 'Gateway cache ~10 min. Click Refresh to rescan from Gommo.';
+});
+
 function syncQueryToUrl() {
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
@@ -685,10 +692,16 @@ defineExpose({ reload: reloadAll });
             {{ isVi ? 'Chưa có dữ liệu.' : 'No data yet.' }}
           </p>
           <div v-else class="or-usage-type-bars">
-            <div v-for="row in typeBreakdown" :key="row.jobType" class="or-usage-type-row">
-              <a :href="exploreTypeHref(row.jobType)" class="or-usage-type-label or-activity-type-link">
-                {{ jobTypeLabel(row.jobType, isVi) }}
-              </a>
+            <a
+              v-for="row in typeBreakdown"
+              :key="row.jobType"
+              :href="exploreTypeHref(row.jobType)"
+              class="or-usage-type-row or-activity-type-drill-row or-activity-top-model-link"
+              :title="isVi ? `Mở Explore — ${jobTypeLabel(row.jobType, isVi)}` : `Open Explore — ${jobTypeLabel(row.jobType, isVi)}`"
+            >
+              <span class="or-usage-type-label or-activity-type-link-label">
+                {{ jobTypeLabel(row.jobType, isVi) }} →
+              </span>
               <div class="or-usage-type-track" role="presentation">
                 <div
                   class="or-usage-type-fill"
@@ -700,7 +713,7 @@ defineExpose({ reload: reloadAll });
                 {{ row.count }} · {{ row.percent }}%
                 <template v-if="row.creditNet > 0"> · {{ formatCredits(row.creditNet) }}</template>
               </span>
-            </div>
+            </a>
           </div>
         </div>
 
@@ -714,7 +727,12 @@ defineExpose({ reload: reloadAll });
         <div class="or-app-panel or-activity-overview-widget">
           <div class="or-activity-hub-widget-head">
             <h3 class="or-app-panel-title">{{ isVi ? 'Top models' : 'Top models' }}</h3>
-            <span v-if="topModelsHint" class="or-app-muted or-activity-overview-hint">
+            <span
+              v-if="topModelsHint"
+              class="or-app-muted or-activity-overview-hint"
+              :class="{ 'or-activity-overview-hint--cached': topModelsFromCache }"
+              :title="topModelsCacheTitle || undefined"
+            >
               {{ topModelsHint }}
             </span>
           </div>

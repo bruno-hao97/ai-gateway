@@ -1330,6 +1330,33 @@
   text-decoration: underline;
 }
 
+.or-activity-type-drill-row {
+  text-decoration: none;
+  color: inherit;
+  border-radius: 8px;
+  transition: background 0.12s ease;
+}
+
+.or-activity-type-drill-row:hover {
+  background: color-mix(in srgb, var(--or-accent) 6%, transparent);
+}
+
+.or-activity-type-drill-row:hover .or-activity-type-link-label {
+  color: var(--or-accent);
+  text-decoration: underline;
+}
+
+.or-activity-type-link-label {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.or-activity-overview-hint--cached {
+  cursor: help;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
 .or-activity-overview-kpi-row,
 .or-activity-hub-kpi-row {
   display: grid;
@@ -3672,6 +3699,48 @@
 .or-usage-load-more {
   margin-top: 0.75rem;
   text-align: center;
+}
+
+.or-usage-load-more-meta {
+  margin: 0 0 0.45rem;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .or-activity-overview-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .or-activity-overview-toolbar-actions {
+    width: 100%;
+  }
+
+  .or-usage-export-type-wrap {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .or-usage-export-type {
+    flex: 1;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .or-usage-dashboard--logs .or-usage-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .or-usage-dashboard--logs .or-usage-toolbar-actions {
+    width: 100%;
+  }
+
+  .or-usage-dashboard--logs .or-usage-search {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
 }
 
 .or-usage-chart-label {

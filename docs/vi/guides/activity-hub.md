@@ -64,7 +64,9 @@ Thủ công (đã login, `npm run docs:stack`):
 
 - [ ] Overview → đổi period → KPI/chart cập nhật; **Làm mới** bỏ cache top models (`from_cache` không còn trong Network → `usage/aggregate`)
 - [ ] **Xuất CSV** chọn loại → tên file có suffix type khi không phải “Tất cả”
-- [ ] **Theo loại job** → click label → Explore có `?type=`
+- [ ] **Theo loại job** → click dòng (label `→`) → Explore có `?type=`
+- [ ] Top models **cache** — hover hint; **Làm mới** quét lại
+- [ ] Explore **Tải thêm** + meta số job đã tải
 - [ ] Top models → Explore có `?model=`
 - [ ] Tab Billing → link giữ `?period=`; Observability mở đúng
 - [ ] Explore → chip filter + `?type=` / `?q=`; **Xóa tất cả bộ lọc** khi trống

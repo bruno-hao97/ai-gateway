@@ -205,11 +205,22 @@ const exploreLogCount = computed(() => filteredListItems.value.length);
 
 const exploreLogSummary = computed(() => {
   if (!logsOnly.value) return '';
-  const count = exploreLogCount.value;
-  if (props.isVi) {
-    return listHasMore.value ? `${count}+ job` : `${count} job`;
+  const filtered = exploreLogCount.value;
+  const loaded = listItems.value.length;
+  if (hasActiveExploreFilters.value && filtered !== loaded) {
+    if (props.isVi) {
+      return listHasMore.value
+        ? `${filtered} khớp · ${loaded}+ đã tải`
+        : `${filtered} khớp · ${loaded} đã tải`;
+    }
+    return listHasMore.value
+      ? `${filtered} shown · ${loaded}+ loaded`
+      : `${filtered} shown · ${loaded} loaded`;
   }
-  return listHasMore.value ? `${count}+ jobs` : `${count} jobs`;
+  if (props.isVi) {
+    return listHasMore.value ? `${filtered}+ job` : `${filtered} job`;
+  }
+  return listHasMore.value ? `${filtered}+ jobs` : `${filtered} jobs`;
 });
 
 const showTypeCols = computed(() => typeFilter.value === 'all');
@@ -941,14 +952,21 @@ onMounted(() => {
           </table>
         </div>
       </div>
-      <div v-if="listHasMore" class="or-usage-load-more">
+      <div v-if="logsOnly && listHasMore && filteredListItems.length > 0" class="or-usage-load-more">
+        <p class="or-usage-load-more-meta or-app-muted">
+          {{
+            isVi
+              ? `Đã tải ${listItems.length} job${listHasMore ? ' — còn thêm từ Gommo' : ''}`
+              : `${listItems.length} jobs loaded${listHasMore ? ' — more available' : ''}`
+          }}
+        </p>
         <button
           type="button"
           class="or-app-btn or-app-btn-ghost or-app-btn-sm"
-          :disabled="listLoading"
+          :disabled="listLoading || searchDeepening"
           @click="loadMoreList"
         >
-          {{ listLoading ? (isVi ? 'Đang tải…' : 'Loading…') : isVi ? 'Xem thêm' : 'Load more' }}
+          {{ listLoading ? (isVi ? 'Đang tải…' : 'Loading…') : isVi ? 'Tải thêm' : 'Load more' }}
         </button>
       </div>
     </div>

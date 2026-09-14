@@ -65,7 +65,9 @@ Manual (logged in, `npm run docs:stack`):
 
 - [ ] Overview → change period → KPI/charts update; **Refresh** bypasses top-models cache (`from_cache` absent in Network → `usage/aggregate`)
 - [ ] **Export CSV** with type filter → file name includes type when not “All”
-- [ ] **Usage by type** label → Explore with `?type=`
+- [ ] **Usage by type** row (label `→`) → Explore with `?type=`
+- [ ] Top models **cached** hint shows tooltip on hover; **Refresh** rescans
+- [ ] Explore **Load more** loads next page; meta shows loaded count
 - [ ] Top models row → Explore with `?model=`
 - [ ] Billing tab → links keep `?period=`; Observability link works
 - [ ] Explore filters → chips + `?type=` / `?q=`; **Clear all filters** on empty state
