@@ -21,7 +21,7 @@ npm run test:aggregate
 
 - [ ] Hero: **Open Playground**, **Activity**, **Copy token**
 - [ ] Widget Usage (7 ngày) tải; recent jobs click → Explore + modal job
-- [ ] **Workspace**: Activity, Access token, BYOK, Files, Observability
+- [ ] **Workspace**: Activity, Access token, Credits, BYOK, Files, Observability
 - [ ] **Resources**: Quickstart, MCP, Authentication, **Portal smoke test** (trang này)
 
 ## Chat (`/app/chat/`)

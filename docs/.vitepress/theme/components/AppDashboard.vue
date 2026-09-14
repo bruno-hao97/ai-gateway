@@ -155,6 +155,15 @@ const overviewWorkspaceCards = computed(() => [
     cta: isVi.value ? 'Mở token' : 'Open token',
   },
   {
+    id: 'credits',
+    title: isVi.value ? 'Credits' : 'Credits',
+    desc: isVi.value
+      ? 'Nạp VietQR, KPI số dư và lịch sử đơn — credits cộng tự động.'
+      : 'VietQR top-up, balance KPIs, and order history — credits apply automatically.',
+    href: `${prefix.value}/app/credits/`,
+    cta: isVi.value ? 'Nạp credits' : 'Top up',
+  },
+  {
     id: 'byok',
     title: 'BYOK',
     badge: 'beta',

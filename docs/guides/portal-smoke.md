@@ -21,7 +21,7 @@ npm run test:aggregate
 
 - [ ] Hero: **Open Playground**, **Activity**, **Copy token**
 - [ ] Usage widget (7 days) loads; recent jobs clickable → Explore + job modal
-- [ ] **Workspace** cards: Activity, Access token, BYOK, Files, Observability
+- [ ] **Workspace** cards: Activity, Access token, Credits, BYOK, Files, Observability
 - [ ] **Resources**: Quickstart, MCP, Authentication, **Portal smoke test** (this page)
 
 ## Chat (`/app/chat/`)
