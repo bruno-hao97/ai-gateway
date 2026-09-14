@@ -288,5 +288,15 @@
     "hash": "f95e09629d5ac0e7",
     "en": "Wan 3.0 is a next-generation AI video generation model supporting Text-to-Video (T2V) and Image-to-Video (I2V). It excels at prompt understanding, natural motion, character and scene consistency, and supports diverse visual styles and camera movements. Wan 3.0 is ideal for ads, social media content, cinematic video, and storytelling.",
     "updatedAt": "2026-09-09T01:41:45.938Z"
+  },
+  "gpt-image-2.5-flare": {
+    "hash": "022fd9edfd80a6f8",
+    "en": "Fast, high-quality AI image generation and editing for content, ads, products, and high-volume image workflows.",
+    "updatedAt": "2026-09-14T08:00:00.000Z"
+  },
+  "gpt-image-2.5-sunburst": {
+    "hash": "4b4dc38114813334",
+    "en": "Premium tier focused on image quality, edit accuracy, and character consistency — for professional design and creative production.",
+    "updatedAt": "2026-09-14T08:00:00.000Z"
   }
 }

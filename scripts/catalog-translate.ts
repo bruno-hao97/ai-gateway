@@ -59,11 +59,13 @@ async function main() {
       seen.add(slug);
 
       if (!looksVietnamese(vi)) {
-        cache[slug] = {
-          hash: hashDescription(vi),
-          en: vi,
-          updatedAt: new Date().toISOString(),
-        };
+        if (!getCachedEnglish(cache, slug, vi)) {
+          cache[slug] = {
+            hash: hashDescription(vi),
+            en: vi,
+            updatedAt: new Date().toISOString(),
+          };
+        }
         continue;
       }
 
