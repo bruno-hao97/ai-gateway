@@ -16,6 +16,7 @@
     "portal:smoke": "node scripts/portal-smoke-http.mjs",
     "test:aggregate": "node --import tsx --test src/services/usageAggregateCache.test.ts",
     "test:observability": "node --import tsx --test src/services/observabilityStore.test.ts",
+    "observability:verify-background": "tsx scripts/observability-verify-background.ts",
     "client:publish": "npm publish --workspace=@ai-gateway/client --access public",
     "portal:sync": "node scripts/sync-portal-to-docs.mjs",
     "docs:dev": "vitepress dev docs --port 5173",

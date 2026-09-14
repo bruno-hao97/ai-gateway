@@ -147,6 +147,25 @@ Background delivery has the same limits as gateway poll (no retry queue, single-
 
 Manage webhooks at [Observability](/app/observability/) (sidebar **Developer → Observability**, badge **beta**). The on-page callout lists the same limits in plain language.
 
+### Automated background verify (live)
+
+Requires a running gateway, user Bearer token, and credits for one small image job:
+
+```bash
+# .env: OBSERVABILITY_VERIFY_TOKEN=<access_token from /ai/login>
+npm run observability:verify-background
+```
+
+The script:
+
+1. Starts a local HTTP receiver on `127.0.0.1`
+2. Registers a webhook pointing at it
+3. Creates `POST /gateway/jobs/image` with `wait: false`
+4. Waits for `job.completed` or `job.failed` with `data.background: true`
+5. Deletes the webhook
+
+Exits **SKIP** if the model returns a result immediately (sync path). Optional env: `OBSERVABILITY_VERIFY_GATEWAY_URL`, `OBSERVABILITY_VERIFY_MODEL_SLUG`, `OBSERVABILITY_VERIFY_TIMEOUT_MS` (default 6 min).
+
 ### Smoke test checklist
 
 Manual (logged in, `npm run docs:stack`):
@@ -157,5 +176,6 @@ Manual (logged in, `npm run docs:stack`):
 - [ ] **Delete** → confirm dialog; webhook removed
 - [ ] Expand **Example payload** → **Copy JSON** works
 - [ ] At 5 webhooks → form disabled with limit hint
+- [ ] Optional live: `npm run observability:verify-background` (see above)
 
 See also [Usage history](./usage.md) and [Media & jobs](./media.md).

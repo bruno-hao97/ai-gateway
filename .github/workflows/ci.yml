@@ -22,6 +22,9 @@ jobs:
       - name: TypeScript build
         run: npm run build
 
+      - name: Gateway client tests
+        run: npm run client:test
+
       - name: Portal theme unit tests
         run: npm run theme:test
 

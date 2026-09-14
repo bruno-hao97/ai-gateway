@@ -67,6 +67,7 @@ Xem [Observability reference](/vi/reference/observability.md). Kiểm tra nhanh:
 - [ ] Stat cards → Activity / Credits
 - [ ] Webhook thêm, test, xóa; Copy JSON payload
 - [ ] Job `wait: false` async + webhook → delivery sau poll nền (`data.background: true`)
+- [ ] Tuỳ chọn live: `npm run observability:verify-background` — xem [Observability reference](/vi/reference/observability.md)
 
 ## Credits (`/app/credits/`)
 

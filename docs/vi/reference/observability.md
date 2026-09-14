@@ -146,6 +146,19 @@ Delivery nền cùng giới hạn poll gateway (không retry queue, file store s
 
 Quản lý webhook: [Observability](/vi/app/observability/) (sidebar **Developer → Observability**, badge **beta**). Callout trên trang liệt kê cùng giới hạn.
 
+### Verify background tự động (live)
+
+Cần gateway chạy, Bearer user và credit cho một job ảnh nhỏ:
+
+```bash
+# .env: OBSERVABILITY_VERIFY_TOKEN=<access_token từ /ai/login>
+npm run observability:verify-background
+```
+
+Script: receiver local → đăng ký webhook → `POST /gateway/jobs/image` `wait: false` → đợi event `data.background: true` → xóa webhook.
+
+Thoát **SKIP** nếu model trả kết quả ngay (sync). Env tuỳ chọn: `OBSERVABILITY_VERIFY_GATEWAY_URL`, `OBSERVABILITY_VERIFY_MODEL_SLUG`, `OBSERVABILITY_VERIFY_TIMEOUT_MS` (mặc định 6 phút).
+
 ### Smoke test checklist
 
 Thủ công (đã đăng nhập, `npm run docs:stack`):
@@ -156,5 +169,6 @@ Thủ công (đã đăng nhập, `npm run docs:stack`):
 - [ ] **Xóa** → hộp thoại xác nhận; webhook bị xóa
 - [ ] Mở **Ví dụ payload** → **Copy JSON** hoạt động
 - [ ] Đủ 5 webhook → form bị disable + hint giới hạn
+- [ ] Tuỳ chọn live: `npm run observability:verify-background` (xem trên)
 
 Xem thêm [Lịch sử usage](./usage.md) và [Media & jobs](./media.md).

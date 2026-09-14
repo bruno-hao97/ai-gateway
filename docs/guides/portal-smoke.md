@@ -67,6 +67,7 @@ See [Observability reference](/reference/observability.md). Quick pass:
 - [ ] Stat cards → Activity / Credits
 - [ ] Webhook add, test, delete; payload Copy JSON
 - [ ] `wait: false` async job + webhook → delivery after background poll (`data.background: true`)
+- [ ] Optional live: `npm run observability:verify-background` — see [Observability reference](/reference/observability.md#automated-background-verify-live)
 
 ## Credits (`/app/credits/`)
 
