@@ -8,7 +8,11 @@ const props = defineProps<{
   models: ChatModelOption[];
   disabled?: boolean;
   isVi?: boolean;
+  /** Gateway BYOK map — show badge on mapped chat models */
+  byokModelIds?: string[];
 }>();
+
+const byokIdSet = computed(() => new Set(props.byokModelIds ?? []));
 
 const emit = defineEmits<{
   'update:modelId': [value: string];
@@ -44,6 +48,10 @@ function select(id: string) {
   open.value = false;
 }
 
+function isByokModel(id: string): boolean {
+  return byokIdSet.value.has(id);
+}
+
 function onDocClick(e: MouseEvent) {
   if (!open.value) return;
   const el = root.value;
@@ -64,6 +72,13 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
       @click.stop="toggle"
     >
       <span class="or-chat-model-trigger-label">{{ modelPickerLabel(activeModel, !!isVi) }}</span>
+      <span
+        v-if="isByokModel(modelId)"
+        class="or-chat-model-badge or-chat-model-badge--byok"
+        :title="isVi ? 'Model chat BYOK — dùng provider key' : 'BYOK chat model — uses your provider key'"
+      >
+        BYOK
+      </span>
       <span class="or-chat-model-trigger-caret" aria-hidden="true">▾</span>
     </button>
 
@@ -88,7 +103,17 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
             :aria-selected="model.id === modelId"
             @click="select(model.id)"
           >
-            <span class="or-chat-model-item-label">{{ model.label }}</span>
+            <span class="or-chat-model-item-top">
+              <span class="or-chat-model-item-label">{{ model.label }}</span>
+              <span v-if="isByokModel(model.id)" class="or-chat-model-badges">
+                <span
+                  class="or-chat-model-badge or-chat-model-badge--byok"
+                  :title="isVi ? 'Chat BYOK' : 'Chat BYOK'"
+                >
+                  BYOK
+                </span>
+              </span>
+            </span>
           </button>
         </li>
         <li v-if="filtered.length === 0" class="or-chat-model-empty">

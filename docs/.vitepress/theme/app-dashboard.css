@@ -134,6 +134,18 @@
   color: var(--or-accent);
 }
 
+.or-app-sidebar-credits-link {
+  display: block;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.or-app-sidebar-credits-link:hover {
+  opacity: 0.85;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .or-app-sidebar-user {
   margin: 0.2rem 0 0;
   font-size: 0.6875rem;
@@ -208,6 +220,13 @@
   background: color-mix(in srgb, var(--or-accent) 15%, transparent);
   color: var(--or-text);
   border: 1px solid color-mix(in srgb, var(--or-accent) 35%, transparent);
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+a.or-app-credits-pill:hover {
+  background: color-mix(in srgb, var(--or-accent) 24%, transparent);
+  border-color: color-mix(in srgb, var(--or-accent) 50%, transparent);
 }
 
 .or-app-btn {
@@ -7187,6 +7206,19 @@ body.gw-api-playground-immersive .or-app-playground-layout.or-catalog {
   border: 1px solid var(--or-border);
   color: var(--or-text-muted);
   white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.or-chat-model-badge--byok {
+  border-color: color-mix(in srgb, #6366f1 45%, var(--or-border));
+  color: #6366f1;
+  background: color-mix(in srgb, #6366f1 12%, transparent);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.or-chat-model-trigger .or-chat-model-badge--byok {
+  margin-left: 0.25rem;
 }
 
 .or-app-chat-sidebar-backdrop {

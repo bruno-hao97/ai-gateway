@@ -22,6 +22,7 @@ npm run test:aggregate
 - [ ] Hero: **Open Playground**, **Activity**, **Copy token**
 - [ ] Usage widget (7 days) loads; recent jobs clickable → Explore + job modal
 - [ ] **Workspace** cards: Activity, Access token, Credits, BYOK, Files, Observability
+- [ ] Header / sidebar **credits pill** → `/app/credits/`
 - [ ] **Resources**: Quickstart, MCP, Authentication, **Portal smoke test** (this page)
 
 ## Chat (`/app/chat/`)
@@ -29,6 +30,7 @@ npm run test:aggregate
 - [ ] Low-credit banner when balance &lt; threshold
 - [ ] BYOK hint when gateway has mapped chat models — link **Open BYOK**
 - [ ] Hint updates when selecting a BYOK-mapped model (with provider key saved)
+- [ ] Model picker shows **BYOK** badge on mapped models
 
 ## Activity (`/app/activity/`)
 

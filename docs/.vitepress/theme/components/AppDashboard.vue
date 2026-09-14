@@ -135,6 +135,8 @@ const overviewActivityHref = computed(() =>
   activityHubHref(prefix.value, { period: PROFILE_USAGE_PREVIEW_PERIOD }),
 );
 
+const creditsHref = computed(() => `${prefix.value}/app/credits/`);
+
 const overviewWorkspaceCards = computed(() => [
   {
     id: 'activity',
@@ -586,7 +588,9 @@ useVitepressUrlSync(syncDashboardFromLocation);
       </nav>
 
       <div class="or-app-sidebar-foot">
-        <p class="or-app-sidebar-credits">{{ formatCredits(credits) }} credits</p>
+        <a :href="creditsHref" class="or-app-sidebar-credits or-app-sidebar-credits-link">
+          {{ formatCredits(credits) }} credits
+        </a>
         <p v-if="username" class="or-app-sidebar-user">@{{ username }}</p>
       </div>
     </aside>
@@ -684,7 +688,7 @@ useVitepressUrlSync(syncDashboardFromLocation);
           </p>
         </div>
         <div class="or-app-header-actions">
-          <span class="or-app-credits-pill">{{ formatCredits(credits) }} credits</span>
+          <a :href="creditsHref" class="or-app-credits-pill">{{ formatCredits(credits) }} credits</a>
           <button
             type="button"
             class="or-app-btn or-app-btn-ghost"

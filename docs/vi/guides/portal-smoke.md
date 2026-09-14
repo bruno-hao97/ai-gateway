@@ -22,6 +22,7 @@ npm run test:aggregate
 - [ ] Hero: **Open Playground**, **Activity**, **Copy token**
 - [ ] Widget Usage (7 ngày) tải; recent jobs click → Explore + modal job
 - [ ] **Workspace**: Activity, Access token, Credits, BYOK, Files, Observability
+- [ ] Pill **credits** header / sidebar → `/app/credits/`
 - [ ] **Resources**: Quickstart, MCP, Authentication, **Portal smoke test** (trang này)
 
 ## Chat (`/app/chat/`)
@@ -29,6 +30,7 @@ npm run test:aggregate
 - [ ] Banner số dư thấp khi credits &lt; ngưỡng
 - [ ] Hint BYOK khi gateway có model map — link **Mở BYOK**
 - [ ] Hint đổi khi chọn model BYOK (đã lưu provider key)
+- [ ] Model picker có badge **BYOK** trên model map
 
 ## Activity (`/app/activity/`)
 

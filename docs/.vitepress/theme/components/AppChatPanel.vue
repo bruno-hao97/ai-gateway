@@ -177,6 +177,8 @@ const byokMappedIds = computed(
   () => new Set((byokStatus.value?.supportedChatModels ?? []).map((m) => m.gatewayModelId)),
 );
 
+const byokModelIdList = computed(() => [...byokMappedIds.value]);
+
 const hasProviderByok = computed(() =>
   (byokStatus.value?.providers ?? []).some((p) => p.chatSupported && p.configured),
 );
@@ -1780,6 +1782,7 @@ onUnmounted(() => {
             v-model:model-id="activeModelId"
             class="or-chat-model-picker--toolbar"
             :models="chatModels"
+            :byok-model-ids="byokModelIdList"
             :disabled="streaming || modelsLoading || chatModels.length === 0"
             :is-vi="isVi"
           />
