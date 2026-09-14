@@ -27,6 +27,7 @@ Chia sẻ hoặc bookmark view bằng query:
 | `model` | Slug model | Chỉ Explore; lọc danh sách job |
 | `job` | `id_base` job | Chỉ Explore; mở modal chi tiết job |
 | `type` | `image`, `video`, `audio`, `music` | Chỉ Explore; lọc theo loại job |
+| `q` | Từ khóa tìm | Chỉ Explore; lọc model/prompt (client-side) |
 
 Ví dụ:
 
@@ -34,6 +35,7 @@ Ví dụ:
 - Trends 90 ngày: `/vi/app/activity/?tab=trends&period=90d`
 - Explore một model: `/vi/app/activity/?tab=explore&model=imagegen_2_0&period=30d`
 - Explore job video: `/vi/app/activity/?tab=explore&type=video&period=30d`
+- Tìm kiếm + loại: `/vi/app/activity/?tab=explore&type=video&q=cat`
 
 Click **Top models** trên Overview để sang Explore với filter model tương ứng. **Copy link** trong modal job để chia sẻ URL `?job=`. **Xuất CSV** trên Overview tải tối đa 1.000 job theo period đang chọn.
 

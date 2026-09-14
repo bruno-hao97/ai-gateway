@@ -1646,12 +1646,18 @@
   color: var(--or-accent);
 }
 
+.or-usage-explore-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
 .or-usage-explore-filter-chip {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0.65rem;
   padding: 0.45rem 0.65rem;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--or-accent) 35%, var(--or-border));

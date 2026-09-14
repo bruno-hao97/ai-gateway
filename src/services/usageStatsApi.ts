@@ -118,11 +118,41 @@ export function normalizeUsageType(raw: string | undefined): UsageStatsType {
   return 'all';
 }
 
+function normalizeLogJobType(raw: string | undefined, model?: string): UsageStatsType | undefined {
+  const token = String(raw || '').trim().toLowerCase();
+  const aliases: Record<string, UsageStatsType> = {
+    image: 'image',
+    img: 'image',
+    video: 'video',
+    t2v: 'video',
+    i2v: 'video',
+    audio: 'audio',
+    tts: 'audio',
+    music: 'music',
+  };
+  if (token && aliases[token]) return aliases[token];
+  if (token === 'image' || token === 'video' || token === 'audio' || token === 'music') {
+    return token;
+  }
+  const modelHint = String(model || '').toLowerCase();
+  if (/veo|t2v|i2v|video|sora|kling/.test(modelHint)) return 'video';
+  if (/imagen|midjourney|flux|dall|imagegen|stable/.test(modelHint)) return 'image';
+  if (/tts|audio|speech|eleven/.test(modelHint)) return 'audio';
+  if (/music|suno|udio/.test(modelHint)) return 'music';
+  return undefined;
+}
+
 function normalizeLogItem(raw: Record<string, unknown>): UsageListItem {
   const id = String(raw.id_base || raw.id || raw.job_id || raw.task_id || '').trim();
+  const model = String(raw.model || '').trim();
+  const type = normalizeLogJobType(
+    typeof raw.type === 'string' ? raw.type : undefined,
+    model,
+  );
   return {
     ...(raw as UsageListItem),
     id_base: id || (raw as UsageListItem).id_base,
+    ...(type ? { type } : {}),
   };
 }
 

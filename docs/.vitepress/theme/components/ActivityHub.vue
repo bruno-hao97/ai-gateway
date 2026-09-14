@@ -77,10 +77,16 @@ function readTypeFromLocation(): UsageStatsType | 'all' {
   return 'all';
 }
 
+function readSearchFromLocation(): string {
+  if (typeof window === 'undefined') return '';
+  return new URLSearchParams(window.location.search).get('q')?.trim() || '';
+}
+
 const sharedPeriod = ref<UsageStatsPeriod>(readPeriodFromLocation());
 const sharedModel = ref(readModelFromLocation());
 const sharedJobId = ref(readJobFromLocation());
 const sharedType = ref<UsageStatsType | 'all'>(readTypeFromLocation());
+const sharedSearchQuery = ref(readSearchFromLocation());
 const overviewLoading = ref(true);
 const overviewError = ref('');
 const statsData = ref<UsageStatsData | null>(null);
@@ -195,6 +201,11 @@ function syncQueryToUrl() {
   } else {
     url.searchParams.delete('type');
   }
+  if (activeTab.value === 'explore' && sharedSearchQuery.value) {
+    url.searchParams.set('q', sharedSearchQuery.value);
+  } else {
+    url.searchParams.delete('q');
+  }
   window.history.replaceState({}, '', url.toString());
 }
 
@@ -227,6 +238,13 @@ function setSharedType(type: UsageStatsType | 'all') {
   syncQueryToUrl();
 }
 
+function setSharedSearch(query: string) {
+  const next = query.trim();
+  if (sharedSearchQuery.value === next) return;
+  sharedSearchQuery.value = next;
+  syncQueryToUrl();
+}
+
 const showEmptyOverview = computed(
   () =>
     !overviewLoading.value &&
@@ -242,6 +260,7 @@ function tabHref(tab: ActivityTab, model?: string): string {
     model: model?.trim() || (tab === 'explore' ? sharedModel.value : undefined),
     job: tab === 'explore' ? sharedJobId.value : undefined,
     type: tab === 'explore' ? sharedType.value : undefined,
+    q: tab === 'explore' ? sharedSearchQuery.value : undefined,
   });
 }
 
@@ -397,17 +416,22 @@ function syncFromLocation() {
   const nextModel = nextTab === 'explore' ? readModelFromLocation() : '';
   const nextJob = nextTab === 'explore' ? readJobFromLocation() : '';
   const nextType = nextTab === 'explore' ? readTypeFromLocation() : 'all';
+  const nextSearch = nextTab === 'explore' ? readSearchFromLocation() : '';
   const tabChanged = nextTab !== activeTab.value;
   const periodChanged = nextPeriod !== sharedPeriod.value;
   const modelChanged = nextModel !== sharedModel.value;
   const jobChanged = nextJob !== sharedJobId.value;
   const typeChanged = nextType !== sharedType.value;
-  if (!tabChanged && !periodChanged && !modelChanged && !jobChanged && !typeChanged) return;
+  const searchChanged = nextSearch !== sharedSearchQuery.value;
+  if (!tabChanged && !periodChanged && !modelChanged && !jobChanged && !typeChanged && !searchChanged) {
+    return;
+  }
   activeTab.value = nextTab;
   sharedPeriod.value = nextPeriod;
   sharedModel.value = nextModel;
   sharedJobId.value = nextJob;
   sharedType.value = nextType;
+  sharedSearchQuery.value = nextSearch;
   void reloadActiveTab();
 }
 
@@ -772,6 +796,7 @@ defineExpose({ reload: reloadAll });
         :initial-model-filter="sharedModel"
         :initial-job-id="sharedJobId"
         :initial-type-filter="sharedType"
+        :initial-search-query="sharedSearchQuery"
         :credits="credits"
         :is-vi="isVi"
         :prefix="prefix"
@@ -779,6 +804,7 @@ defineExpose({ reload: reloadAll });
         @model-filter-change="setSharedModel"
         @job-id-change="setSharedJob"
         @type-filter-change="setSharedType"
+        @search-query-change="setSharedSearch"
       />
     </div>
 

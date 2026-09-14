@@ -344,13 +344,53 @@ export function listItemStatus(item: UsageListItem): 'success' | 'failed' | 'pen
   return 'success';
 }
 
+const USAGE_JOB_TYPE_ALIASES: Record<string, UsageStatsType> = {
+  image: 'image',
+  img: 'image',
+  picture: 'image',
+  video: 'video',
+  vid: 'video',
+  t2v: 'video',
+  i2v: 'video',
+  audio: 'audio',
+  speech: 'audio',
+  tts: 'audio',
+  music: 'music',
+  song: 'music',
+};
+
+/** Normalize Gommo job type for filters and chips. */
+export function normalizeUsageJobType(
+  raw: string | undefined,
+  model?: string,
+): UsageStatsType | undefined {
+  const token = String(raw || '').trim().toLowerCase();
+  if (token && USAGE_JOB_TYPE_ALIASES[token]) return USAGE_JOB_TYPE_ALIASES[token];
+  if (token === 'image' || token === 'video' || token === 'audio' || token === 'music') {
+    return token;
+  }
+
+  const modelHint = String(model || '').toLowerCase();
+  if (modelHint) {
+    if (/veo|t2v|i2v|video|sora|kling|runway|wan_/.test(modelHint)) return 'video';
+    if (/imagen|midjourney|flux|dall|imagegen|stable|gpt_image/.test(modelHint)) return 'image';
+    if (/tts|audio|speech|eleven|suno_tts/.test(modelHint)) return 'audio';
+    if (/music|suno|udio/.test(modelHint)) return 'music';
+  }
+
+  return undefined;
+}
+
 export function filterListItems(
   items: UsageListItem[],
-  opts: { type: UsageStatsType; query: string },
+  opts: { type: UsageStatsType | 'all'; query: string },
 ): UsageListItem[] {
   const q = opts.query.trim().toLowerCase();
   return items.filter((item) => {
-    if (opts.type !== 'all' && String(item.type || '').toLowerCase() !== opts.type) return false;
+    if (opts.type !== 'all') {
+      const itemType = normalizeUsageJobType(item.type, item.model);
+      if (itemType !== opts.type) return false;
+    }
     if (!q) return true;
     const hay = `${item.model || ''} ${item.prompt || ''} ${item.type || ''} ${item.status || ''}`.toLowerCase();
     return hay.includes(q);
@@ -372,7 +412,12 @@ export function usageJobId(item: UsageListItem | null | undefined): string {
 
 export function normalizeUsageListItem(item: UsageListItem): UsageListItem {
   const id = usageJobId(item);
-  return id ? { ...item, id_base: id } : item;
+  const type = normalizeUsageJobType(item.type, item.model);
+  return {
+    ...item,
+    ...(id ? { id_base: id } : {}),
+    ...(type ? { type } : {}),
+  };
 }
 
 export function matchesUsageJobId(item: UsageListItem, jobId: string): boolean {

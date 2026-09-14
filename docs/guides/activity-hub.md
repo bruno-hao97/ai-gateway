@@ -27,6 +27,7 @@ Share or bookmark a view with query parameters:
 | `model` | Model slug | Explore only; filters job list |
 | `job` | Job `id_base` | Explore only; opens job detail modal |
 | `type` | `image`, `video`, `audio`, `music` | Explore only; filters by job type |
+| `q` | Search text | Explore only; filters model/prompt (client-side) |
 
 Examples:
 
@@ -34,6 +35,7 @@ Examples:
 - Trends, 90 days: `/app/activity/?tab=trends&period=90d`
 - Explore one model: `/app/activity/?tab=explore&model=imagegen_2_0&period=30d`
 - Explore video jobs: `/app/activity/?tab=explore&type=video&period=30d`
+- Search + type: `/app/activity/?tab=explore&type=video&q=cat`
 - Open job detail: `/app/activity/?tab=explore&job=JOB_ID_BASE`
 
 Click **Top models** on Overview to jump to Explore with the model filter applied. Use **Copy link** in the job modal to share a `?job=` URL. **Export CSV** on Overview downloads up to 1,000 jobs for the selected period.

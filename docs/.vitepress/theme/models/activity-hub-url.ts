@@ -15,6 +15,7 @@ export function activityHubHref(
     model?: string;
     job?: string;
     type?: UsageStatsType | 'all';
+    q?: string;
   },
 ): string {
   const params = new URLSearchParams();
@@ -30,6 +31,8 @@ export function activityHubHref(
   if (tab === 'explore' && type !== 'all' && EXPLORE_TYPES.has(type)) {
     params.set('type', type);
   }
+  const q = opts?.q?.trim() || '';
+  if (tab === 'explore' && q) params.set('q', q);
   const query = params.toString();
   const base = `${prefix}/app/activity/`;
   return query ? `${base}?${query}` : base;

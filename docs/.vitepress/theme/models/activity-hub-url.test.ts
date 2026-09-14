@@ -46,4 +46,12 @@ describe('activityHubHref', () => {
     assert.equal(activityHubHref('', { tab: 'trends', type: 'image' }), '/app/activity/?tab=trends');
     assert.equal(activityHubHref('', { tab: 'explore', type: 'all' }), '/app/activity/?tab=explore');
   });
+
+  it('includes q only on explore tab', () => {
+    assert.equal(
+      activityHubHref('', { tab: 'explore', q: 'cat video', type: 'video' }),
+      '/app/activity/?tab=explore&type=video&q=cat+video',
+    );
+    assert.equal(activityHubHref('', { tab: 'overview', q: 'test' }), '/app/activity/');
+  });
 });

@@ -48,6 +48,8 @@ const props = defineProps<{
   initialJobId?: string;
   /** Pre-filter Explore by job type (?type=) */
   initialTypeFilter?: UsageStatsType | 'all';
+  /** Pre-fill Explore search (?q=) */
+  initialSearchQuery?: string;
 }>();
 
 const emit = defineEmits<{
@@ -55,6 +57,7 @@ const emit = defineEmits<{
   modelFilterChange: [model: string];
   jobIdChange: [jobId: string];
   typeFilterChange: [type: UsageStatsType | 'all'];
+  searchQueryChange: [query: string];
 }>();
 
 const logsOnly = computed(() => props.mode === 'logs');
@@ -80,6 +83,7 @@ const jobDetailOpen = ref(false);
 const pendingJobId = ref('');
 const exploreExporting = ref(false);
 let pendingJobRun = 0;
+let searchEmitTimer: ReturnType<typeof setTimeout> | undefined;
 
 const typeOptions = computed(() => [
   { id: 'all' as const, label: props.isVi ? 'Tất cả' : 'All' },
@@ -167,6 +171,7 @@ const filteredListItems = computed(() => {
 });
 
 const hasActiveModelFilter = computed(() => modelFilter.value.trim().length > 0);
+const hasActiveTypeFilter = computed(() => typeFilter.value !== 'all');
 
 const exploreLogCount = computed(() => filteredListItems.value.length);
 
@@ -376,6 +381,23 @@ function clearModelFilter() {
   emit('modelFilterChange', '');
 }
 
+function clearTypeFilter() {
+  if (typeFilter.value === 'all') return;
+  setTypeFilter('all');
+}
+
+function applyInitialSearchQuery(query?: string) {
+  searchQuery.value = (query || '').trim();
+}
+
+function scheduleSearchEmit() {
+  if (!logsOnly.value) return;
+  if (searchEmitTimer) clearTimeout(searchEmitTimer);
+  searchEmitTimer = setTimeout(() => {
+    emit('searchQueryChange', searchQuery.value.trim());
+  }, 400);
+}
+
 function openJobDetail(row: UsageListItem) {
   pendingJobRun += 1;
   const normalized = normalizeUsageListItem(row);
@@ -428,6 +450,7 @@ const exploreJobShareHref = computed(() => {
     model: modelFilter.value || undefined,
     job: jobId,
     type: typeFilter.value,
+    q: searchQuery.value.trim() || undefined,
   });
 });
 
@@ -454,6 +477,21 @@ watch(
   },
   { immediate: true },
 );
+
+watch(
+  () => props.initialSearchQuery,
+  (query) => {
+    const next = (query || '').trim();
+    if (next !== searchQuery.value.trim()) {
+      applyInitialSearchQuery(next);
+    }
+  },
+  { immediate: true },
+);
+
+watch(searchQuery, () => {
+  scheduleSearchEmit();
+});
 
 watch(
   () => props.initialJobId,
@@ -614,12 +652,23 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="logsOnly && hasActiveModelFilter" class="or-usage-explore-filter-chip">
-      <span class="or-usage-explore-filter-label">{{ isVi ? 'Model' : 'Model' }}</span>
-      <code class="or-usage-model">{{ modelFilter }}</code>
-      <button type="button" class="or-usage-explore-filter-clear" @click="clearModelFilter">
-        {{ isVi ? 'Xóa lọc' : 'Clear filter' }}
-      </button>
+    <div v-if="logsOnly && (hasActiveModelFilter || hasActiveTypeFilter)" class="or-usage-explore-filter-chips">
+      <div v-if="hasActiveModelFilter" class="or-usage-explore-filter-chip">
+        <span class="or-usage-explore-filter-label">{{ isVi ? 'Model' : 'Model' }}</span>
+        <code class="or-usage-model">{{ modelFilter }}</code>
+        <button type="button" class="or-usage-explore-filter-clear" @click="clearModelFilter">
+          {{ isVi ? 'Xóa lọc' : 'Clear filter' }}
+        </button>
+      </div>
+      <div v-if="hasActiveTypeFilter" class="or-usage-explore-filter-chip">
+        <span class="or-usage-explore-filter-label">{{ isVi ? 'Loại' : 'Type' }}</span>
+        <span class="or-usage-type-chip" :class="`or-usage-type-chip--${typeFilter}`">
+          {{ jobTypeLabel(typeFilter, isVi) }}
+        </span>
+        <button type="button" class="or-usage-explore-filter-clear" @click="clearTypeFilter">
+          {{ isVi ? 'Xóa lọc' : 'Clear filter' }}
+        </button>
+      </div>
     </div>
 
     <div class="or-usage-toolbar" :class="{ 'or-usage-toolbar--sticky': logsOnly }">
