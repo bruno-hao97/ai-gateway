@@ -9,6 +9,8 @@ description: Tổng quan nạp Gommo VietQR và fulfillment credit
 
 Luồng mặc định proxy Gommo subscriptions. Credit được cộng bởi **Gommo upstream** sau chuyển khoản; client poll `payment_sync`.
 
+**Portal UI:** [`/app/credits/`](/vi/app/credits/) — KPI số dư, gói VietQR, modal checkout, lịch sử nạp. Link sang Activity Billing và [tài liệu billing](./billing-credits.md).
+
 ## Tổng quan
 
 ```

@@ -6,28 +6,22 @@ import type { PlaygroundPortalLocale } from '../models/playground-locale-bridge'
 import { useHybridLocale } from '../composables/use-hybrid-locale';
 import { getStoredToken, getStoredDomain, importSessionFromUrl, loginUrlWithRedirect } from '../models/auth-api';
 import {
-  fetchBillingPackages,
-  fetchBillingStatus,
   fetchMe,
   fetchTopupOrders,
   formatCredits,
-  formatOrderDate,
-  formatTopupOrderStatus,
   getCachedMe,
   getCredits,
   getDisplayName,
   getEmail,
   getAvatarUrl,
   getUsername,
-  type CreditPackage,
   type MeResponse,
   type TopupOrder,
-  type TopupOrderStatus,
 } from '../models/user-api';
 import AppNavIcon from './AppNavIcon.vue';
 import AppChatPanel from './AppChatPanel.vue';
 import ApiPlaygroundEmbed from './ApiPlaygroundEmbed.vue';
-import CreditsCheckoutModal from './CreditsCheckoutModal.vue';
+import CreditsPanel from './CreditsPanel.vue';
 import ProfileLandingPanel from './ProfileLandingPanel.vue';
 import ActivityHub from './ActivityHub.vue';
 import OverviewUsageSection from './OverviewUsageSection.vue';
@@ -38,7 +32,7 @@ import ByokPanel from './ByokPanel.vue';
 import FilesPanel from './FilesPanel.vue';
 import ObservabilityPanel from './ObservabilityPanel.vue';
 import { activityHubHref, PROFILE_USAGE_PREVIEW_PERIOD } from '../models/activity-hub-url';
-import { formatApproxUsd, formatPayTotalLine } from '../models/invoice-buyer';
+import { formatApproxUsd } from '../models/invoice-buyer';
 
 const TOKEN_COPIED_STORAGE_KEY = 'gateway_token_copied';
 
@@ -90,9 +84,6 @@ const overviewUsageStats = ref<OverviewUsageStats>({
   hasError: false,
 });
 
-const packages = ref<CreditPackage[]>([]);
-const packagesLoading = ref(false);
-const packagesError = ref('');
 const topupOrders = ref<TopupOrder[]>([]);
 const ordersLoading = ref(false);
 const showStalePending = ref(false);
@@ -112,12 +103,8 @@ const visibleTopupOrders = computed(() => {
 const hiddenPendingCount = computed(
   () => topupOrders.value.length - visibleTopupOrders.value.length,
 );
-const billingReady = ref(true);
-const checkoutOpen = ref(false);
-const checkoutPackage = ref<CreditPackage | null>(null);
-const checkoutToast = ref('');
-let checkoutToastTimer: ReturnType<typeof setTimeout> | null = null;
 const profileLandingRef = ref<InstanceType<typeof ProfileLandingPanel> | null>(null);
+const creditsPanelRef = ref<InstanceType<typeof CreditsPanel> | null>(null);
 const activityHubRef = ref<InstanceType<typeof ActivityHub> | null>(null);
 const overviewUsageRef = ref<InstanceType<typeof OverviewUsageSection> | null>(null);
 const accessTokenRef = ref<InstanceType<typeof AccessTokenPanel> | null>(null);
@@ -166,6 +153,16 @@ const overviewWorkspaceCards = computed(() => [
       : 'Bearer token, Gateway snippets, and connection checks.',
     href: `${prefix.value}/app/token/`,
     cta: isVi.value ? 'Mở token' : 'Open token',
+  },
+  {
+    id: 'byok',
+    title: 'BYOK',
+    badge: 'beta',
+    desc: isVi.value
+      ? 'Provider key cho chat, link Gommo cho media — hybrid BYOK.'
+      : 'Provider keys for chat, linked Gommo for media — hybrid BYOK.',
+    href: `${prefix.value}/app/byok/`,
+    cta: isVi.value ? 'Mở BYOK' : 'Open BYOK',
   },
   {
     id: 'files',
@@ -419,6 +416,12 @@ async function refreshActivityView() {
   await activityHubRef.value?.reload();
 }
 
+async function refreshCreditsView() {
+  await refreshProfile();
+  await creditsPanelRef.value?.reload();
+  await loadTopupOrders();
+}
+
 async function loadTopupOrders() {
   if (!username.value) {
     topupOrders.value = [];
@@ -434,51 +437,7 @@ async function loadTopupOrders() {
   }
 }
 
-async function loadCreditsView() {
-  packagesLoading.value = true;
-  packagesError.value = '';
-  try {
-    const status = await fetchBillingStatus();
-    billingReady.value = status.gommoPayment !== false;
-    packages.value = await fetchBillingPackages();
-    await loadTopupOrders();
-  } catch (e) {
-    packagesError.value = e instanceof Error ? e.message : String(e);
-  } finally {
-    packagesLoading.value = false;
-  }
-}
-
-function orderStatusClass(status: TopupOrderStatus): string {
-  return `or-app-order-status--${status}`;
-}
-
-function onTopup(packageId: string) {
-  if (!username.value) {
-    packagesError.value = isVi.value ? 'Thiếu username — đăng nhập lại' : 'Missing username — sign in again';
-    return;
-  }
-  const pkg = packages.value.find((item) => item.id === packageId);
-  if (!pkg) return;
-  packagesError.value = '';
-  checkoutPackage.value = pkg;
-  checkoutOpen.value = true;
-}
-
-function closeCheckout() {
-  checkoutOpen.value = false;
-  checkoutPackage.value = null;
-}
-
-function onCheckoutToast(message: string) {
-  checkoutToast.value = message;
-  if (checkoutToastTimer) clearTimeout(checkoutToastTimer);
-  checkoutToastTimer = setTimeout(() => {
-    checkoutToast.value = '';
-  }, 3200);
-}
-
-async function onCheckoutPaid() {
+async function onCreditsPaid() {
   await refreshProfile();
   await loadTopupOrders();
 }
@@ -532,9 +491,6 @@ onMounted(async () => {
     return;
   }
   await refreshProfile();
-  if (props.view === 'credits') {
-    await loadCreditsView();
-  }
   if (props.view === 'profile') {
     await loadProfileView();
   }
@@ -738,7 +694,9 @@ useVitepressUrlSync(syncDashboardFromLocation);
                           ? refreshObservabilityView()
                           : view === 'activity'
                             ? refreshActivityView()
-                            : refreshProfile()
+                            : view === 'credits'
+                              ? refreshCreditsView()
+                              : refreshProfile()
             "
           >
             {{ isVi ? 'Làm mới' : 'Refresh' }}
@@ -899,6 +857,17 @@ useVitepressUrlSync(syncDashboardFromLocation);
               <p>{{ isVi ? 'Bearer token, domain Gommo, và các mode tích hợp.' : 'Bearer token, Gommo domain, and integration modes.' }}</p>
               <span class="or-app-card-cta">{{ isVi ? 'Xem auth' : 'View auth' }} →</span>
             </a>
+            <a :href="`${prefix}/guides/portal-smoke`" class="or-app-card">
+              <h3>{{ isVi ? 'Portal smoke test' : 'Portal smoke test' }}</h3>
+              <p>
+                {{
+                  isVi
+                    ? 'Checklist một lần chạy sau đổi UI portal — Activity, BYOK, Credits…'
+                    : 'One-pass checklist after portal UI changes — Activity, BYOK, Credits…'
+                }}
+              </p>
+              <span class="or-app-card-cta">{{ isVi ? 'Mở checklist' : 'Open checklist' }} →</span>
+            </a>
           </div>
         </section>
 
@@ -1025,146 +994,18 @@ useVitepressUrlSync(syncDashboardFromLocation);
         </section>
 
         <!-- Credits -->
-        <section v-else-if="view === 'credits'" class="or-app-section">
-          <p v-if="!billingReady" class="or-app-alert or-app-alert-warn">
-            {{
-              isVi
-                ? 'Billing Gommo chưa sẵn sàng — xem GET /billing/status.'
-                : 'Gommo billing not ready — see GET /billing/status.'
-            }}
-          </p>
-
-          <p v-if="packagesLoading" class="or-app-muted">
-            {{ isVi ? 'Đang tải gói…' : 'Loading packages…' }}
-          </p>
-          <p v-else-if="packagesError" class="or-app-alert">{{ packagesError }}</p>
-
-          <div v-else-if="packages.length === 0" class="or-app-panel or-app-empty">
-            {{ isVi ? 'Chưa có gói credit.' : 'No credit packages available.' }}
-          </div>
-
-          <div v-else class="or-app-pkg-grid">
-            <article
-              v-for="pkg in packages"
-              :key="pkg.id"
-              class="or-app-pkg"
-              :class="{ featured: pkg.featured }"
-            >
-              <span v-if="pkg.featured" class="or-app-pkg-ribbon">
-                {{ isVi ? 'BEST' : 'BEST' }}
-              </span>
-              <div class="or-app-pkg-head">
-                <h3>{{ pkg.name }}</h3>
-                <span v-if="pkg.bonusPercent > 0" class="or-app-pkg-badge">
-                  +{{ pkg.bonusPercent }}% {{ isVi ? 'Thưởng' : 'Bonus' }}
-                </span>
-              </div>
-              <p class="or-app-pkg-price">
-                {{ pkg.amountVnd.toLocaleString(isVi ? 'vi-VN' : 'en-US') }} ₫
-                <template v-if="!isVi"> · {{ formatApproxUsd(pkg.amountVnd) }}</template>
-              </p>
-              <p class="or-app-pkg-credits">{{ formatCredits(pkg.credits) }} credits</p>
-              <p class="or-app-pkg-vat">{{ formatPayTotalLine(pkg.amountVnd, isVi) }}</p>
-              <button
-                type="button"
-                class="or-app-btn"
-                :class="pkg.featured ? 'or-app-btn-accent' : 'or-app-btn-ghost'"
-                @click="onTopup(pkg.id)"
-              >
-                {{ isVi ? 'Nạp ngay' : 'Top up' }}
-              </button>
-            </article>
-          </div>
-
-          <CreditsCheckoutModal
-            :open="checkoutOpen"
-            :pkg="checkoutPackage"
-            :username="username"
-            :default-email="email"
+        <section v-else-if="view === 'credits'" class="or-app-section or-app-section--credits">
+          <CreditsPanel
+            ref="creditsPanelRef"
             :is-vi="isVi"
-            @close="closeCheckout"
-            @paid="onCheckoutPaid"
-            @toast="onCheckoutToast"
+            :prefix="prefix"
+            :credits="credits"
+            :credits-low="creditsLow"
+            :credits-approx-usd="creditsApproxUsd"
+            :username="username"
+            :email="email"
+            @paid="onCreditsPaid"
           />
-
-          <p v-if="checkoutToast" class="or-checkout-toast" role="status">{{ checkoutToast }}</p>
-
-          <div class="or-app-panel or-app-orders">
-            <div class="or-app-orders-head">
-              <h3 class="or-app-panel-title">
-                {{ isVi ? 'Lịch sử nạp' : 'Top-up history' }}
-              </h3>
-              <button
-                type="button"
-                class="or-app-btn or-app-btn-ghost or-app-btn-sm"
-                :disabled="ordersLoading"
-                @click="loadTopupOrders"
-              >
-                {{ ordersLoading ? (isVi ? 'Đang tải…' : 'Loading…') : isVi ? 'Làm mới' : 'Refresh' }}
-              </button>
-            </div>
-
-            <p v-if="ordersLoading && topupOrders.length === 0" class="or-app-muted">
-              {{ isVi ? 'Đang tải lịch sử…' : 'Loading history…' }}
-            </p>
-            <p v-else-if="visibleTopupOrders.length === 0" class="or-app-muted or-app-orders-empty">
-              {{
-                isVi
-                  ? 'Chưa có đơn nạp. Tạo đơn VietQR ở trên để bắt đầu.'
-                  : 'No top-ups yet. Create a VietQR order above to get started.'
-              }}
-            </p>
-
-            <div v-else class="or-app-orders-table-wrap">
-              <table class="or-app-orders-table">
-                <thead>
-                  <tr>
-                    <th>{{ isVi ? 'Mã đơn' : 'Order' }}</th>
-                    <th>{{ isVi ? 'Credits' : 'Credits' }}</th>
-                    <th>{{ isVi ? 'Số tiền' : 'Amount' }}</th>
-                    <th>{{ isVi ? 'Trạng thái' : 'Status' }}</th>
-                    <th>{{ isVi ? 'Thời gian' : 'Date' }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="order in visibleTopupOrders" :key="order.orderCode">
-                    <td><code>#{{ order.orderCode }}</code></td>
-                    <td>{{ formatCredits(order.credits) }}</td>
-                    <td>
-                      {{ order.amountVnd.toLocaleString(isVi ? 'vi-VN' : 'en-US') }} ₫
-                    </td>
-                    <td>
-                      <span
-                        class="or-app-order-status"
-                        :class="orderStatusClass(order.status)"
-                      >
-                        {{ formatTopupOrderStatus(order.status, isVi) }}
-                      </span>
-                    </td>
-                    <td class="or-app-orders-date">
-                      {{ formatOrderDate(order.createdAt, isVi) }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <button
-              v-if="hiddenPendingCount > 0"
-              type="button"
-              class="or-app-orders-pending-toggle"
-              @click="showStalePending = !showStalePending"
-            >
-              {{
-                showStalePending
-                  ? isVi
-                    ? 'Ẩn đơn chờ cũ'
-                    : 'Hide stale pending'
-                  : isVi
-                    ? `Hiện thêm ${hiddenPendingCount} đơn chờ cũ`
-                    : `Show ${hiddenPendingCount} stale pending`
-              }}
-            </button>
-          </div>
         </section>
       </template>
     </div>

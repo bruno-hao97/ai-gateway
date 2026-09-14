@@ -9,6 +9,8 @@ End-user **credit topup** via Gommo (`create_payment` + VietQR) — separate fro
 
 The default path proxies Gommo subscriptions APIs. Credits are fulfilled by **Gommo upstream** after bank transfer; the gateway polls `payment_sync` from the client.
 
+**Portal UI:** [`/app/credits/`](/app/credits/) — balance KPIs, VietQR package grid, checkout modal, and top-up history. Links to Activity Billing and [billing docs](./billing-credits.md).
+
 ## Overview
 
 ```

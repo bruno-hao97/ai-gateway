@@ -81,9 +81,12 @@ import {
 import { appendUsageRecord } from '../models/usage-history';
 import { modelAcceptsJobRefType } from '../models/media-job';
 import { attachmentBadgeLabel } from '../models/chat-attachment-label';
+import { getStoredToken } from '../models/auth-api';
+import { fetchByokStatus, type ByokStatus } from '../models/byok-api';
 
 const LOW_CREDIT_THRESHOLD = 15_000;
 const LOW_CREDIT_DISMISS_KEY = 'gw_portal_chat_low_credit_dismiss_v1';
+const BYOK_HINT_DISMISS_KEY = 'gw_portal_chat_byok_hint_dismiss_v1';
 
 const props = defineProps<{
   credits?: number;
@@ -154,6 +157,8 @@ const videoModelSlug = ref('');
 const videoFieldValues = ref<CatalogJobFieldValues>({});
 const lowCreditDismissed = ref(false);
 const localCredits = ref<number | null>(null);
+const byokStatus = ref<ByokStatus | null>(null);
+const byokHintDismissed = ref(false);
 
 const creditsBalance = computed(() => {
   if (typeof props.credits === 'number') return props.credits;
@@ -167,6 +172,16 @@ const showLowCreditBanner = computed(() => {
   if (balance == null) return false;
   return balance > 0 && balance < LOW_CREDIT_THRESHOLD;
 });
+
+const byokMappedIds = computed(
+  () => new Set((byokStatus.value?.supportedChatModels ?? []).map((m) => m.gatewayModelId)),
+);
+
+const hasProviderByok = computed(() =>
+  (byokStatus.value?.providers ?? []).some((p) => p.chatSupported && p.configured),
+);
+
+const byokHref = computed(() => `${prefix.value}/app/byok/`);
 
 const activeImageModel = computed(() => resolveImageModel(imageModels.value, imageModelSlug.value));
 const activeVideoModel = computed(() => resolveVideoModel(videoModels.value, videoModelSlug.value));
@@ -252,6 +267,35 @@ const activeModelId = computed({
 
 const activeModel = computed(() => findChatModel(chatModels.value, activeModelId.value));
 
+const activeModelUsesByok = computed(() => byokMappedIds.value.has(activeModelId.value));
+
+const showByokHint = computed(() => {
+  if (byokHintDismissed.value) return false;
+  if (!byokStatus.value?.enabled) return false;
+  return (byokStatus.value.supportedChatModels ?? []).length > 0;
+});
+
+const byokHintMessage = computed(() => {
+  const count = byokStatus.value?.supportedChatModels?.length ?? 0;
+  if (!hasProviderByok.value) {
+    return isVi.value
+      ? `Chat BYOK: ${count} model trong gateway map — thêm provider key để dùng key của bạn (phí platform vẫn trừ credit Gommo).`
+      : `Chat BYOK: ${count} mapped models — add a provider key to use your own key (platform fees still use Gommo credits).`;
+  }
+  if (activeModelUsesByok.value) {
+    const mapped = byokStatus.value?.supportedChatModels?.find(
+      (m) => m.gatewayModelId === activeModelId.value,
+    );
+    const provider = mapped?.byokProvider ?? 'provider';
+    return isVi.value
+      ? `Model này chạy BYOK (${provider}) — token tính trên key của bạn; gateway vẫn kiểm tra credit Gommo.`
+      : `This model uses BYOK (${provider}) — tokens bill to your key; gateway still checks Gommo credits.`;
+  }
+  return isVi.value
+    ? `Có ${count} model chat BYOK — chọn trong menu model. Media vẫn dùng Gommo.`
+    : `${count} BYOK chat models available — pick one in the model menu. Media still uses Gommo.`;
+});
+
 const filteredSessions = computed(() => {
   const q = search.value.trim().toLowerCase();
   if (!q) return sessions.value;
@@ -267,6 +311,24 @@ function dismissLowCreditBanner() {
     sessionStorage.setItem(LOW_CREDIT_DISMISS_KEY, '1');
   } catch {
     /* ignore */
+  }
+}
+
+function dismissByokHint() {
+  byokHintDismissed.value = true;
+  try {
+    sessionStorage.setItem(BYOK_HINT_DISMISS_KEY, '1');
+  } catch {
+    /* ignore */
+  }
+}
+
+async function loadByokHint() {
+  if (!getStoredToken()) return;
+  try {
+    byokStatus.value = await fetchByokStatus();
+  } catch {
+    byokStatus.value = null;
   }
 }
 
@@ -1555,10 +1617,12 @@ function onPopState() {
 onMounted(() => {
   try {
     lowCreditDismissed.value = sessionStorage.getItem(LOW_CREDIT_DISMISS_KEY) === '1';
+    byokHintDismissed.value = sessionStorage.getItem(BYOK_HINT_DISMISS_KEY) === '1';
   } catch {
     /* ignore */
   }
   if (props.credits == null) void refreshCreditsBalance();
+  void loadByokHint();
   purgeRemoteChatSessions();
   backfillChatSessionPreviews();
   void loadChatModelCatalog().finally(() => ensureSession());
@@ -1760,6 +1824,18 @@ onUnmounted(() => {
               {{ isVi ? 'Nạp credits' : 'Top up' }}
             </a>
             <button type="button" class="or-app-chat-action" @click="dismissLowCreditBanner">×</button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="showByokHint" class="or-app-chat-col">
+        <div class="or-app-chat-byok-hint">
+          <p>{{ byokHintMessage }}</p>
+          <div class="or-app-chat-low-credit-actions">
+            <a :href="byokHref" class="or-app-btn or-app-btn-ghost or-app-chat-low-credit-link">
+              {{ isVi ? 'Mở BYOK' : 'Open BYOK' }}
+            </a>
+            <button type="button" class="or-app-chat-action" @click="dismissByokHint">×</button>
           </div>
         </div>
       </div>

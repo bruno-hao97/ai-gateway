@@ -59,6 +59,7 @@ const overviewSidebarEn = [
   { text: 'MCP & agents', link: '/mcp' },
   { text: 'Billing & credits', link: '/guides/billing-credits' },
   { text: 'Activity hub', link: '/guides/activity-hub' },
+  { text: 'Portal smoke test', link: '/guides/portal-smoke' },
   { text: 'FAQ', link: '/faq' },
   { text: 'Report feedback', link: '/report-feedback' },
 ];
@@ -72,6 +73,7 @@ const overviewSidebarVi = [
   { text: 'MCP & agents', link: '/vi/mcp' },
   { text: 'Billing & credits', link: '/vi/guides/billing-credits' },
   { text: 'Activity hub', link: '/vi/guides/activity-hub' },
+  { text: 'Portal smoke test', link: '/vi/guides/portal-smoke' },
   { text: 'FAQ', link: '/vi/faq' },
   { text: 'Góp ý', link: '/vi/report-feedback' },
 ];

@@ -7084,6 +7084,23 @@ body.gw-api-playground-immersive .or-app-playground-layout.or-catalog {
   white-space: nowrap;
 }
 
+.or-app-chat-byok-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.5rem 0 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.55rem;
+  border: 1px solid color-mix(in srgb, #6366f1 40%, var(--or-border));
+  background: color-mix(in srgb, #6366f1 10%, var(--or-bg));
+  font-size: 0.8125rem;
+}
+
+.or-app-chat-byok-hint p {
+  margin: 0;
+}
+
 .or-app-chat-pending-above {
   padding: 0.35rem 0 0;
 }
