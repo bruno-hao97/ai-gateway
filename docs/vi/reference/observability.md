@@ -145,4 +145,15 @@ So sánh với `X-Gateway-Signature` (constant-time).
 
 Quản lý webhook: [Observability](/vi/app/observability/) (sidebar **Developer → Observability**, badge **beta**). Callout trên trang liệt kê cùng giới hạn.
 
+### Smoke test checklist
+
+Thủ công (đã đăng nhập, `npm run docs:stack`):
+
+- [ ] Stat cards → Activity Trends, Explore, Credits
+- [ ] Thêm webhook → thông báo thành công; hiển thị `n/5`
+- [ ] **Test** → thông báo thành công; badge delivery cập nhật OK/Lỗi
+- [ ] **Xóa** → hộp thoại xác nhận; webhook bị xóa
+- [ ] Mở **Ví dụ payload** → **Copy JSON** hoạt động
+- [ ] Đủ 5 webhook → form bị disable + hint giới hạn
+
 Xem thêm [Lịch sử usage](./usage.md) và [Media & jobs](./media.md).

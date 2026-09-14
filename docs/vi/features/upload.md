@@ -47,6 +47,14 @@ List models
 POST /gateway/jobs/video + wait hoặc poll
 ```
 
+## Portal UI
+
+Quản lý upload tại [Files](/vi/app/files/) (sidebar **Developer → Files**, badge **beta**):
+
+- Album Gommo (ảnh/video) từ library API
+- **Upload gần đây** lưu `localStorage` trên trình duyệt này
+- **Copy URL** hoặc **Copy fields** (JSON snippet cho `POST /gateway/jobs/*`)
+
 ## Mode C / Direct
 
 Form: `access_token`, `domain`, `project_id=default`, `file` / `video_file`.

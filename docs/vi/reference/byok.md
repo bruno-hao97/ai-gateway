@@ -146,4 +146,15 @@ Dùng **session token hiện tại** cho domain đó trừ khi body có `access_
 
 Quản lý tại [BYOK](/vi/app/byok/) (sidebar **Developer → BYOK**, badge **beta**). Callout và quick-start trên trang khớp tài liệu này.
 
+### Smoke test checklist
+
+Thủ công (đã đăng nhập, `npm run docs:stack`):
+
+- [ ] **Providers** → lưu key → thông báo xanh
+- [ ] **Test** key → thành công hoặc lỗi đỏ
+- [ ] **Xóa** → confirm → credential bị xóa
+- [ ] **Gommo** → link session → badge primary
+- [ ] Tab **Usage** → badge OK/Lỗi; link **Activity**
+- [ ] Quick links: Chat, Chat API, Access token, Activity
+
 Xem thêm [Chat](/vi/reference/chat), [Media & jobs](/vi/reference/media), [Authentication](/vi/authentication).

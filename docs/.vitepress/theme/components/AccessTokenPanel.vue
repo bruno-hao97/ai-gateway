@@ -7,10 +7,12 @@ import {
   GOMMO_V2_HOST,
   GOMMO_V2_HOST_LABEL,
 } from '../models/gommo-hosts';
+import { activityHubHref } from '../models/activity-hub-url';
+import { apiBase } from '../models/gateway-base';
 import { formatApproxUsd } from '../models/invoice-buyer';
 import { fetchMe, fetchUsageLogs, formatCredits } from '../models/user-api';
 import { formatUsageTime } from '../models/usage-history';
-import { listItemCreatedAt } from '../models/usage-stats';
+import { listItemCreatedAt, normalizeUsageListItem, usageJobId } from '../models/usage-stats';
 
 const TOKEN_COPIED_STORAGE_KEY = 'gateway_token_copied';
 
@@ -29,19 +31,21 @@ const emit = defineEmits<{
   tokenCopied: [];
 }>();
 
-type SnippetTab = 'auth' | 'curl' | 'javascript' | 'python' | 'mcp';
+type SnippetTab = 'gateway' | 'auth' | 'curl' | 'javascript' | 'python' | 'mcp';
 type ConnectionStatus = 'idle' | 'checking' | 'connected' | 'error';
 
 const revealToken = ref(false);
 const copied = ref(false);
 const copiedSnippet = ref<SnippetTab | ''>('');
-const activeTab = ref<SnippetTab>('auth');
+const activeTab = ref<SnippetTab>('gateway');
 const accountStatus = ref<ConnectionStatus>('idle');
 const gommoV2Status = ref<ConnectionStatus>('idle');
 const accountMessage = ref('');
 const gommoV2Message = ref('');
+const connectionSuccess = ref('');
 const lastVerifiedAt = ref<number | null>(null);
 const lastActivityAt = ref('');
+const lastActivityJobId = ref('');
 const lastActivityLoading = ref(true);
 
 const checksRunning = computed(
@@ -92,7 +96,38 @@ const gommoV2StatusLabel = computed(() =>
   ),
 );
 
+const gatewayRoot = computed(() => {
+  const base = apiBase();
+  if (base) return base.replace(/\/$/, '');
+  if (typeof window !== 'undefined') return window.location.origin;
+  return 'http://localhost:5173';
+});
+
+const lastActivityHref = computed(() =>
+  activityHubHref(props.prefix, {
+    tab: 'explore',
+    period: '30d',
+    ...(lastActivityJobId.value ? { job: lastActivityJobId.value } : {}),
+  }),
+);
+
+const mediaJobsDocsHref = computed(() => `${props.prefix}/features/media-jobs`);
+
 const quickLinks = computed(() => [
+  {
+    id: 'activity',
+    title: 'Activity',
+    desc: props.isVi ? 'Usage, job logs và billing trên gateway.' : 'Usage, job logs, and billing on the gateway.',
+    href: `${props.prefix}/app/activity/`,
+    cta: props.isVi ? 'Mở Activity' : 'Open Activity',
+  },
+  {
+    id: 'observability',
+    title: 'Observability',
+    desc: props.isVi ? 'Webhook job (beta) và mirror local.' : 'Job webhooks (beta) and local mirror.',
+    href: `${props.prefix}/app/observability/`,
+    cta: props.isVi ? 'Mở Observability' : 'Open Observability',
+  },
   {
     id: 'gommo-api',
     title: props.isVi ? 'Gommo public API' : 'Gommo public API',
@@ -132,8 +167,9 @@ const lastVerifiedLabel = computed(() => {
 });
 
 const snippetTabs = computed(() => [
+  { id: 'gateway' as const, label: props.isVi ? 'Gateway' : 'Gateway' },
   { id: 'auth' as const, label: props.isVi ? 'Authorization' : 'Authorization' },
-  { id: 'curl' as const, label: 'curl' },
+  { id: 'curl' as const, label: props.isVi ? 'curl (Gommo)' : 'curl (Gommo)' },
   { id: 'javascript' as const, label: 'JavaScript' },
   { id: 'python' as const, label: 'Python' },
   { id: 'mcp' as const, label: props.isVi ? 'MCP JSON' : 'MCP JSON' },
@@ -142,9 +178,15 @@ const snippetTabs = computed(() => [
 const snippets = computed(() => {
   const t = props.token || 'YOUR_ACCESS_TOKEN';
   const domain = appDomain.value || '79ai.net';
+  const gw = gatewayRoot.value;
+  const gatewayJobUrl = `${gw}/gateway/jobs/image`;
   const jobUrl = `${GOMMO_V2_HOST}/ai/jobs/image/MODEL_ID`;
   const formBody = `domain=${domain}&prompt=Hello`;
   return {
+    gateway: `curl -X POST "${gatewayJobUrl}" \\
+  -H "Authorization: Bearer ${t}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"modelSlug":"MODEL_SLUG","wait":true,"fields":{"prompt":"Hello","ratio":"16:9"}}'`,
     auth: `Authorization: Bearer ${t}`,
     curl: `curl -X POST "${jobUrl}" \\
   -H "Authorization: Bearer ${t}" \\
@@ -256,8 +298,18 @@ async function checkGommoV2(): Promise<void> {
   }
 }
 
+function clearConnectionFeedback() {
+  connectionSuccess.value = '';
+}
+
 async function testConnection() {
+  clearConnectionFeedback();
   await Promise.all([checkAccount(), checkGommoV2()]);
+  if (accountStatus.value === 'connected' && gommoV2Status.value === 'connected') {
+    connectionSuccess.value = props.isVi
+      ? 'Kết nối OK — tài khoản và Jobs API.'
+      : 'Connected — account and Jobs API OK.';
+  }
 }
 
 function signOut() {
@@ -277,8 +329,9 @@ async function loadLastActivity() {
       page: 1,
       limit: 1,
     });
-    const row = data.items[0];
+    const row = data.items[0] ? normalizeUsageListItem(data.items[0]) : null;
     const created = row ? listItemCreatedAt(row) : '';
+    lastActivityJobId.value = row ? usageJobId(row) : '';
     lastActivityAt.value = created ? formatUsageTime(created, props.isVi) : '';
   } catch {
     lastActivityAt.value = '';
@@ -343,6 +396,8 @@ defineExpose({
         </button>
       </div>
 
+      <p v-if="connectionSuccess" class="or-token-connection-success" role="status">{{ connectionSuccess }}</p>
+
       <div class="or-token-meta-table-wrap">
         <table class="or-token-meta-table">
           <thead>
@@ -373,7 +428,15 @@ defineExpose({
               </td>
               <td>
                 <span v-if="lastActivityLoading" class="or-app-muted">…</span>
-                <span v-else>{{ lastActivityAt || (isVi ? 'Chưa có job' : 'No jobs yet') }}</span>
+                <a
+                  v-else-if="lastActivityAt"
+                  :href="lastActivityHref"
+                  class="or-token-activity-link"
+                  :title="isVi ? 'Mở job trong Activity' : 'Open job in Activity'"
+                >
+                  {{ lastActivityAt }} →
+                </a>
+                <span v-else>{{ isVi ? 'Chưa có job' : 'No jobs yet' }}</span>
               </td>
               <td>
                 <strong>{{ formatCredits(credits) }}</strong>
@@ -444,8 +507,11 @@ defineExpose({
                   : 'Copy snippet'
             }}
           </button>
+          <a v-if="activeTab === 'gateway'" :href="mediaJobsDocsHref" class="or-token-snippet-link">
+            {{ isVi ? 'Media jobs (gateway)' : 'Media jobs (gateway)' }} →
+          </a>
           <a
-            v-if="activeTab === 'mcp'"
+            v-else-if="activeTab === 'mcp'"
             :href="`${prefix}/mcp/other-hosts`"
             class="or-token-snippet-link"
           >

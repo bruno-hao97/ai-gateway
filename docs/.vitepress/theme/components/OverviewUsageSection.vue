@@ -9,6 +9,8 @@ import {
   listItemCredit,
   listItemCreatedAt,
   listItemStatus,
+  normalizeUsageListItem,
+  usageJobId,
   type UsageListItem,
   type UsageStatsData,
   type UsageStatsType,
@@ -106,6 +108,16 @@ function promptPreview(prompt?: string): string {
   return text.length > 56 ? `${text.slice(0, 56).trim()}…` : text;
 }
 
+function jobExploreHref(row: UsageListItem): string {
+  const normalized = normalizeUsageListItem(row);
+  const id = usageJobId(normalized);
+  return activityHubHref(props.prefix, {
+    tab: 'explore',
+    period: PROFILE_USAGE_PREVIEW_PERIOD,
+    ...(id ? { job: id } : {}),
+  });
+}
+
 async function load() {
   loading.value = true;
   statsError.value = '';
@@ -113,7 +125,7 @@ async function load() {
 
   try {
     statsData.value = await fetchUsageStats({
-      period: '7d',
+      period: PROFILE_USAGE_PREVIEW_PERIOD,
       type: 'all',
       language: props.isVi ? 'vi' : 'en',
     });
@@ -124,13 +136,13 @@ async function load() {
 
   try {
     const data = await fetchUsageLogs({
-      period: '7d',
+      period: PROFILE_USAGE_PREVIEW_PERIOD,
       type: 'all',
       language: 'VI',
       page: 1,
       limit: 3,
     });
-    recentJobs.value = data.items.slice(0, 3);
+    recentJobs.value = data.items.slice(0, 3).map(normalizeUsageListItem);
   } catch (e) {
     recentJobs.value = [];
     listError.value = e instanceof Error ? e.message : String(e);
@@ -156,6 +168,7 @@ defineExpose({ reload: load });
       <div>
         <h2 id="overview-usage-title" class="or-overview-usage-title">
           {{ isVi ? '7 ngày gần đây' : 'Last 7 days' }}
+          <span class="or-profile-period-pill">7d</span>
         </h2>
         <p class="or-overview-usage-sub">
           {{ isVi ? 'Từ Gommo usage-history — cùng nguồn tab Usage.' : 'From Gommo usage-history — same source as Usage tab.' }}
@@ -262,27 +275,29 @@ defineExpose({ reload: load });
         </p>
         <ul v-else class="or-overview-recent-list">
           <li v-for="row in recentJobs" :key="row.id_base || `${row.created_at}-${row.model}`">
-            <div class="or-overview-recent-main">
-              <span class="or-overview-recent-type">
-                {{ jobTypeLabel((row.type as UsageStatsType) || 'image', isVi) }}
-              </span>
-              <code class="or-overview-recent-model">{{ row.model || '—' }}</code>
-              <span class="or-overview-recent-prompt" :title="row.prompt">{{ promptPreview(row.prompt) }}</span>
-            </div>
-            <div class="or-overview-recent-meta">
-              <span class="or-overview-recent-time">
-                {{ formatUsageTime(listItemCreatedAt(row) || '', isVi) }}
-              </span>
-              <span
-                class="or-usage-status or-overview-recent-status"
-                :class="`or-usage-status--${listItemStatus(row)}`"
-              >
-                {{ statusLabel(listItemStatus(row)) }}
-              </span>
-              <span v-if="listItemCredit(row) > 0" class="or-overview-recent-credit">
-                {{ formatCredits(listItemCredit(row)) }}
-              </span>
-            </div>
+            <a :href="jobExploreHref(row)" class="or-overview-recent-row">
+              <div class="or-overview-recent-main">
+                <span class="or-overview-recent-type">
+                  {{ jobTypeLabel((row.type as UsageStatsType) || 'image', isVi) }}
+                </span>
+                <code class="or-overview-recent-model">{{ row.model || '—' }}</code>
+                <span class="or-overview-recent-prompt" :title="row.prompt">{{ promptPreview(row.prompt) }}</span>
+              </div>
+              <div class="or-overview-recent-meta">
+                <span class="or-overview-recent-time">
+                  {{ formatUsageTime(listItemCreatedAt(row) || '', isVi) }}
+                </span>
+                <span
+                  class="or-usage-status or-overview-recent-status"
+                  :class="`or-usage-status--${listItemStatus(row)}`"
+                >
+                  {{ statusLabel(listItemStatus(row)) }}
+                </span>
+                <span v-if="listItemCredit(row) > 0" class="or-overview-recent-credit">
+                  {{ formatCredits(listItemCredit(row)) }}
+                </span>
+              </div>
+            </a>
           </li>
         </ul>
       </div>

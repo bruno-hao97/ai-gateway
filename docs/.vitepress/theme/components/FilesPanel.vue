@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { uploadChatImage, uploadChatVideo, isImageUploadFile, isVideoUploadFile } from '../models/chat-api';
+import { playgroundAppPath } from '../models/gateway-base';
 import {
   fetchAlbumLibrary,
+  jobFieldsSnippet,
+  loadRecentUploads,
+  saveRecentUploads,
   uploadFileItem,
   type LibraryFileItem,
 } from '../models/library-api';
@@ -21,8 +25,16 @@ const libraryItems = ref<LibraryFileItem[]>([]);
 const uploadItems = ref<LibraryFileItem[]>([]);
 const uploading = ref(false);
 const uploadError = ref('');
+const uploadSuccess = ref('');
 const copiedId = ref('');
+const copiedFieldsId = ref('');
 const fileInputRef = ref<HTMLInputElement | null>(null);
+
+const playgroundHref = computed(() =>
+  playgroundAppPath(props.prefix as '' | '/vi', {
+    type: filter.value === 'videos' ? 'video' : 'image',
+  }),
+);
 
 const pathLabel = computed(() => {
   if (filter.value === 'images') return '/images/';
@@ -114,13 +126,16 @@ async function onFilePicked(event: Event) {
 
   uploading.value = true;
   uploadError.value = '';
+  uploadSuccess.value = '';
   try {
     const url = isVideo ? await uploadChatVideo(file) : await uploadChatImage(file);
     uploadItems.value = [
       uploadFileItem(url, file, isVideo ? 'video' : 'image'),
       ...uploadItems.value,
     ].slice(0, 24);
+    saveRecentUploads(uploadItems.value);
     filter.value = 'uploads';
+    uploadSuccess.value = props.isVi ? 'Upload thành công — URL đã sẵn sàng.' : 'Upload complete — URL is ready.';
   } catch (e) {
     uploadError.value = e instanceof Error ? e.message : String(e);
   } finally {
@@ -138,11 +153,30 @@ async function copyUrl(item: LibraryFileItem) {
       copiedId.value = '';
     }, 2000);
   } catch {
-    /* ignore */
+    uploadError.value = props.isVi ? 'Không copy được URL' : 'Could not copy URL';
   }
 }
 
+async function copyJobFields(item: LibraryFileItem) {
+  const snippet = jobFieldsSnippet(item);
+  if (!snippet) return;
+  try {
+    await navigator.clipboard.writeText(snippet);
+    copiedFieldsId.value = item.id || item.mediaUrl || '';
+    setTimeout(() => {
+      copiedFieldsId.value = '';
+    }, 2000);
+  } catch {
+    uploadError.value = props.isVi ? 'Không copy được snippet' : 'Could not copy snippet';
+  }
+}
+
+function itemKey(item: LibraryFileItem): string {
+  return item.id || item.mediaUrl || item.thumbnailUrl || '';
+}
+
 onMounted(() => {
+  uploadItems.value = loadRecentUploads();
   void loadLibrary();
 });
 
@@ -218,6 +252,7 @@ defineExpose({ reload });
       </div>
 
       <p v-if="loadError" class="or-app-error or-files-note">{{ loadError }}</p>
+      <p v-if="uploadSuccess" class="or-files-success or-files-note" role="status">{{ uploadSuccess }}</p>
       <p v-if="uploadError" class="or-app-error or-files-note">{{ uploadError }}</p>
 
       <div v-if="loading" class="or-files-grid or-files-grid--loading">
@@ -245,9 +280,14 @@ defineExpose({ reload });
                 : 'Upload a new asset or run jobs in Playground to populate your Gommo album.'
           }}
         </p>
-        <button type="button" class="or-app-btn or-app-btn-primary" @click="openUploadPicker">
-          {{ isVi ? 'Upload file' : 'Upload file' }}
-        </button>
+        <div class="or-files-empty-actions">
+          <button type="button" class="or-app-btn or-app-btn-primary" @click="openUploadPicker">
+            {{ isVi ? 'Upload file' : 'Upload file' }}
+          </button>
+          <a :href="playgroundHref" class="or-app-btn or-app-btn-ghost">
+            {{ isVi ? 'Mở Playground' : 'Open Playground' }}
+          </a>
+        </div>
       </div>
 
       <div v-else class="or-files-grid">
@@ -293,13 +333,30 @@ defineExpose({ reload });
                 @click="copyUrl(item)"
               >
                 {{
-                  copiedId === (item.id || item.mediaUrl)
+                  copiedId === itemKey(item)
                     ? isVi
                       ? 'Đã copy'
                       : 'Copied'
                     : isVi
                       ? 'Copy URL'
                       : 'Copy URL'
+                }}
+              </button>
+              <button
+                type="button"
+                class="or-files-card-btn"
+                :disabled="!item.mediaUrl && !item.thumbnailUrl"
+                :title="isVi ? 'JSON fields cho POST /gateway/jobs/*' : 'JSON fields for POST /gateway/jobs/*'"
+                @click="copyJobFields(item)"
+              >
+                {{
+                  copiedFieldsId === itemKey(item)
+                    ? isVi
+                      ? 'Đã copy'
+                      : 'Copied'
+                    : isVi
+                      ? 'Copy fields'
+                      : 'Copy fields'
                 }}
               </button>
               <a
@@ -319,9 +376,24 @@ defineExpose({ reload });
       <footer class="or-files-footer">{{ itemCountLabel }}</footer>
     </div>
 
+    <div class="or-files-quicklinks">
+      <a :href="playgroundHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
+        {{ isVi ? 'Playground' : 'Playground' }} →
+      </a>
+      <a :href="`${prefix}/app/token/`" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
+        {{ isVi ? 'Access token' : 'Access token' }} →
+      </a>
+      <a :href="`${prefix}/features/upload`" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
+        {{ isVi ? 'Upload docs' : 'Upload docs' }} →
+      </a>
+    </div>
+
     <p class="or-app-muted or-files-footnote">
-      <a :href="`${prefix}/features/upload`">{{ isVi ? 'Tài liệu upload' : 'Upload docs' }}</a>
-      ·
+      {{
+        isVi
+          ? 'Album Gommo từ library API; upload gần đây lưu localStorage trên trình duyệt này.'
+          : 'Gommo album from library API; recent uploads persist in this browser’s localStorage.'
+      }}
       <a :href="`${prefix}/reference/gommo-public-api`">{{ isVi ? 'Gommo library API' : 'Gommo library API' }}</a>
     </p>
   </div>

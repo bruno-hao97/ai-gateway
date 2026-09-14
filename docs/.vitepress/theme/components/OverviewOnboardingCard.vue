@@ -24,6 +24,12 @@ const steps = computed(() => [
     href: `${props.prefix}/app/playground/`,
   },
   {
+    id: 'activity',
+    done: props.hasJobs,
+    label: props.isVi ? 'Xem usage trên Activity' : 'Review usage in Activity',
+    href: `${props.prefix}/app/activity/?period=7d`,
+  },
+  {
     id: 'docs',
     done: false,
     label: props.isVi ? 'Đọc Quickstart REST' : 'Read the REST Quickstart',
@@ -40,8 +46,8 @@ const steps = computed(() => [
     <p class="or-overview-onboarding-sub">
       {{
         isVi
-          ? 'Ba bước nhanh để tích hợp gateway.'
-          : 'Three quick steps to start using the gateway.'
+          ? 'Bốn bước nhanh để tích hợp gateway.'
+          : 'Four quick steps to start using the gateway.'
       }}
     </p>
     <ol class="or-overview-onboarding-list">

@@ -21,6 +21,20 @@ const props = defineProps<{
   credits: number;
 }>();
 
+const MAX_WEBHOOKS = 5;
+
+const PAYLOAD_EXAMPLE = `{
+  "type": "job.completed",
+  "timestamp": "2026-09-12T02:00:00.000Z",
+  "data": {
+    "jobType": "image",
+    "modelSlug": "flux-schnell",
+    "jobId": "abc123",
+    "resultUrl": "https://…",
+    "status": "success"
+  }
+}`;
+
 type DestStatus = 'open' | 'soon';
 
 interface ObsDestination {
@@ -41,18 +55,24 @@ const localJobCount = ref(0);
 const webhooks = ref<ObservabilityWebhook[]>([]);
 const webhooksLoading = ref(false);
 const webhooksError = ref('');
+const webhooksSuccess = ref('');
 const webhookUrl = ref('');
 const webhookLabel = ref('');
 const webhookSecret = ref('');
 const webhookSaving = ref(false);
 const webhookActionId = ref('');
+const copiedPayload = ref(false);
 
-const usageHref = computed(() => `${props.prefix}/app/activity/?tab=trends`);
-const logsHref = computed(() => `${props.prefix}/app/activity/?tab=explore`);
-const activityHref = computed(() => `${props.prefix}/app/activity/`);
+const usageHref = computed(() => `${props.prefix}/app/activity/?tab=trends&period=7d`);
+const logsHref = computed(() => `${props.prefix}/app/activity/?tab=explore&period=7d`);
+const activityHref = computed(() => `${props.prefix}/app/activity/?period=7d`);
+const creditsHref = computed(() => `${props.prefix}/app/credits/`);
 const usageDocsHref = computed(() => `${props.prefix}/reference/usage`);
 const observabilityDocsHref = computed(() => `${props.prefix}/reference/observability`);
 const mcpHref = computed(() => `${props.prefix}/mcp/`);
+
+const webhookSlotsLeft = computed(() => Math.max(0, MAX_WEBHOOKS - webhooks.value.length));
+const canAddWebhook = computed(() => webhookSlotsLeft.value > 0 && !webhookSaving.value);
 
 const betaLimitations = computed(() =>
   props.isVi
@@ -172,12 +192,41 @@ function webhookDisplayName(webhook: ObservabilityWebhook): string {
   return webhook.label?.trim() || webhook.url;
 }
 
-function deliveryLabel(webhook: ObservabilityWebhook): string {
-  if (!webhook.lastDeliveryAt) return props.isVi ? 'Chưa gửi' : 'Never sent';
-  const status = webhook.lastDeliveryStatus === 'ok'
-    ? props.isVi ? 'OK' : 'OK'
-    : props.isVi ? 'Lỗi' : 'Error';
-  return `${status} · ${new Date(webhook.lastDeliveryAt).toLocaleString(props.isVi ? 'vi-VN' : undefined)}`;
+function deliveryBadge(webhook: ObservabilityWebhook): { label: string; tone: 'never' | 'ok' | 'error' } {
+  if (!webhook.lastDeliveryAt) {
+    return { label: props.isVi ? 'Chưa gửi' : 'Never sent', tone: 'never' };
+  }
+  if (webhook.lastDeliveryStatus === 'ok') {
+    return { label: props.isVi ? 'OK' : 'OK', tone: 'ok' };
+  }
+  return { label: props.isVi ? 'Lỗi' : 'Error', tone: 'error' };
+}
+
+function deliveryTime(webhook: ObservabilityWebhook): string {
+  if (!webhook.lastDeliveryAt) return '';
+  return new Date(webhook.lastDeliveryAt).toLocaleString(props.isVi ? 'vi-VN' : undefined);
+}
+
+function clearWebhookFeedback() {
+  webhooksError.value = '';
+  webhooksSuccess.value = '';
+}
+
+function setWebhookSuccess(message: string) {
+  webhooksError.value = '';
+  webhooksSuccess.value = message;
+}
+
+async function copyPayloadExample() {
+  try {
+    await navigator.clipboard.writeText(PAYLOAD_EXAMPLE);
+    copiedPayload.value = true;
+    window.setTimeout(() => {
+      copiedPayload.value = false;
+    }, 2000);
+  } catch {
+    webhooksError.value = props.isVi ? 'Không copy được' : 'Could not copy';
+  }
 }
 
 async function loadStats() {
@@ -214,9 +263,9 @@ async function reloadAll() {
 
 async function onAddWebhook() {
   const url = webhookUrl.value.trim();
-  if (!url) return;
+  if (!url || !canAddWebhook.value) return;
   webhookSaving.value = true;
-  webhooksError.value = '';
+  clearWebhookFeedback();
   try {
     await createObservabilityWebhook({
       url,
@@ -227,6 +276,7 @@ async function onAddWebhook() {
     webhookLabel.value = '';
     webhookSecret.value = '';
     await loadWebhooks();
+    setWebhookSuccess(props.isVi ? 'Đã thêm webhook.' : 'Webhook added.');
   } catch (e) {
     webhooksError.value = e instanceof Error ? e.message : String(e);
   } finally {
@@ -249,11 +299,13 @@ async function onToggleWebhook(webhook: ObservabilityWebhook, event: Event) {
 
 async function onTestWebhook(id: string) {
   webhookActionId.value = id;
-  webhooksError.value = '';
+  clearWebhookFeedback();
   try {
     const result = await testObservabilityWebhook(id);
     if (!result.ok) {
       webhooksError.value = result.error || (props.isVi ? 'Test thất bại' : 'Test failed');
+    } else {
+      setWebhookSuccess(props.isVi ? 'Test webhook đã gửi — kiểm tra endpoint của bạn.' : 'Test webhook sent — check your endpoint.');
     }
     await loadWebhooks();
   } catch (e) {
@@ -263,11 +315,18 @@ async function onTestWebhook(id: string) {
   }
 }
 
-async function onDeleteWebhook(id: string) {
+async function onDeleteWebhook(id: string, label: string) {
+  const prompt = props.isVi
+    ? `Xóa webhook "${label}"?`
+    : `Delete webhook "${label}"?`;
+  if (!window.confirm(prompt)) return;
+
   webhookActionId.value = id;
+  clearWebhookFeedback();
   try {
     await deleteObservabilityWebhook(id);
     await loadWebhooks();
+    setWebhookSuccess(props.isVi ? 'Đã xóa webhook.' : 'Webhook deleted.');
   } catch (e) {
     webhooksError.value = e instanceof Error ? e.message : String(e);
   } finally {
@@ -302,24 +361,25 @@ defineExpose({ reload: reloadAll });
     </aside>
 
     <div class="or-obs-stats" aria-label="Summary">
-      <div class="or-obs-stat">
+      <a :href="usageHref" class="or-obs-stat or-obs-stat--link" :title="isVi ? 'Mở Trends' : 'Open Trends'">
         <span class="or-obs-stat-label">{{ isVi ? 'Job 7 ngày' : 'Jobs (7d)' }}</span>
         <strong class="or-obs-stat-value">
           <template v-if="statsLoading">…</template>
           <template v-else>{{ totalJobs7d }}</template>
         </strong>
         <span v-if="statsError" class="or-obs-stat-hint or-obs-stat-hint--err">{{ statsError }}</span>
-      </div>
-      <div class="or-obs-stat">
+        <span v-else class="or-obs-stat-hint">{{ isVi ? 'Activity → Trends' : 'Activity → Trends' }}</span>
+      </a>
+      <a :href="logsHref" class="or-obs-stat or-obs-stat--link" :title="isVi ? 'Mở Explore' : 'Open Explore'">
         <span class="or-obs-stat-label">{{ isVi ? 'Mirror local' : 'Local mirror' }}</span>
         <strong class="or-obs-stat-value">{{ localJobCount }}</strong>
-        <span class="or-obs-stat-hint">{{ isVi ? 'Playground / Chat' : 'Playground / Chat' }}</span>
-      </div>
-      <div class="or-obs-stat">
+        <span class="or-obs-stat-hint">{{ isVi ? 'Playground / Chat · Explore' : 'Playground / Chat · Explore' }}</span>
+      </a>
+      <a :href="creditsHref" class="or-obs-stat or-obs-stat--link" :title="isVi ? 'Mở Credits' : 'Open Credits'">
         <span class="or-obs-stat-label">{{ isVi ? 'Số dư' : 'Balance' }}</span>
         <strong class="or-obs-stat-value">{{ formatCredits(credits) }}</strong>
         <span class="or-obs-stat-hint">{{ isVi ? 'Gommo credits' : 'Gommo credits' }}</span>
-      </div>
+      </a>
     </div>
 
     <section class="or-obs-section" aria-labelledby="or-obs-logging-title">
@@ -368,10 +428,15 @@ defineExpose({ reload: reloadAll });
     </section>
 
     <section class="or-obs-section" aria-labelledby="or-obs-webhooks-title">
-      <h2 id="or-obs-webhooks-title" class="or-obs-section-title or-obs-section-title--inline">
-        <span>{{ isVi ? 'Webhooks' : 'Webhooks' }}</span>
-        <span class="or-obs-pill or-obs-pill--beta">Beta</span>
-      </h2>
+      <div class="or-obs-section-head-row">
+        <h2 id="or-obs-webhooks-title" class="or-obs-section-title or-obs-section-title--inline">
+          <span>{{ isVi ? 'Webhooks' : 'Webhooks' }}</span>
+          <span class="or-obs-pill or-obs-pill--beta">Beta</span>
+        </h2>
+        <span class="or-obs-webhook-count" :class="{ 'or-obs-webhook-count--full': webhookSlotsLeft === 0 }">
+          {{ webhooks.length }}/{{ MAX_WEBHOOKS }}
+        </span>
+      </div>
       <p class="or-obs-section-sub">
         {{
           isVi
@@ -380,14 +445,44 @@ defineExpose({ reload: reloadAll });
         }}
       </p>
 
+      <details class="or-obs-payload-details">
+        <summary class="or-obs-payload-summary">
+          {{ isVi ? 'Ví dụ payload & headers' : 'Example payload & headers' }}
+        </summary>
+        <div class="or-obs-payload-body">
+          <p class="or-obs-payload-hint">
+            {{
+              isVi
+                ? 'Headers: Content-Type, X-Gateway-Event, X-Gateway-Timestamp, X-Gateway-Signature (khi có secret).'
+                : 'Headers: Content-Type, X-Gateway-Event, X-Gateway-Timestamp, X-Gateway-Signature (when secret is set).'
+            }}
+          </p>
+          <pre class="or-obs-payload-pre"><code>{{ PAYLOAD_EXAMPLE }}</code></pre>
+          <button type="button" class="or-app-btn or-app-btn-ghost or-app-btn-sm" @click="copyPayloadExample">
+            {{ copiedPayload ? (isVi ? 'Đã copy' : 'Copied') : isVi ? 'Copy JSON' : 'Copy JSON' }}
+          </button>
+        </div>
+      </details>
+
       <form class="or-obs-webhook-form" @submit.prevent="onAddWebhook">
         <label class="or-obs-webhook-field">
           <span>{{ isVi ? 'Endpoint URL (HTTPS)' : 'Endpoint URL (HTTPS)' }}</span>
-          <input v-model="webhookUrl" type="url" required placeholder="https://example.com/hooks/gateway" />
+          <input
+            v-model="webhookUrl"
+            type="url"
+            required
+            :disabled="!canAddWebhook"
+            placeholder="https://example.com/hooks/gateway"
+          />
         </label>
         <label class="or-obs-webhook-field">
           <span>{{ isVi ? 'Tên (tuỳ chọn)' : 'Label (optional)' }}</span>
-          <input v-model="webhookLabel" type="text" :placeholder="isVi ? 'Production' : 'Production'" />
+          <input
+            v-model="webhookLabel"
+            type="text"
+            :disabled="!canAddWebhook"
+            :placeholder="isVi ? 'Production' : 'Production'"
+          />
         </label>
         <label class="or-obs-webhook-field">
           <span>{{ isVi ? 'Signing secret (tuỳ chọn)' : 'Signing secret (optional)' }}</span>
@@ -395,14 +490,19 @@ defineExpose({ reload: reloadAll });
             v-model="webhookSecret"
             type="password"
             autocomplete="off"
+            :disabled="!canAddWebhook"
             :placeholder="isVi ? 'Dùng cho HMAC SHA-256' : 'For HMAC SHA-256'"
           />
         </label>
-        <button type="submit" class="or-app-btn or-app-btn-primary or-app-btn-sm" :disabled="webhookSaving || !webhookUrl.trim()">
+        <button type="submit" class="or-app-btn or-app-btn-primary or-app-btn-sm" :disabled="!canAddWebhook || !webhookUrl.trim()">
           {{ webhookSaving ? (isVi ? 'Đang lưu…' : 'Saving…') : isVi ? 'Thêm webhook' : 'Add webhook' }}
         </button>
+        <p v-if="webhookSlotsLeft === 0" class="or-obs-webhook-limit">
+          {{ isVi ? `Tối đa ${MAX_WEBHOOKS} webhook/account.` : `Maximum ${MAX_WEBHOOKS} webhooks per account.` }}
+        </p>
       </form>
 
+      <p v-if="webhooksSuccess" class="or-obs-webhook-success" role="status">{{ webhooksSuccess }}</p>
       <p v-if="webhooksError" class="or-obs-webhook-error">{{ webhooksError }}</p>
       <p v-if="webhooksLoading" class="or-app-muted or-obs-webhook-empty">{{ isVi ? 'Đang tải…' : 'Loading…' }}</p>
       <p v-else-if="webhooks.length === 0" class="or-app-muted or-obs-webhook-empty">
@@ -417,7 +517,10 @@ defineExpose({ reload: reloadAll });
               <code class="or-obs-webhook-url">{{ webhook.url }}</code>
             </p>
             <p class="or-obs-dest-meta">
-              {{ deliveryLabel(webhook) }}
+              <span class="or-obs-delivery-badge" :class="`or-obs-delivery-badge--${deliveryBadge(webhook).tone}`">
+                {{ deliveryBadge(webhook).label }}
+              </span>
+              <span v-if="deliveryTime(webhook)"> · {{ deliveryTime(webhook) }}</span>
               <span v-if="webhook.secretHint"> · {{ webhook.secretHint }}</span>
               <span v-if="webhook.lastDeliveryError" class="or-obs-dest-meta-err"> — {{ webhook.lastDeliveryError }}</span>
             </p>
@@ -445,7 +548,7 @@ defineExpose({ reload: reloadAll });
               type="button"
               class="or-app-btn or-app-btn-ghost or-app-btn-sm"
               :disabled="webhookActionId === webhook.id"
-              @click="onDeleteWebhook(webhook.id)"
+              @click="onDeleteWebhook(webhook.id, webhookDisplayName(webhook))"
             >
               {{ isVi ? 'Xóa' : 'Delete' }}
             </button>

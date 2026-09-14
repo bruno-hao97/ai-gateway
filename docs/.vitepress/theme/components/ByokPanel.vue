@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { activityHubHref } from '../models/activity-hub-url';
 import { getStoredDomain } from '../models/auth-api';
 import {
   createByokProviderCredential,
@@ -32,6 +33,7 @@ type TabId = 'providers' | 'gommo' | 'usage';
 
 const activeTab = ref<TabId>('providers');
 const loading = ref(true);
+const refreshing = ref(false);
 const error = ref('');
 const status = ref<ByokStatus | null>(null);
 const providerCreds = ref<ByokCredential[]>([]);
@@ -44,7 +46,9 @@ const providerLabel = ref('');
 const selectedProvider = ref('openai');
 const gommoDomain = ref('');
 const gommoLabel = ref('');
-const actionMessage = ref('');
+const actionSuccess = ref('');
+const actionError = ref('');
+const credentialActionId = ref('');
 
 const providers = computed(() => status.value?.providers ?? []);
 
@@ -71,6 +75,9 @@ const betaLimitations = computed(() =>
 const sdkDocsHref = computed(() => `${props.prefix}/sdk/typescript/`);
 const byokDocsHref = computed(() => `${props.prefix}/reference/byok`);
 const chatDocsHref = computed(() => `${props.prefix}/reference/chat`);
+const tokenHref = computed(() => `${props.prefix}/app/token/`);
+const chatAppHref = computed(() => `${props.prefix}/app/chat/`);
+const activityHref = computed(() => activityHubHref(props.prefix, { tab: 'trends', period: '7d' }));
 
 const hasProviderKey = computed(() =>
   providers.value.some((provider) => provider.configured && provider.credentialCount > 0),
@@ -120,6 +127,37 @@ function goToTab(tab: TabId) {
   activeTab.value = tab;
 }
 
+function clearActionFeedback() {
+  actionSuccess.value = '';
+  actionError.value = '';
+}
+
+function setActionSuccess(message: string) {
+  actionError.value = '';
+  actionSuccess.value = message;
+}
+
+function setActionError(message: string) {
+  actionSuccess.value = '';
+  actionError.value = message;
+}
+
+function credentialLabel(cred: ByokCredential): string {
+  if (cred.kind === 'gommo') {
+    return cred.gommoDomain || cred.label || cred.id;
+  }
+  return cred.label || `${cred.providerSlug} · ${cred.secretHint}`;
+}
+
+function eventStatusLabel(event: ByokUsageEvent): string {
+  if (event.ok) return props.isVi ? 'OK' : 'OK';
+  return event.errorCode || (props.isVi ? 'Lỗi' : 'Error');
+}
+
+function eventStatusTone(event: ByokUsageEvent): 'ok' | 'error' {
+  return event.ok ? 'ok' : 'error';
+}
+
 function providerStatusLabel(provider: ByokProviderInfo): string {
   if (provider.configured) {
     return props.isVi
@@ -129,10 +167,14 @@ function providerStatusLabel(provider: ByokProviderInfo): string {
   return props.isVi ? 'Chưa cấu hình' : 'Not configured';
 }
 
-async function reload() {
-  loading.value = true;
+async function reload(opts?: { initial?: boolean }) {
+  const isInitial = opts?.initial ?? !status.value;
+  if (isInitial) {
+    loading.value = true;
+  } else {
+    refreshing.value = true;
+  }
   error.value = '';
-  actionMessage.value = '';
   try {
     status.value = await fetchByokStatus();
     providerCreds.value = await fetchByokCredentials('provider');
@@ -147,11 +189,12 @@ async function reload() {
     error.value = e instanceof Error ? e.message : String(e);
   } finally {
     loading.value = false;
+    refreshing.value = false;
   }
 }
 
 async function onAddProviderKey() {
-  actionMessage.value = '';
+  clearActionFeedback();
   try {
     await createByokProviderCredential({
       providerSlug: selectedProvider.value,
@@ -160,15 +203,15 @@ async function onAddProviderKey() {
     });
     providerSecret.value = '';
     providerLabel.value = '';
-    actionMessage.value = props.isVi ? 'Đã lưu provider key.' : 'Provider key saved.';
     await reload();
+    setActionSuccess(props.isVi ? 'Đã lưu provider key.' : 'Provider key saved.');
   } catch (e) {
-    actionMessage.value = e instanceof Error ? e.message : String(e);
+    setActionError(e instanceof Error ? e.message : String(e));
   }
 }
 
 async function onLinkGommo() {
-  actionMessage.value = '';
+  clearActionFeedback();
   try {
     await linkGommoAccount({
       domain: gommoDomain.value.trim(),
@@ -176,32 +219,77 @@ async function onLinkGommo() {
       setPrimary: true,
     });
     gommoLabel.value = '';
-    actionMessage.value = props.isVi ? 'Đã liên kết Gommo account.' : 'Gommo account linked.';
     await reload();
+    setActionSuccess(props.isVi ? 'Đã liên kết Gommo account.' : 'Gommo account linked.');
   } catch (e) {
-    actionMessage.value = e instanceof Error ? e.message : String(e);
+    setActionError(e instanceof Error ? e.message : String(e));
   }
 }
 
-async function onDeleteCredential(id: string) {
-  await deleteByokCredential(id);
-  await reload();
+async function onDeleteCredential(cred: ByokCredential) {
+  const label = credentialLabel(cred);
+  const prompt = props.isVi ? `Xóa credential "${label}"?` : `Delete credential "${label}"?`;
+  if (!window.confirm(prompt)) return;
+
+  credentialActionId.value = cred.id;
+  clearActionFeedback();
+  try {
+    await deleteByokCredential(cred.id);
+    await reload();
+    setActionSuccess(props.isVi ? 'Đã xóa credential.' : 'Credential deleted.');
+  } catch (e) {
+    setActionError(e instanceof Error ? e.message : String(e));
+  } finally {
+    credentialActionId.value = '';
+  }
 }
 
 async function onTestCredential(id: string) {
-  const result = await testByokCredential(id);
-  actionMessage.value = result.message;
+  credentialActionId.value = id;
+  clearActionFeedback();
+  try {
+    const result = await testByokCredential(id);
+    if (result.ok) {
+      setActionSuccess(result.message || (props.isVi ? 'Test thành công.' : 'Test passed.'));
+    } else {
+      setActionError(result.message || (props.isVi ? 'Test thất bại.' : 'Test failed.'));
+    }
+    await reload();
+  } catch (e) {
+    setActionError(e instanceof Error ? e.message : String(e));
+  } finally {
+    credentialActionId.value = '';
+  }
 }
 
 async function onSetPrimary(id: string) {
-  await setPrimaryGommoAccount(id);
-  actionMessage.value = props.isVi ? 'Đã đặt primary account.' : 'Primary account updated.';
-  await reload();
+  clearActionFeedback();
+  try {
+    await setPrimaryGommoAccount(id);
+    await reload();
+    setActionSuccess(props.isVi ? 'Đã đặt primary account.' : 'Primary account updated.');
+  } catch (e) {
+    setActionError(e instanceof Error ? e.message : String(e));
+  }
 }
 
 async function onToggleFallback(cred: ByokCredential) {
-  await patchByokCredential(cred.id, { sharedFallback: !cred.sharedFallback });
-  await reload();
+  clearActionFeedback();
+  try {
+    await patchByokCredential(cred.id, { sharedFallback: !cred.sharedFallback });
+    await reload();
+    setActionSuccess(
+      cred.sharedFallback
+        ? props.isVi
+          ? 'Đã tắt Gommo fallback.'
+          : 'Gommo fallback disabled.'
+        : props.isVi
+          ? 'Đã bật Gommo fallback.'
+          : 'Gommo fallback enabled.',
+    );
+  } catch (e) {
+    setActionError(e instanceof Error ? e.message : String(e));
+  }
 }
 
 function formatUsageTime(at: string): string {
@@ -212,10 +300,12 @@ function formatUsageTime(at: string): string {
 
 onMounted(() => {
   gommoDomain.value = props.sessionDomain.trim() || getStoredDomain();
-  void reload();
+  void reload({ initial: true });
 });
 
-defineExpose({ reload });
+defineExpose({
+  reload: () => reload({ initial: false }),
+});
 </script>
 
 <template>
@@ -242,8 +332,9 @@ defineExpose({ reload });
     </aside>
 
     <section
-      v-if="status && !loading && !error"
+      v-if="status && !error"
       class="or-overview-onboarding or-byok-quickstart"
+      :class="{ 'or-byok-quickstart--refreshing': refreshing }"
       aria-labelledby="or-byok-quickstart-title"
     >
       <h2 id="or-byok-quickstart-title" class="or-overview-onboarding-title">
@@ -306,7 +397,11 @@ defineExpose({ reload });
       </button>
     </div>
 
-    <div v-if="status && !loading && !error" class="or-byok-meta or-app-panel">
+    <div
+      v-if="status && !error"
+      class="or-byok-meta or-app-panel"
+      :class="{ 'or-byok-meta--refreshing': refreshing }"
+    >
       <p class="or-app-muted" :title="platformFeeHelp">
         {{
           isVi
@@ -332,9 +427,17 @@ defineExpose({ reload });
     <p v-else-if="error" class="or-app-alert">{{ error }}</p>
 
     <template v-else>
-      <p v-if="actionMessage" class="or-app-muted">{{ actionMessage }}</p>
+      <p v-if="refreshing" class="or-byok-refresh-hint" role="status">
+        {{ isVi ? 'Đang cập nhật…' : 'Refreshing…' }}
+      </p>
+      <p v-if="actionSuccess" class="or-byok-action-success" role="status">{{ actionSuccess }}</p>
+      <p v-if="actionError" class="or-byok-action-error">{{ actionError }}</p>
 
-      <div v-if="activeTab === 'providers'" class="or-byok-panel">
+      <div
+        v-if="activeTab === 'providers'"
+        class="or-byok-panel"
+        :class="{ 'or-byok-panel--refreshing': refreshing }"
+      >
         <p class="or-app-muted">
           {{
             isVi
@@ -387,7 +490,12 @@ defineExpose({ reload });
             <span>{{ isVi ? 'Nhãn (tuỳ chọn)' : 'Label (optional)' }}</span>
             <input v-model="providerLabel" type="text" />
           </label>
-          <button type="button" class="or-app-btn or-app-btn-accent" @click="onAddProviderKey">
+          <button
+            type="button"
+            class="or-app-btn or-app-btn-primary or-app-btn-sm or-byok-form-submit"
+            :disabled="refreshing || !providerSecret.trim()"
+            @click="onAddProviderKey"
+          >
             {{ isVi ? 'Lưu key' : 'Save key' }}
           </button>
         </div>
@@ -401,18 +509,29 @@ defineExpose({ reload });
               <p v-if="cred.label" class="or-app-muted">{{ cred.label }}</p>
             </div>
             <div class="or-byok-cred-actions">
-              <button type="button" class="or-app-btn or-app-btn-ghost" @click="onTestCredential(cred.id)">
+              <button
+                type="button"
+                class="or-app-btn or-app-btn-ghost or-app-btn-sm"
+                :disabled="refreshing || credentialActionId === cred.id"
+                @click="onTestCredential(cred.id)"
+              >
                 Test
               </button>
               <button
                 type="button"
-                class="or-app-btn or-app-btn-ghost"
+                class="or-app-btn or-app-btn-ghost or-app-btn-sm"
                 :title="fallbackHelp"
+                :disabled="refreshing || credentialActionId === cred.id"
                 @click="onToggleFallback(cred)"
               >
                 {{ cred.sharedFallback ? (isVi ? 'Fallback: bật' : 'Fallback: on') : (isVi ? 'Fallback: tắt' : 'Fallback: off') }}
               </button>
-              <button type="button" class="or-app-btn or-app-btn-ghost" @click="onDeleteCredential(cred.id)">
+              <button
+                type="button"
+                class="or-app-btn or-app-btn-ghost or-app-btn-sm"
+                :disabled="refreshing || credentialActionId === cred.id"
+                @click="onDeleteCredential(cred)"
+              >
                 {{ isVi ? 'Xóa' : 'Delete' }}
               </button>
             </div>
@@ -420,7 +539,11 @@ defineExpose({ reload });
         </div>
       </div>
 
-      <div v-else-if="activeTab === 'gommo'" class="or-byok-panel">
+      <div
+        v-else-if="activeTab === 'gommo'"
+        class="or-byok-panel"
+        :class="{ 'or-byok-panel--refreshing': refreshing }"
+      >
         <p v-if="status?.primaryGommo?.primary" class="or-app-panel or-byok-meta">
           {{
             isVi
@@ -446,7 +569,12 @@ defineExpose({ reload });
             <span>{{ isVi ? 'Nhãn (tuỳ chọn)' : 'Label (optional)' }}</span>
             <input v-model="gommoLabel" type="text" />
           </label>
-          <button type="button" class="or-app-btn or-app-btn-accent" @click="onLinkGommo">
+          <button
+            type="button"
+            class="or-app-btn or-app-btn-primary or-app-btn-sm or-byok-form-submit"
+            :disabled="refreshing || !gommoDomain.trim()"
+            @click="onLinkGommo"
+          >
             {{ isVi ? 'Liên kết session hiện tại' : 'Link current session' }}
           </button>
         </div>
@@ -465,15 +593,26 @@ defineExpose({ reload });
               <button
                 v-if="!cred.isPrimary"
                 type="button"
-                class="or-app-btn or-app-btn-ghost"
+                class="or-app-btn or-app-btn-ghost or-app-btn-sm"
+                :disabled="refreshing || credentialActionId === cred.id"
                 @click="onSetPrimary(cred.id)"
               >
                 {{ isVi ? 'Đặt primary' : 'Set primary' }}
               </button>
-              <button type="button" class="or-app-btn or-app-btn-ghost" @click="onTestCredential(cred.id)">
+              <button
+                type="button"
+                class="or-app-btn or-app-btn-ghost or-app-btn-sm"
+                :disabled="refreshing || credentialActionId === cred.id"
+                @click="onTestCredential(cred.id)"
+              >
                 Test
               </button>
-              <button type="button" class="or-app-btn or-app-btn-ghost" @click="onDeleteCredential(cred.id)">
+              <button
+                type="button"
+                class="or-app-btn or-app-btn-ghost or-app-btn-sm"
+                :disabled="refreshing || credentialActionId === cred.id"
+                @click="onDeleteCredential(cred)"
+              >
                 {{ isVi ? 'Xóa' : 'Delete' }}
               </button>
             </div>
@@ -481,14 +620,19 @@ defineExpose({ reload });
         </div>
       </div>
 
-      <div v-else class="or-byok-panel">
-        <p class="or-app-muted">
-          {{
-            isVi
-              ? 'Thống kê 7 ngày — request BYOK vs platform (Gommo fallback).'
-              : 'Last 7 days — BYOK vs platform (Gommo fallback) requests.'
-          }}
-        </p>
+      <div v-else class="or-byok-panel" :class="{ 'or-byok-panel--refreshing': refreshing }">
+        <div class="or-byok-usage-head">
+          <p class="or-app-muted or-byok-usage-intro">
+            {{
+              isVi
+                ? 'Thống kê 7 ngày — request BYOK vs platform (Gommo fallback). Media usage xem Activity.'
+                : 'Last 7 days — BYOK vs platform (Gommo fallback) requests. Media usage is on Activity.'
+            }}
+          </p>
+          <a :href="activityHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
+            {{ isVi ? 'Activity' : 'Activity' }} →
+          </a>
+        </div>
 
         <div v-if="usageSummary" class="or-byok-usage-grid">
           <article class="or-app-panel or-byok-usage-card">
@@ -519,14 +663,33 @@ defineExpose({ reload });
               <strong>{{ event.source }}</strong>
               <span class="or-app-muted"> · {{ event.provider || '—' }} · {{ event.model }}</span>
             </div>
-            <div class="or-app-muted">
-              {{ formatUsageTime(event.at) }}
-              · {{ event.latencyMs }}ms
-              · {{ event.ok ? 'ok' : event.errorCode || 'err' }}
+            <div class="or-byok-usage-row-meta">
+              <span class="or-obs-delivery-badge" :class="`or-obs-delivery-badge--${eventStatusTone(event)}`">
+                {{ eventStatusLabel(event) }}
+              </span>
+              <span class="or-app-muted">
+                {{ formatUsageTime(event.at) }}
+                · {{ event.latencyMs }}ms
+              </span>
             </div>
           </article>
         </div>
         <p v-else class="or-app-muted">{{ isVi ? 'Chưa có usage.' : 'No usage yet.' }}</p>
+      </div>
+
+      <div class="or-byok-quicklinks">
+        <a :href="chatAppHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
+          {{ isVi ? 'Chat' : 'Chat' }} →
+        </a>
+        <a :href="chatDocsHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
+          {{ isVi ? 'Chat API' : 'Chat API' }} →
+        </a>
+        <a :href="tokenHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
+          {{ isVi ? 'Access token' : 'Access token' }} →
+        </a>
+        <a :href="activityHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
+          {{ isVi ? 'Activity' : 'Activity' }} →
+        </a>
       </div>
     </template>
   </div>
@@ -631,6 +794,11 @@ defineExpose({ reload });
   margin-bottom: 1rem;
 }
 
+.or-byok-form-submit {
+  justify-self: start;
+  width: auto;
+}
+
 .or-byok-field {
   display: grid;
   gap: 0.35rem;
@@ -686,5 +854,63 @@ defineExpose({ reload });
 .or-byok-usage-row {
   padding: 0.65rem 0;
   border-bottom: 1px solid var(--vp-c-divider);
+}
+
+.or-byok-usage-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  margin-top: 0.25rem;
+}
+
+.or-byok-usage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.or-byok-usage-intro {
+  flex: 1;
+  min-width: 12rem;
+  margin: 0;
+}
+
+.or-byok-action-success {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  color: #15803d;
+}
+
+.or-byok-action-error {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  color: #b91c1c;
+}
+
+.or-byok-quicklinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--vp-c-divider);
+}
+
+.or-byok-refresh-hint {
+  margin: 0 0 0.65rem;
+  font-size: 0.75rem;
+  color: var(--or-text-muted, var(--vp-c-text-2));
+}
+
+.or-byok-panel--refreshing,
+.or-byok-meta--refreshing,
+.or-byok-quickstart--refreshing {
+  opacity: 0.72;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
 }
 </style>

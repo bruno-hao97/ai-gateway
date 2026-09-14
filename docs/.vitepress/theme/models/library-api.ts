@@ -166,6 +166,45 @@ export async function fetchAlbumLibrary(opts: {
     .filter((item) => item.id || item.mediaUrl || item.thumbnailUrl);
 }
 
+const RECENT_UPLOADS_KEY = 'gw_files_recent_uploads';
+const MAX_RECENT_UPLOADS = 24;
+
+function safeParseUploadList(raw: string | null): LibraryFileItem[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item): item is LibraryFileItem => Boolean(item && typeof item === 'object'))
+      .filter((item) => item.source === 'upload' && (item.mediaUrl || item.thumbnailUrl))
+      .slice(0, MAX_RECENT_UPLOADS);
+  } catch {
+    return [];
+  }
+}
+
+export function loadRecentUploads(): LibraryFileItem[] {
+  if (typeof window === 'undefined') return [];
+  return safeParseUploadList(window.localStorage.getItem(RECENT_UPLOADS_KEY));
+}
+
+export function saveRecentUploads(items: LibraryFileItem[]): void {
+  if (typeof window === 'undefined') return;
+  const uploads = items
+    .filter((item) => item.source === 'upload')
+    .slice(0, MAX_RECENT_UPLOADS);
+  window.localStorage.setItem(RECENT_UPLOADS_KEY, JSON.stringify(uploads));
+}
+
+export function jobFieldsSnippet(item: LibraryFileItem): string {
+  const url = item.mediaUrl || item.thumbnailUrl || '';
+  if (!url) return '';
+  if (item.mediaKind === 'video') {
+    return JSON.stringify({ video_url: url }, null, 2);
+  }
+  return JSON.stringify({ images: [{ url }] }, null, 2);
+}
+
 export function uploadFileItem(
   url: string,
   file: File,

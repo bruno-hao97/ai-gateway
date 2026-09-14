@@ -145,4 +145,15 @@ Do **not** rely on webhooks alone for async `wait: false` jobs until a future re
 
 Manage webhooks at [Observability](/app/observability/) (sidebar **Developer → Observability**, badge **beta**). The on-page callout lists the same limits in plain language.
 
+### Smoke test checklist
+
+Manual (logged in, `npm run docs:stack`):
+
+- [ ] Stat cards link to Activity Trends, Explore, and Credits
+- [ ] Add webhook → success message; count shows `n/5`
+- [ ] **Test** → success message; delivery badge updates to OK or Error
+- [ ] **Delete** → confirm dialog; webhook removed
+- [ ] Expand **Example payload** → **Copy JSON** works
+- [ ] At 5 webhooks → form disabled with limit hint
+
 See also [Usage history](./usage.md) and [Media & jobs](./media.md).

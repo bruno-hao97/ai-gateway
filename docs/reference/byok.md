@@ -146,4 +146,15 @@ Uses your **current session token** for that domain unless you pass `access_toke
 
 Manage keys and accounts at [BYOK](/app/byok/) (sidebar **Developer → BYOK**, badge **beta**). The on-page callout and quick-start steps mirror this document.
 
+### Smoke test checklist
+
+Manual (logged in, `npm run docs:stack`):
+
+- [ ] **Providers** → save key → green success message
+- [ ] **Test** on a key → success or red error (not silent)
+- [ ] **Delete** → confirm dialog → credential removed
+- [ ] **Gommo** → link session → primary badge
+- [ ] **Usage** tab → event rows show OK/Error badges; **Activity** link works
+- [ ] Footer quick links: Chat, Chat API, Access token, Activity
+
 See also [Chat](./chat.md), [Media & jobs](./media.md), and [Authentication](/authentication).

@@ -71,12 +71,15 @@ defineExpose({ reload });
     <section id="profile-usage" class="or-profile-section or-profile-section-card">
       <div class="or-profile-section-head">
         <div>
-          <h2 class="or-profile-section-title or-profile-section-title--lg">Usage</h2>
+          <h2 class="or-profile-section-title or-profile-section-title--lg">
+            Usage
+            <span class="or-profile-period-pill">7d</span>
+          </h2>
           <p class="or-profile-section-sub">
             {{
               isVi
-                ? 'Jobs và credit từ Gommo usage-history (7 ngày).'
-                : 'Jobs and credits from Gommo usage-history (last 7 days).'
+                ? 'Jobs và credit từ Gommo usage-history — cùng period với Activity khi mở từ đây.'
+                : 'Jobs and credits from Gommo usage-history — same period as Activity links from here.'
             }}
           </p>
         </div>

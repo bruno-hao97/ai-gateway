@@ -55,6 +55,14 @@ POST /gateway/jobs/video  with URL + prompt + ratio from catalog
 wait: true  or  poll job
 ```
 
+## Portal UI
+
+Manage uploads at [Files](/app/files/) (sidebar **Developer → Files**, badge **beta**):
+
+- Gommo album (images/videos) from library API
+- **Recent uploads** persist in browser `localStorage` on this device
+- **Copy URL** or **Copy fields** (JSON snippet for `POST /gateway/jobs/*`)
+
 ## Mode C / Direct
 
 Proxy and direct calls use Gommo form fields:

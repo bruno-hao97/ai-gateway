@@ -37,6 +37,7 @@ import AccessTokenPanel from './AccessTokenPanel.vue';
 import ByokPanel from './ByokPanel.vue';
 import FilesPanel from './FilesPanel.vue';
 import ObservabilityPanel from './ObservabilityPanel.vue';
+import { activityHubHref, PROFILE_USAGE_PREVIEW_PERIOD } from '../models/activity-hub-url';
 import { formatApproxUsd, formatPayTotalLine } from '../models/invoice-buyer';
 
 const TOKEN_COPIED_STORAGE_KEY = 'gateway_token_copied';
@@ -142,6 +143,51 @@ const showNoJobsBanner = computed(
 const hasOverviewJobs = computed(
   () => overviewUsageStats.value.loaded && overviewUsageStats.value.totalJobs > 0,
 );
+
+const overviewActivityHref = computed(() =>
+  activityHubHref(prefix.value, { period: PROFILE_USAGE_PREVIEW_PERIOD }),
+);
+
+const overviewWorkspaceCards = computed(() => [
+  {
+    id: 'activity',
+    title: 'Activity',
+    desc: isVi.value
+      ? 'Usage, trends, job logs và billing — analytics đầy đủ.'
+      : 'Usage, trends, job logs, and billing — full analytics.',
+    href: overviewActivityHref.value,
+    cta: isVi.value ? 'Mở Activity' : 'Open Activity',
+  },
+  {
+    id: 'token',
+    title: isVi.value ? 'Access token' : 'Access token',
+    desc: isVi.value
+      ? 'Bearer token, snippet Gateway và kiểm tra kết nối.'
+      : 'Bearer token, Gateway snippets, and connection checks.',
+    href: `${prefix.value}/app/token/`,
+    cta: isVi.value ? 'Mở token' : 'Open token',
+  },
+  {
+    id: 'files',
+    title: isVi.value ? 'Files' : 'Files',
+    badge: 'beta',
+    desc: isVi.value
+      ? 'Upload ảnh/video và album Gommo — copy URL cho jobs.'
+      : 'Upload images/videos and Gommo album — copy URLs for jobs.',
+    href: `${prefix.value}/app/files/`,
+    cta: isVi.value ? 'Mở Files' : 'Open Files',
+  },
+  {
+    id: 'observability',
+    title: 'Observability',
+    badge: 'beta',
+    desc: isVi.value
+      ? 'Webhook job (beta), mirror local và usage Gommo.'
+      : 'Job webhooks (beta), local mirror, and Gommo usage.',
+    href: `${prefix.value}/app/observability/`,
+    cta: isVi.value ? 'Mở Observability' : 'Open Observability',
+  },
+]);
 
 function onOverviewUsageStats(payload: { totalJobs: number; hasError: boolean }) {
   overviewUsageStats.value = {
@@ -743,6 +789,9 @@ useVitepressUrlSync(syncDashboardFromLocation);
               <a :href="`${prefix}/app/playground/`" class="or-app-btn or-app-btn-primary">
                 {{ isVi ? 'Mở Playground' : 'Open Playground' }}
               </a>
+              <a :href="overviewActivityHref" class="or-app-btn or-app-btn-ghost">
+                {{ isVi ? 'Activity' : 'Activity' }}
+              </a>
               <button
                 type="button"
                 class="or-app-btn or-app-btn-ghost"
@@ -808,6 +857,23 @@ useVitepressUrlSync(syncDashboardFromLocation);
               :token-copied="tokenCopiedEver"
               :has-jobs="hasOverviewJobs"
             />
+          </div>
+
+          <h2 class="or-overview-links-title">{{ isVi ? 'Workspace' : 'Workspace' }}</h2>
+          <div class="or-app-grid or-app-grid--overview or-overview-workspace">
+            <a
+              v-for="card in overviewWorkspaceCards"
+              :key="card.id"
+              :href="card.href"
+              class="or-app-card"
+            >
+              <h3>
+                {{ card.title }}
+                <span v-if="card.badge" class="or-app-title-badge">{{ card.badge }}</span>
+              </h3>
+              <p>{{ card.desc }}</p>
+              <span class="or-app-card-cta">{{ card.cta }} →</span>
+            </a>
           </div>
 
           <h2 class="or-overview-links-title">{{ isVi ? 'Tài liệu' : 'Resources' }}</h2>
