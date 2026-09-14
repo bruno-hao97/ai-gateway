@@ -23,6 +23,8 @@ export interface UsageModelAggregateData {
   pages_scanned: number;
   truncated: boolean;
   items: ModelAggregateRow[];
+  /** Set by gateway in-memory cache on repeat requests */
+  from_cache?: boolean;
 }
 
 const PAGE_LIMIT = 100;

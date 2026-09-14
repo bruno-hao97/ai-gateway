@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useVitepressUrlSync } from '../composables/use-vitepress-url-sync';
+import { activityHubHref } from '../models/activity-hub-url';
 import { fetchUsageLogs, fetchUsageModelAggregate, fetchUsageStats, formatCredits } from '../models/user-api';
 import { formatUsageTime } from '../models/usage-history';
 import {
@@ -13,6 +14,10 @@ import {
   sparklineSvgPath,
   sparklineValuesFromChart,
   typeBreakdownFromSummary,
+  downloadTextFile,
+  exportListCsv,
+  normalizeUsageListItem,
+  usageJobId,
   type TopModelRow,
   type UsageListItem,
   type UsageStatsData,
@@ -22,12 +27,14 @@ import {
 import ProfileUsagePanel from './ProfileUsagePanel.vue';
 import ProfileActivityPanel from './ProfileActivityPanel.vue';
 import ActivityUsageCharts from './ActivityUsageCharts.vue';
+import UsageJobDetailModal from './UsageJobDetailModal.vue';
 import type { TopupOrder } from '../models/user-api';
 
 type ActivityTab = 'overview' | 'trends' | 'explore' | 'billing';
 
 const ACTIVITY_TABS = new Set<ActivityTab>(['overview', 'trends', 'explore', 'billing']);
 const PERIOD_OPTIONS = new Set<UsageStatsPeriod>(['7d', '30d', '90d']);
+const TYPE_OPTIONS = new Set<UsageStatsType>(['image', 'video', 'audio', 'music']);
 
 const props = defineProps<{
   isVi: boolean;
@@ -58,8 +65,22 @@ function readModelFromLocation(): string {
   return new URLSearchParams(window.location.search).get('model')?.trim() || '';
 }
 
+function readJobFromLocation(): string {
+  if (typeof window === 'undefined') return '';
+  return new URLSearchParams(window.location.search).get('job')?.trim() || '';
+}
+
+function readTypeFromLocation(): UsageStatsType | 'all' {
+  if (typeof window === 'undefined') return 'all';
+  const type = new URLSearchParams(window.location.search).get('type');
+  if (type && TYPE_OPTIONS.has(type as UsageStatsType)) return type as UsageStatsType;
+  return 'all';
+}
+
 const sharedPeriod = ref<UsageStatsPeriod>(readPeriodFromLocation());
 const sharedModel = ref(readModelFromLocation());
+const sharedJobId = ref(readJobFromLocation());
+const sharedType = ref<UsageStatsType | 'all'>(readTypeFromLocation());
 const overviewLoading = ref(true);
 const overviewError = ref('');
 const statsData = ref<UsageStatsData | null>(null);
@@ -67,7 +88,11 @@ const recentJobs = ref<UsageListItem[]>([]);
 const topModels = ref<TopModelRow[]>([]);
 const topModelsScanned = ref(0);
 const topModelsTruncated = ref(false);
+const topModelsFromCache = ref(false);
 const chartDays = ref(14);
+const selectedJob = ref<UsageListItem | null>(null);
+const jobDetailOpen = ref(false);
+const overviewExporting = ref(false);
 
 function readActivityTab(): ActivityTab {
   if (typeof window === 'undefined') return 'overview';
@@ -137,14 +162,15 @@ const periodLabel = computed(() => {
 const topModelsHint = computed(() => {
   if (topModelsScanned.value <= 0) return '';
   const scanned = topModelsScanned.value.toLocaleString();
-  if (props.isVi) {
-    return topModelsTruncated.value
+  const base = props.isVi
+    ? topModelsTruncated.value
       ? `Từ ${scanned}+ job (giới hạn scan)`
-      : `Từ ${scanned} job`;
-  }
-  return topModelsTruncated.value
-    ? `From ${scanned}+ jobs (scan cap)`
-    : `From ${scanned} jobs`;
+      : `Từ ${scanned} job`
+    : topModelsTruncated.value
+      ? `From ${scanned}+ jobs (scan cap)`
+      : `From ${scanned} jobs`;
+  if (!topModelsFromCache.value) return base;
+  return props.isVi ? `${base} · cache` : `${base} · cached`;
 });
 
 function syncQueryToUrl() {
@@ -158,6 +184,16 @@ function syncQueryToUrl() {
     url.searchParams.set('model', sharedModel.value);
   } else {
     url.searchParams.delete('model');
+  }
+  if (activeTab.value === 'explore' && sharedJobId.value) {
+    url.searchParams.set('job', sharedJobId.value);
+  } else {
+    url.searchParams.delete('job');
+  }
+  if (activeTab.value === 'explore' && sharedType.value !== 'all') {
+    url.searchParams.set('type', sharedType.value);
+  } else {
+    url.searchParams.delete('type');
   }
   window.history.replaceState({}, '', url.toString());
 }
@@ -180,6 +216,17 @@ function setSharedModel(model: string) {
   syncQueryToUrl();
 }
 
+function setSharedJob(jobId: string) {
+  sharedJobId.value = jobId.trim();
+  syncQueryToUrl();
+}
+
+function setSharedType(type: UsageStatsType | 'all') {
+  if (sharedType.value === type) return;
+  sharedType.value = type;
+  syncQueryToUrl();
+}
+
 const showEmptyOverview = computed(
   () =>
     !overviewLoading.value &&
@@ -189,18 +236,69 @@ const showEmptyOverview = computed(
 );
 
 function tabHref(tab: ActivityTab, model?: string): string {
-  const params = new URLSearchParams();
-  if (tab !== 'overview') params.set('tab', tab);
-  if (sharedPeriod.value !== '30d') params.set('period', sharedPeriod.value);
-  const modelParam = model?.trim() || (tab === 'explore' ? sharedModel.value : '');
-  if (modelParam) params.set('model', modelParam);
-  const query = params.toString();
-  const base = `${props.prefix}/app/activity/`;
-  return query ? `${base}?${query}` : base;
+  return activityHubHref(props.prefix, {
+    tab,
+    period: sharedPeriod.value,
+    model: model?.trim() || (tab === 'explore' ? sharedModel.value : undefined),
+    job: tab === 'explore' ? sharedJobId.value : undefined,
+    type: tab === 'explore' ? sharedType.value : undefined,
+  });
 }
 
 function exploreModelHref(model: string): string {
   return tabHref('explore', model);
+}
+
+function openJobDetail(row: UsageListItem) {
+  selectedJob.value = row;
+  jobDetailOpen.value = true;
+}
+
+function closeJobDetail() {
+  jobDetailOpen.value = false;
+  selectedJob.value = null;
+}
+
+function overviewJobShareHref(row: UsageListItem): string {
+  const jobId = usageJobId(row);
+  if (!jobId) return '';
+  return activityHubHref(props.prefix, {
+    tab: 'explore',
+    period: sharedPeriod.value,
+    model: row.model || undefined,
+    job: jobId,
+  });
+}
+
+const overviewJobShareHrefValue = computed(() =>
+  selectedJob.value ? overviewJobShareHref(selectedJob.value) : '',
+);
+
+async function exportOverviewCsv() {
+  if (overviewExporting.value) return;
+  overviewExporting.value = true;
+  try {
+    const items: UsageListItem[] = [];
+    for (let page = 1; page <= 10; page++) {
+      const data = await fetchUsageLogs({
+        period: sharedPeriod.value,
+        type: 'all',
+        language: 'VI',
+        page,
+        limit: 100,
+      });
+      items.push(...data.items);
+      const pageFull = data.items.length >= (data.limit ?? 100);
+      if (!data.has_more || data.items.length === 0 || !pageFull) break;
+    }
+    if (items.length === 0) return;
+    downloadTextFile(
+      exportListCsv(items),
+      `activity-jobs-${sharedPeriod.value}.csv`,
+    );
+  } finally {
+    overviewExporting.value = false;
+  }
 }
 
 function statusLabel(status: ReturnType<typeof listItemStatus>): string {
@@ -257,12 +355,14 @@ async function loadOverview() {
     topModels.value = aggregate.items;
     topModelsScanned.value = aggregate.scanned_jobs;
     topModelsTruncated.value = aggregate.truncated;
-    recentJobs.value = logs.items.slice(0, 5);
+    topModelsFromCache.value = Boolean(aggregate.from_cache);
+    recentJobs.value = logs.items.slice(0, 5).map(normalizeUsageListItem);
   } catch (e) {
     statsData.value = null;
     topModels.value = [];
     topModelsScanned.value = 0;
     topModelsTruncated.value = false;
+    topModelsFromCache.value = false;
     recentJobs.value = [];
     overviewError.value = e instanceof Error ? e.message : String(e);
   }
@@ -295,13 +395,19 @@ function syncFromLocation() {
   const nextTab = readActivityTab();
   const nextPeriod = readPeriodFromLocation();
   const nextModel = nextTab === 'explore' ? readModelFromLocation() : '';
+  const nextJob = nextTab === 'explore' ? readJobFromLocation() : '';
+  const nextType = nextTab === 'explore' ? readTypeFromLocation() : 'all';
   const tabChanged = nextTab !== activeTab.value;
   const periodChanged = nextPeriod !== sharedPeriod.value;
   const modelChanged = nextModel !== sharedModel.value;
-  if (!tabChanged && !periodChanged && !modelChanged) return;
+  const jobChanged = nextJob !== sharedJobId.value;
+  const typeChanged = nextType !== sharedType.value;
+  if (!tabChanged && !periodChanged && !modelChanged && !jobChanged && !typeChanged) return;
   activeTab.value = nextTab;
   sharedPeriod.value = nextPeriod;
   sharedModel.value = nextModel;
+  sharedJobId.value = nextJob;
+  sharedType.value = nextType;
   void reloadActiveTab();
 }
 
@@ -328,6 +434,12 @@ defineExpose({ reload: reloadAll });
       </a>
     </nav>
 
+    <p class="or-activity-hub-meta or-app-muted">
+      <a :href="`${prefix}/app/observability/`" class="or-activity-hub-meta-link">
+        {{ isVi ? 'Webhook export → Observability' : 'Webhook export → Observability' }}
+      </a>
+    </p>
+
     <div v-if="activeTab === 'overview'" class="or-activity-hub-panel or-activity-overview">
       <div class="or-activity-overview-toolbar">
         <div class="or-usage-filter-group" role="group" :aria-label="isVi ? 'Khoảng thời gian' : 'Time range'">
@@ -342,14 +454,24 @@ defineExpose({ reload: reloadAll });
             {{ opt.label }}
           </button>
         </div>
-        <button
-          type="button"
-          class="or-app-btn or-app-btn-ghost or-app-btn-sm"
-          :disabled="overviewLoading"
-          @click="loadOverview"
-        >
-          {{ overviewLoading ? (isVi ? 'Đang tải…' : 'Loading…') : isVi ? 'Làm mới' : 'Refresh' }}
-        </button>
+        <div class="or-activity-overview-toolbar-actions">
+          <button
+            type="button"
+            class="or-app-btn or-app-btn-ghost or-app-btn-sm"
+            :disabled="overviewLoading || overviewExporting || (summary?.total ?? 0) === 0"
+            @click="exportOverviewCsv"
+          >
+            {{ overviewExporting ? (isVi ? 'Đang xuất…' : 'Exporting…') : isVi ? 'Xuất CSV' : 'Export CSV' }}
+          </button>
+          <button
+            type="button"
+            class="or-app-btn or-app-btn-ghost or-app-btn-sm"
+            :disabled="overviewLoading"
+            @click="loadOverview"
+          >
+            {{ overviewLoading ? (isVi ? 'Đang tải…' : 'Loading…') : isVi ? 'Làm mới' : 'Refresh' }}
+          </button>
+        </div>
       </div>
 
       <p v-if="overviewError" class="or-app-error">{{ overviewError }}</p>
@@ -590,7 +712,15 @@ defineExpose({ reload: reloadAll });
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in recentJobs" :key="row.id_base || `${row.created_at}-${row.model}`">
+                <tr
+                  v-for="row in recentJobs"
+                  :key="row.id_base || `${row.created_at}-${row.model}`"
+                  class="or-activity-recent-row or-usage-explore-row--clickable"
+                  tabindex="0"
+                  role="button"
+                  @click="openJobDetail(row)"
+                  @keydown.enter="openJobDetail(row)"
+                >
                   <td class="or-usage-td-time">
                     {{ formatUsageTime(listItemCreatedAt(row) || '', isVi) }}
                   </td>
@@ -640,11 +770,15 @@ defineExpose({ reload: reloadAll });
         mode="logs"
         :initial-period="sharedPeriod"
         :initial-model-filter="sharedModel"
+        :initial-job-id="sharedJobId"
+        :initial-type-filter="sharedType"
         :credits="credits"
         :is-vi="isVi"
         :prefix="prefix"
         @period-change="setSharedPeriod"
         @model-filter-change="setSharedModel"
+        @job-id-change="setSharedJob"
+        @type-filter-change="setSharedType"
       />
     </div>
 
@@ -659,5 +793,13 @@ defineExpose({ reload: reloadAll });
         @refresh="emit('refresh')"
       />
     </div>
+
+    <UsageJobDetailModal
+      :open="jobDetailOpen"
+      :item="selectedJob"
+      :is-vi="isVi"
+      :share-href="overviewJobShareHrefValue"
+      @close="closeJobDetail"
+    />
   </div>
 </template>

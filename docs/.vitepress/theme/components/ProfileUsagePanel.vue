@@ -1,14 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import { activityHubHref } from '../models/activity-hub-url';
 import { fetchUsageLogs, fetchUsageStats, formatCredits } from '../models/user-api';
 import { formatUsageTime } from '../models/usage-history';
 import {
   chartDaysForPeriod,
   chartSeriesFromStats,
+  downloadTextFile,
   exportListCsv,
   exportStatsTableCsv,
   filterListItems,
   filterStatsTable,
+  matchesUsageJobId,
+  normalizeUsageListItem,
+  usageJobId,
   jobTypeLabel,
   listItemCredit,
   listItemCreatedAt,
@@ -39,11 +44,17 @@ const props = defineProps<{
   initialPeriod?: UsageStatsPeriod;
   /** Pre-filter Explore by model (?model=) */
   initialModelFilter?: string;
+  /** Deep-link job modal (?job=) */
+  initialJobId?: string;
+  /** Pre-filter Explore by job type (?type=) */
+  initialTypeFilter?: UsageStatsType | 'all';
 }>();
 
 const emit = defineEmits<{
   periodChange: [period: UsageStatsPeriod];
   modelFilterChange: [model: string];
+  jobIdChange: [jobId: string];
+  typeFilterChange: [type: UsageStatsType | 'all'];
 }>();
 
 const logsOnly = computed(() => props.mode === 'logs');
@@ -66,6 +77,9 @@ const modelFilter = ref('');
 const chartDays = ref(14);
 const selectedJob = ref<UsageListItem | null>(null);
 const jobDetailOpen = ref(false);
+const pendingJobId = ref('');
+const exploreExporting = ref(false);
+let pendingJobRun = 0;
 
 const typeOptions = computed(() => [
   { id: 'all' as const, label: props.isVi ? 'Tất cả' : 'All' },
@@ -193,7 +207,8 @@ async function loadList(reset = true) {
       page: listPage.value,
       limit: 30,
     });
-    listItems.value = reset ? data.items : [...listItems.value, ...data.items];
+    const items = data.items.map(normalizeUsageListItem);
+    listItems.value = reset ? items : [...listItems.value, ...items];
     listHasMore.value = Boolean(data.has_more) || data.items.length >= (data.limit ?? 30);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -231,6 +246,7 @@ async function reloadRecords() {
   if (!trendsOnly.value) {
     await loadList(true);
     await loadAllPagesForModelFilter();
+    await tryOpenPendingJob();
   }
   loading.value = false;
 }
@@ -253,18 +269,57 @@ async function loadAllPagesForModelFilter() {
 
 defineExpose({ reloadRecords });
 
+function applyClientExploreFilters(items: UsageListItem[]): UsageListItem[] {
+  let filtered = items;
+  const model = modelFilter.value.trim();
+  if (model) {
+    filtered = filtered.filter((item) => (item.model || '').trim() === model);
+  }
+  return filterListItems(filtered, {
+    type: typeFilter.value,
+    query: searchQuery.value,
+  });
+}
+
+async function exportExploreCsv() {
+  if (exploreExporting.value) return;
+  exploreExporting.value = true;
+  try {
+    const items: UsageListItem[] = [];
+    for (let page = 1; page <= 10; page++) {
+      const data = await fetchUsageLogs({
+        period: period.value,
+        type: typeFilter.value,
+        language: 'VI',
+        page,
+        limit: 100,
+      });
+      items.push(...data.items.map(normalizeUsageListItem));
+      const pageFull = data.items.length >= (data.limit ?? 100);
+      if (!data.has_more || data.items.length === 0 || !pageFull) break;
+    }
+    const filtered = applyClientExploreFilters(items);
+    if (filtered.length === 0) return;
+    const suffix = modelFilter.value.trim() ? `-${modelFilter.value.trim()}` : '';
+    downloadTextFile(
+      exportListCsv(filtered),
+      `activity-explore-${period.value}${suffix}.csv`,
+    );
+  } finally {
+    exploreExporting.value = false;
+  }
+}
+
 function exportCsv() {
+  if (logsOnly.value) {
+    void exportExploreCsv();
+    return;
+  }
   const csv =
     filteredListItems.value.length > 0
       ? exportListCsv(filteredListItems.value)
       : exportStatsTableCsv(tableRows.value);
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `usage-${statsData.value?.period || 'export'}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadTextFile(csv, `usage-${statsData.value?.period || 'export'}.csv`);
 }
 
 function colHeight(total: number): number {
@@ -299,6 +354,22 @@ function applyInitialModelFilter(model?: string) {
   modelFilter.value = (model || '').trim();
 }
 
+function applyInitialTypeFilter(type?: UsageStatsType | 'all') {
+  if (!type || type === 'all') {
+    typeFilter.value = 'all';
+    return;
+  }
+  if (type === 'image' || type === 'video' || type === 'audio' || type === 'music') {
+    typeFilter.value = type;
+  }
+}
+
+function setTypeFilter(next: UsageStatsType | 'all') {
+  if (typeFilter.value === next) return;
+  typeFilter.value = next;
+  if (logsOnly.value) emit('typeFilterChange', next);
+}
+
 function clearModelFilter() {
   if (!modelFilter.value) return;
   modelFilter.value = '';
@@ -306,14 +377,59 @@ function clearModelFilter() {
 }
 
 function openJobDetail(row: UsageListItem) {
-  selectedJob.value = row;
+  pendingJobRun += 1;
+  const normalized = normalizeUsageListItem(row);
+  selectedJob.value = normalized;
   jobDetailOpen.value = true;
+  if (!logsOnly.value) return;
+  emit('jobIdChange', usageJobId(normalized));
 }
 
 function closeJobDetail() {
   jobDetailOpen.value = false;
   selectedJob.value = null;
+  if (logsOnly.value) {
+    emit('jobIdChange', '');
+  }
 }
+
+function applyInitialJobId(jobId?: string) {
+  pendingJobId.value = (jobId || '').trim();
+}
+
+async function tryOpenPendingJob() {
+  const id = pendingJobId.value;
+  if (!id || !logsOnly.value) return;
+  const runId = ++pendingJobRun;
+
+  let found = listItems.value.find((item) => matchesUsageJobId(item, id));
+  let guard = 0;
+  while (!found && listHasMore.value && guard < 30) {
+    if (runId !== pendingJobRun) return;
+    await loadMoreList();
+    found = listItems.value.find((item) => matchesUsageJobId(item, id));
+    guard += 1;
+  }
+
+  if (runId !== pendingJobRun) return;
+  if (found) {
+    selectedJob.value = normalizeUsageListItem(found);
+    jobDetailOpen.value = true;
+  }
+  pendingJobId.value = '';
+}
+
+const exploreJobShareHref = computed(() => {
+  const jobId = usageJobId(selectedJob.value);
+  if (!logsOnly.value || !jobId) return '';
+  return activityHubHref(props.prefix, {
+    tab: 'explore',
+    period: period.value,
+    model: modelFilter.value || undefined,
+    job: jobId,
+    type: typeFilter.value,
+  });
+});
 
 watch(
   () => props.initialPeriod,
@@ -327,6 +443,26 @@ watch(
   () => props.initialModelFilter,
   (model) => {
     applyInitialModelFilter(model);
+  },
+  { immediate: true },
+);
+
+watch(
+  () => props.initialTypeFilter,
+  (type) => {
+    applyInitialTypeFilter(type);
+  },
+  { immediate: true },
+);
+
+watch(
+  () => props.initialJobId,
+  (jobId) => {
+    const id = (jobId || '').trim();
+    applyInitialJobId(id);
+    if (!id || !logsOnly.value || loading.value) return;
+    if (jobDetailOpen.value && matchesUsageJobId(selectedJob.value, id)) return;
+    void tryOpenPendingJob();
   },
   { immediate: true },
 );
@@ -507,7 +643,7 @@ onMounted(() => {
             type="button"
             class="or-usage-pill"
             :class="{ active: typeFilter === opt.id }"
-            @click="typeFilter = opt.id"
+            @click="setTypeFilter(opt.id)"
           >
             {{ opt.label }}
           </button>
@@ -527,10 +663,18 @@ onMounted(() => {
         <button
           type="button"
           class="or-app-btn or-app-btn-ghost or-app-btn-sm"
-          :disabled="filteredListItems.length === 0 && tableRows.length === 0"
+          :disabled="exploreExporting || (filteredListItems.length === 0 && tableRows.length === 0)"
           @click="exportCsv"
         >
-          {{ isVi ? 'Xuất CSV' : 'Export CSV' }}
+          {{
+            exploreExporting
+              ? isVi
+                ? 'Đang xuất…'
+                : 'Exporting…'
+              : isVi
+                ? 'Xuất CSV'
+                : 'Export CSV'
+          }}
         </button>
       </div>
     </div>
@@ -738,6 +882,7 @@ onMounted(() => {
       :open="jobDetailOpen"
       :item="selectedJob"
       :is-vi="isVi"
+      :share-href="exploreJobShareHref"
       @close="closeJobDetail"
     />
   </div>

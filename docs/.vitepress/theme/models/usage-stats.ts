@@ -163,6 +163,7 @@ export interface UsageModelAggregateData {
   pages_scanned: number;
   truncated: boolean;
   items: TopModelRow[];
+  from_cache?: boolean;
 }
 
 export function chartDaysForPeriod(period: UsageStatsPeriod): number {
@@ -356,6 +357,41 @@ export function filterListItems(
   });
 }
 
+type UsageListItemRaw = UsageListItem & {
+  id?: string;
+  job_id?: string;
+  task_id?: string;
+};
+
+/** Stable job key for deep links — Gommo may use id_base, id, or job_id. */
+export function usageJobId(item: UsageListItem | null | undefined): string {
+  if (!item) return '';
+  const raw = item as UsageListItemRaw;
+  return String(raw.id_base || raw.id || raw.job_id || raw.task_id || '').trim();
+}
+
+export function normalizeUsageListItem(item: UsageListItem): UsageListItem {
+  const id = usageJobId(item);
+  return id ? { ...item, id_base: id } : item;
+}
+
+export function matchesUsageJobId(item: UsageListItem, jobId: string): boolean {
+  const id = jobId.trim();
+  if (!id) return false;
+  return usageJobId(item) === id;
+}
+
+export function downloadTextFile(content: string, filename: string, mime = 'text/csv;charset=utf-8'): void {
+  if (typeof document === 'undefined') return;
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function exportListCsv(items: UsageListItem[]): string {
   const header = ['created_at', 'type', 'model', 'prompt', 'status', 'credit', 'id_base'];
   const rows = items.map((item) =>
@@ -366,7 +402,7 @@ export function exportListCsv(items: UsageListItem[]): string {
       `"${String(item.prompt || '').replace(/"/g, '""')}"`,
       item.status || '',
       listItemCredit(item) || '',
-      item.id_base || '',
+      usageJobId(item),
     ].join(','),
   );
   return [header.join(','), ...rows].join('\n');

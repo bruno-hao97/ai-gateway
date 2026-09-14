@@ -118,15 +118,25 @@ export function normalizeUsageType(raw: string | undefined): UsageStatsType {
   return 'all';
 }
 
+function normalizeLogItem(raw: Record<string, unknown>): UsageListItem {
+  const id = String(raw.id_base || raw.id || raw.job_id || raw.task_id || '').trim();
+  return {
+    ...(raw as UsageListItem),
+    id_base: id || (raw as UsageListItem).id_base,
+  };
+}
+
 function extractLogItems(data: Record<string, unknown>): UsageListItem[] {
-  if (Array.isArray(data.items)) return data.items as UsageListItem[];
-  const nested = data.data;
-  if (nested && typeof nested === 'object' && Array.isArray((nested as { items?: UsageListItem[] }).items)) {
-    return (nested as { items: UsageListItem[] }).items;
+  let items: Record<string, unknown>[] = [];
+  if (Array.isArray(data.items)) items = data.items as Record<string, unknown>[];
+  else {
+    const nested = data.data;
+    if (nested && typeof nested === 'object' && Array.isArray((nested as { items?: unknown[] }).items)) {
+      items = (nested as { items: Record<string, unknown>[] }).items;
+    } else if (Array.isArray(data.logs)) items = data.logs as Record<string, unknown>[];
+    else if (Array.isArray(data.list)) items = data.list as Record<string, unknown>[];
   }
-  if (Array.isArray(data.logs)) return data.logs as UsageListItem[];
-  if (Array.isArray(data.list)) return data.list as UsageListItem[];
-  return [];
+  return items.map(normalizeLogItem);
 }
 
 export class UsageStatsApi {

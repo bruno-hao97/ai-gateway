@@ -4,6 +4,11 @@ import {
   normalizeAggregateGroupBy,
 } from '../services/usageAggregateApi.js';
 import {
+  getCachedUsageAggregate,
+  setCachedUsageAggregate,
+  usageAggregateCacheKey,
+} from '../services/usageAggregateCache.js';
+import {
   UsageStatsApi,
   normalizeUsagePeriod,
   normalizeUsageType,
@@ -99,14 +104,32 @@ async function handleAggregate(req: import('express').Request, res: import('expr
     return;
   }
 
-  const data = await fetchTopModelAggregate(statsClient(req, projectId), {
+  const auth = getGatewayAuth(req);
+  const cacheKey = usageAggregateCacheKey({
+    token: auth.accessToken,
+    domain: readDomain(req),
+    projectId: projectId || 'default',
     period,
     type,
     language,
-    device,
     top,
     maxPages,
+    device_id: device?.device_id,
   });
+
+  let data = getCachedUsageAggregate(cacheKey);
+  if (!data) {
+    data = await fetchTopModelAggregate(statsClient(req, projectId), {
+      period,
+      type,
+      language,
+      device,
+      top,
+      maxPages,
+    });
+    setCachedUsageAggregate(cacheKey, data);
+  }
+
   res.json({ success: true, data });
 }
 

@@ -70,7 +70,7 @@ curl.exe -X POST "http://localhost:3001/gateway/usage/aggregate" ^
 | `top` | 1–20, default `5` |
 | `maxPages` | 1–100, default `50` (scan cap) |
 
-Response `data`: `scanned_jobs`, `pages_scanned`, `truncated`, `items[]` (`model`, `count`, `credit`, `percent`).
+Response `data`: `scanned_jobs`, `pages_scanned`, `truncated`, `items[]` (`model`, `count`, `credit`, `percent`), optional `from_cache` when served from gateway memory cache (default TTL 10 minutes, `USAGE_AGGREGATE_CACHE_TTL_MS`).
 
 ## Dashboard mapping
 

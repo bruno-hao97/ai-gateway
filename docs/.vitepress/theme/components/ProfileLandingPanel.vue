@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import OverviewUsageSection from './OverviewUsageSection.vue';
 import OverviewRecentTopups from './OverviewRecentTopups.vue';
 import ProfileActivityHeatmap from './ProfileActivityHeatmap.vue';
+import { activityHubHref, PROFILE_USAGE_PREVIEW_PERIOD } from '../models/activity-hub-url';
 import { formatCredits } from '../models/user-api';
 import type { TopupOrder } from '../models/user-api';
 
@@ -27,9 +28,15 @@ const emit = defineEmits<{
 const usageRef = ref<InstanceType<typeof OverviewUsageSection> | null>(null);
 const heatmapRef = ref<InstanceType<typeof ProfileActivityHeatmap> | null>(null);
 
-const usageDetailHref = computed(() => `${props.prefix}/app/activity/?tab=trends`);
-const logsDetailHref = computed(() => `${props.prefix}/app/activity/?tab=explore`);
-const activityDetailHref = computed(() => `${props.prefix}/app/activity/`);
+const usageDetailHref = computed(() =>
+  activityHubHref(props.prefix, { tab: 'trends', period: PROFILE_USAGE_PREVIEW_PERIOD }),
+);
+const logsDetailHref = computed(() =>
+  activityHubHref(props.prefix, { tab: 'explore', period: PROFILE_USAGE_PREVIEW_PERIOD }),
+);
+const activityDetailHref = computed(() =>
+  activityHubHref(props.prefix, { period: PROFILE_USAGE_PREVIEW_PERIOD }),
+);
 const tokenHref = computed(() => `${props.prefix}/app/token/`);
 const authDocsHref = computed(() => `${props.prefix}/authentication`);
 const creditsHref = computed(() => `${props.prefix}/app/credits/`);

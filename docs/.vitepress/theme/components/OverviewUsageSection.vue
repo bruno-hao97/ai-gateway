@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { fetchUsageLogs, fetchUsageStats, formatCredits } from '../models/user-api';
 import { formatUsageTime } from '../models/usage-history';
+import { activityHubHref, PROFILE_USAGE_PREVIEW_PERIOD } from '../models/activity-hub-url';
 import {
   chartSeriesFromStats,
   jobTypeLabel,
@@ -78,8 +79,12 @@ const metricOptions = computed(() => [
   { id: 'success' as const, label: props.isVi ? 'Thành công' : 'Success' },
 ]);
 
-const usageHref = computed(() => `${props.prefix}/app/activity/?tab=trends`);
-const logsHref = computed(() => `${props.prefix}/app/activity/?tab=explore`);
+const usageHref = computed(() =>
+  activityHubHref(props.prefix, { tab: 'trends', period: PROFILE_USAGE_PREVIEW_PERIOD }),
+);
+const logsHref = computed(() =>
+  activityHubHref(props.prefix, { tab: 'explore', period: PROFILE_USAGE_PREVIEW_PERIOD }),
+);
 
 function colHeight(value: number): number {
   return Math.round((value / chartMax.value) * 100);

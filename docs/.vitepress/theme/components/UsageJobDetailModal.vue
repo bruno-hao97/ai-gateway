@@ -7,6 +7,7 @@ import {
   listItemCredit,
   listItemCreatedAt,
   listItemStatus,
+  usageJobId,
   type UsageListItem,
   type UsageStatsType,
 } from '../models/usage-stats';
@@ -15,6 +16,8 @@ const props = defineProps<{
   open: boolean;
   item: UsageListItem | null;
   isVi: boolean;
+  /** Full URL to reopen this job in Explore */
+  shareHref?: string;
 }>();
 
 const emit = defineEmits<{
@@ -22,8 +25,11 @@ const emit = defineEmits<{
 }>();
 
 const copied = ref(false);
+const linkCopied = ref(false);
 
 const status = computed(() => (props.item ? listItemStatus(props.item) : 'pending'));
+
+const jobId = computed(() => usageJobId(props.item));
 
 const statusLabel = computed(() => {
   if (status.value === 'success') return props.isVi ? 'Thành công' : 'Success';
@@ -36,6 +42,7 @@ watch(
   (open, _, onCleanup) => {
     if (!open) {
       copied.value = false;
+      linkCopied.value = false;
       return;
     }
     const onKeydown = (event: KeyboardEvent) => {
@@ -50,16 +57,35 @@ function onBackdropClick(event: MouseEvent) {
   if (event.target === event.currentTarget) emit('close');
 }
 
-async function copyText(text: string) {
+async function copyText(text: string, which: 'id' | 'link' = 'id') {
   if (!text || typeof navigator === 'undefined') return;
   try {
     await navigator.clipboard.writeText(text);
+    if (which === 'link') {
+      linkCopied.value = true;
+      window.setTimeout(() => {
+        linkCopied.value = false;
+      }, 1500);
+      return;
+    }
     copied.value = true;
     window.setTimeout(() => {
       copied.value = false;
     }, 1500);
   } catch {
-    copied.value = false;
+    if (which === 'link') linkCopied.value = false;
+    else copied.value = false;
+  }
+}
+
+function shareUrl(): string {
+  const href = props.shareHref?.trim();
+  if (!href) return '';
+  if (typeof window === 'undefined') return href;
+  try {
+    return new URL(href, window.location.origin).href;
+  } catch {
+    return href;
   }
 }
 </script>
@@ -78,9 +104,19 @@ async function copyText(text: string) {
     >
       <div class="or-usage-job-modal-head">
         <h3 class="or-usage-job-modal-title">{{ isVi ? 'Chi tiết job' : 'Job details' }}</h3>
-        <button type="button" class="or-usage-job-modal-close" :aria-label="isVi ? 'Đóng' : 'Close'" @click="emit('close')">
-          ×
-        </button>
+        <div class="or-usage-job-modal-head-actions">
+          <button
+            v-if="shareHref"
+            type="button"
+            class="or-app-btn or-app-btn-ghost or-app-btn-sm"
+            @click="copyText(shareUrl(), 'link')"
+          >
+            {{ linkCopied ? (isVi ? 'Đã copy link' : 'Link copied') : isVi ? 'Copy link' : 'Copy link' }}
+          </button>
+          <button type="button" class="or-usage-job-modal-close" :aria-label="isVi ? 'Đóng' : 'Close'" @click="emit('close')">
+            ×
+          </button>
+        </div>
       </div>
 
       <div class="or-usage-job-modal-body">
@@ -109,14 +145,14 @@ async function copyText(text: string) {
             <dt>{{ isVi ? 'Credit' : 'Credit' }}</dt>
             <dd>{{ listItemCredit(item) > 0 ? formatCredits(listItemCredit(item)) : '—' }}</dd>
           </div>
-          <div v-if="item.id_base" class="or-usage-job-modal-row">
+          <div v-if="jobId" class="or-usage-job-modal-row">
             <dt>{{ isVi ? 'Job ID' : 'Job ID' }}</dt>
             <dd class="or-usage-job-modal-mono">
-              <code>{{ item.id_base }}</code>
+              <code>{{ jobId }}</code>
               <button
                 type="button"
                 class="or-app-btn or-app-btn-ghost or-app-btn-sm"
-                @click="copyText(item.id_base || '')"
+                @click="copyText(jobId)"
               >
                 {{ copied ? (isVi ? 'Đã copy' : 'Copied') : isVi ? 'Copy' : 'Copy' }}
               </button>

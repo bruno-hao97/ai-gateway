@@ -25,14 +25,18 @@ Share or bookmark a view with query parameters:
 | `tab` | `trends`, `explore`, `billing` | Overview (omit param) |
 | `period` | `7d`, `30d`, `90d` | `30d` |
 | `model` | Model slug | Explore only; filters job list |
+| `job` | Job `id_base` | Explore only; opens job detail modal |
+| `type` | `image`, `video`, `audio`, `music` | Explore only; filters by job type |
 
 Examples:
 
 - Overview, 30 days: `/app/activity/`
 - Trends, 90 days: `/app/activity/?tab=trends&period=90d`
 - Explore one model: `/app/activity/?tab=explore&model=imagegen_2_0&period=30d`
+- Explore video jobs: `/app/activity/?tab=explore&type=video&period=30d`
+- Open job detail: `/app/activity/?tab=explore&job=JOB_ID_BASE`
 
-Click **Top models** on Overview to jump to Explore with the model filter applied.
+Click **Top models** on Overview to jump to Explore with the model filter applied. Use **Copy link** in the job modal to share a `?job=` URL. **Export CSV** on Overview downloads up to 1,000 jobs for the selected period.
 
 ## API
 

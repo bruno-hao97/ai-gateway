@@ -60,7 +60,7 @@ Gateway paginate `action=logs` và gom theo `model` (tối đa 50 trang × 100 d
 | `top` | 1–20, mặc định `5` |
 | `maxPages` | 1–100, mặc định `50` |
 
-Response: `scanned_jobs`, `truncated`, `items[]` (`model`, `count`, `credit`, `percent`).
+Response: `scanned_jobs`, `truncated`, `items[]` (`model`, `count`, `credit`, `percent`), `from_cache` tùy chọn khi gateway trả từ cache bộ nhớ (TTL mặc định 10 phút, `USAGE_AGGREGATE_CACHE_TTL_MS`).
 
 ## Map UI
 

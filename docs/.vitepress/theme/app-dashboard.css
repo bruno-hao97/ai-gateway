@@ -1240,6 +1240,21 @@
   border-bottom: 1px solid var(--or-border);
 }
 
+.or-activity-hub-meta {
+  margin: 0.35rem 0 0.85rem;
+  font-size: 0.75rem;
+}
+
+.or-activity-hub-meta-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.or-activity-hub-meta-link:hover {
+  color: var(--or-accent);
+  text-decoration: underline;
+}
+
 .or-activity-hub-tab {
   display: inline-flex;
   align-items: center;
@@ -1273,6 +1288,13 @@
   justify-content: space-between;
   gap: 0.65rem;
   margin-bottom: 0.85rem;
+}
+
+.or-activity-overview-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 .or-activity-overview-kpi-row,
@@ -1609,6 +1631,12 @@
   background: color-mix(in srgb, var(--or-accent) 8%, var(--or-bg-elevated));
 }
 
+.or-activity-top-model-link:hover .or-activity-top-model-name {
+  color: var(--or-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .or-activity-recent-model-link {
   text-decoration: none;
   color: inherit;
@@ -1695,6 +1723,12 @@
   margin: 0;
   font-size: 0.9375rem;
   font-weight: 600;
+}
+
+.or-usage-job-modal-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .or-usage-job-modal-close {
@@ -1791,6 +1825,10 @@
 .or-activity-recent-table th,
 .or-activity-recent-table td {
   padding: 0.4rem 0.35rem;
+}
+
+.or-activity-recent-row:hover {
+  background: color-mix(in srgb, var(--or-accent) 6%, var(--or-bg-elevated));
 }
 
 .or-activity-hub-kpi-label {
