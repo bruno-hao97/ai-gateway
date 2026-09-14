@@ -919,7 +919,7 @@
     const ep = global.GatewayEndpointRegistry?.getById(activeEndpointId);
     if (!ep) return;
     closeEndpointDetail();
-    if (typeof global.setResponseTab === 'function') global.setResponseTab('request');
+    if (typeof global.setResponseTab === 'function') global.setResponseTab('request', { pin: true });
     if (ep.jobType && $('jobType')) {
       $('jobType').value = ep.jobType;
       if (typeof global.openMediaJobPanel === 'function') {
@@ -933,7 +933,7 @@
     const ep = global.GatewayEndpointRegistry?.getById(activeEndpointId);
     if (!ep) return;
     closeEndpointDetail();
-    if (typeof global.setResponseTab === 'function') global.setResponseTab('result');
+    if (typeof global.setResponseTab === 'function') global.setResponseTab('result', { resetPin: true });
 
     switch (ep.id) {
       case 'list-models':

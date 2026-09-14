@@ -550,7 +550,7 @@ function renderMainResultPreview(url, mediaHint = '') {
 }
 
 function restoreJobResultEntry(entry) {
-  showJobResultLayout({ focusTab: true });
+  showJobResultLayout({ focusTab: !userPinnedResponseTab });
   const main = $('resultMain');
   if (main && entry.phase) main.dataset.phase = entry.phase;
   if (entry.createJson != null) displayCreateJson(entry.createJson);
@@ -3497,8 +3497,15 @@ $('btnRequestBodyView')?.addEventListener('click', () => {
   setRequestBodyView(!requestBodyRawView);
 });
 
-function setResponseTab(tab) {
+function maybeFocusResultTab({ resetPin = false } = {}) {
+  if (resetPin) userPinnedResponseTab = false;
+  if (!userPinnedResponseTab) setResponseTab('result');
+}
+
+function setResponseTab(tab, { pin = false, resetPin = false } = {}) {
   if (!RESPONSE_TABS.has(tab)) return;
+  if (resetPin) userPinnedResponseTab = false;
+  if (pin) userPinnedResponseTab = true;
   activeResponseTab = tab;
   document.querySelectorAll('.pg-response-tab').forEach((btn) => {
     const active = btn.dataset.responseTab === tab;
@@ -3517,6 +3524,7 @@ function setResponseTab(tab) {
   }
   if (tab === 'endpoints') globalThis.GatewayEndpointDetail?.refreshEndpointsTable?.();
   if (tab === 'request') refreshRequestPreview();
+  if (tab === 'guide' || tab === 'skill') renderAiGuidePanel();
 }
 
 function restoreResponseTab() {
@@ -3759,10 +3767,7 @@ function getActiveCopyText() {
 document.querySelectorAll('.pg-response-tab').forEach((btn) => {
   btn.addEventListener('click', () => {
     const tab = btn.dataset.responseTab;
-    if (tab) {
-      userPinnedResponseTab = true;
-      setResponseTab(tab);
-    }
+    if (tab) setResponseTab(tab, { pin: true });
   });
 });
 
@@ -3914,7 +3919,7 @@ function buildPollPendingEcho(message) {
   };
 }
 
-function showJobResultLayout({ focusTab = false } = {}) {
+function showJobResultLayout({ focusTab = false, resetPin = false } = {}) {
   if (resultEmpty) resultEmpty.hidden = true;
   const libraryWrap = $('resultLibraryList');
   if (libraryWrap) libraryWrap.hidden = true;
@@ -3923,7 +3928,7 @@ function showJobResultLayout({ focusTab = false } = {}) {
   if (main) main.hidden = false;
   const legacy = $('resultLegacyJsonWrap');
   if (legacy) legacy.hidden = true;
-  if (focusTab) setResponseTab('result');
+  if (focusTab) maybeFocusResultTab({ resetPin });
 }
 
 function displayCreateJson(body, opts = {}) {
@@ -4831,10 +4836,7 @@ function showResultUrl(url, mediaHint = '', { focusTab = false } = {}) {
   showJobResultLayout();
   renderMainResultPreview(url, mediaHint);
   persistActivePanelPreview(url, mediaHint);
-  if (focusTab) {
-    userPinnedResponseTab = false;
-    setResponseTab('result');
-  }
+  if (focusTab) maybeFocusResultTab({ resetPin: true });
 }
 
 /** Match server parseModelsList — data array, data.models, data.items */
@@ -6502,8 +6504,7 @@ $('btnMediaJob')?.addEventListener('click', async () => {
   const prevGallery = panelResultCache.get(activeResultWorkerKey)?.gallery || [];
   panelResultCache.set(activeResultWorkerKey, { type: 'job', gallery: prevGallery });
   resetResultPanelState();
-  userPinnedResponseTab = false;
-  showJobResultLayout({ focusTab: true });
+  showJobResultLayout({ focusTab: true, resetPin: true });
   setResultPhase('sending');
   setResultStatusPill('running');
   updateResultStepper('create');

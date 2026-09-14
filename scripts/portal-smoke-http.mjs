@@ -18,8 +18,10 @@ const docRoutes = [
   '/app/observability/',
   '/app/profile/',
   '/app/playground/',
+  '/app/playground/?worker=create-image',
   '/guides/portal-smoke',
   '/vi/app/',
+  '/vi/app/playground/',
   '/vi/guides/portal-smoke',
 ];
 

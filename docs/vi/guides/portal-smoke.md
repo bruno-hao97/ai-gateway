@@ -26,6 +26,19 @@ npm run portal:smoke   # HTTP 200 + HTML (cần docs:stack)
 - [ ] Pill **credits** header / sidebar → `/app/credits/`
 - [ ] **Resources**: Quickstart, MCP, Authentication, **Portal smoke test** (trang này)
 
+## Playground (`/app/playground/`)
+
+Embed full-screen — không có sidebar/header app. Xem [API Playground](/vi/reference/playground.md).
+
+- [ ] Hero Overview **Open Playground** → `/app/playground/`
+- [ ] Iframe tải (mặc định **Create image**); không kẹt loading
+- [ ] Đã login → playground nhận token (Connection OK / list models)
+- [ ] **List models** → chọn model + ratio từ catalog
+- [ ] **Image job** bật **wait** → có `resultUrl` / preview
+- [ ] URL đổi khi đổi worker (`?worker=create-video`, …)
+- [ ] Link **Playground** từ [Models](/vi/models/) → `?model=` điền sẵn
+- [ ] Tuỳ chọn: Observability **Local mirror** bật → có dòng job sau chạy
+
 ## Chat (`/app/chat/`)
 
 - [ ] Banner số dư thấp khi credits &lt; ngưỡng

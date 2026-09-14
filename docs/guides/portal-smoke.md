@@ -26,6 +26,19 @@ npm run portal:smoke   # HTTP 200 + HTML fragments (needs docs:stack)
 - [ ] Header / sidebar **credits pill** → `/app/credits/`
 - [ ] **Resources**: Quickstart, MCP, Authentication, **Portal smoke test** (this page)
 
+## Playground (`/app/playground/`)
+
+Immersive embed — no app sidebar/header. See [API Playground](/reference/playground.md) (redirects here).
+
+- [ ] Overview hero **Open Playground** → `/app/playground/`
+- [ ] Iframe loads (default **Create image** worker); no endless loading spinner
+- [ ] Logged in → playground picks up token (Connection OK / can list models)
+- [ ] **List models** → pick catalog model + ratio from list (not guessed)
+- [ ] **Image job** with **wait** checked → `resultUrl` in response / preview
+- [ ] URL updates when switching worker (`?worker=create-video`, etc.)
+- [ ] Deep link from [Models](/models/) **Playground** button → `?model=` pre-filled
+- [ ] Optional: Observability **Local mirror** on → job row appears after run
+
 ## Chat (`/app/chat/`)
 
 - [ ] Low-credit banner when balance &lt; threshold
