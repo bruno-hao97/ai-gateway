@@ -442,6 +442,8 @@ export async function fetchUsageModelAggregate(opts?: {
   type?: UsageStatsType;
   language?: string;
   top?: number;
+  /** Bypass gateway in-memory aggregate cache */
+  refresh?: boolean;
 }): Promise<UsageModelAggregateData> {
   const form = usageFormBase({
     period: opts?.period,
@@ -450,6 +452,7 @@ export async function fetchUsageModelAggregate(opts?: {
   });
   form.set('groupBy', 'model');
   if (opts?.top != null) form.set('top', String(opts.top));
+  if (opts?.refresh) form.set('refresh', '1');
   return postUsage<UsageModelAggregateData>('aggregate', form);
 }
 

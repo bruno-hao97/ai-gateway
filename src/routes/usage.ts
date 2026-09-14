@@ -117,7 +117,10 @@ async function handleAggregate(req: import('express').Request, res: import('expr
     device_id: device?.device_id,
   });
 
-  let data = getCachedUsageAggregate(cacheKey);
+  const refreshRaw = readField(req, 'refresh').toLowerCase();
+  const forceRefresh = refreshRaw === '1' || refreshRaw === 'true' || refreshRaw === 'yes';
+
+  let data = forceRefresh ? null : getCachedUsageAggregate(cacheKey);
   if (!data) {
     data = await fetchTopModelAggregate(statsClient(req, projectId), {
       period,

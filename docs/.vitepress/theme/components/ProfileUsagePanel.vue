@@ -82,8 +82,10 @@ const selectedJob = ref<UsageListItem | null>(null);
 const jobDetailOpen = ref(false);
 const pendingJobId = ref('');
 const exploreExporting = ref(false);
+const searchDeepening = ref(false);
 let pendingJobRun = 0;
 let searchEmitTimer: ReturnType<typeof setTimeout> | undefined;
+let searchDeepTimer: ReturnType<typeof setTimeout> | undefined;
 
 const typeOptions = computed(() => [
   { id: 'all' as const, label: props.isVi ? 'Tất cả' : 'All' },
@@ -172,6 +174,32 @@ const filteredListItems = computed(() => {
 
 const hasActiveModelFilter = computed(() => modelFilter.value.trim().length > 0);
 const hasActiveTypeFilter = computed(() => typeFilter.value !== 'all');
+const hasActiveSearchFilter = computed(() => searchQuery.value.trim().length > 0);
+const hasActiveExploreFilters = computed(
+  () => hasActiveModelFilter.value || hasActiveTypeFilter.value || hasActiveSearchFilter.value,
+);
+
+const exploreFilterSummary = computed(() => {
+  if (!logsOnly.value || !hasActiveExploreFilters.value) return '';
+  const parts: string[] = [];
+  if (hasActiveTypeFilter.value) parts.push(jobTypeLabel(typeFilter.value, props.isVi));
+  if (hasActiveModelFilter.value) parts.push(modelFilter.value.trim());
+  if (hasActiveSearchFilter.value) parts.push(`"${searchQuery.value.trim()}"`);
+  return parts.join(' · ');
+});
+
+const exploreEmptyMessage = computed(() => {
+  if (!hasActiveExploreFilters.value) {
+    return props.isVi ? 'Chưa có bản ghi trong khoảng đã chọn.' : 'No records in the selected range.';
+  }
+  const summary = exploreFilterSummary.value;
+  if (props.isVi) {
+    return summary
+      ? `Không có job khớp bộ lọc: ${summary}.`
+      : 'Không có job khớp bộ lọc.';
+  }
+  return summary ? `No jobs match filters: ${summary}.` : 'No jobs match the current filters.';
+});
 
 const exploreLogCount = computed(() => filteredListItems.value.length);
 
@@ -250,7 +278,7 @@ async function reloadRecords() {
   }
   if (!trendsOnly.value) {
     await loadList(true);
-    await loadAllPagesForModelFilter();
+    await deepenExploreListForFilters();
     await tryOpenPendingJob();
   }
   loading.value = false;
@@ -262,13 +290,21 @@ async function loadMoreList() {
   await loadList(false);
 }
 
-async function loadAllPagesForModelFilter() {
+async function deepenExploreListForFilters() {
   const model = modelFilter.value.trim();
-  if (!logsOnly.value || !model) return;
-  let guard = 0;
-  while (listHasMore.value && guard < 30) {
-    await loadMoreList();
-    guard += 1;
+  const q = searchQuery.value.trim();
+  if (!logsOnly.value || (!model && !q)) return;
+  if (!listHasMore.value) return;
+
+  searchDeepening.value = true;
+  try {
+    let guard = 0;
+    while (listHasMore.value && guard < 30) {
+      await loadMoreList();
+      guard += 1;
+    }
+  } finally {
+    searchDeepening.value = false;
   }
 }
 
@@ -386,6 +422,18 @@ function clearTypeFilter() {
   setTypeFilter('all');
 }
 
+function clearSearchFilter() {
+  if (!searchQuery.value.trim()) return;
+  searchQuery.value = '';
+  emit('searchQueryChange', '');
+}
+
+function clearAllExploreFilters() {
+  if (hasActiveModelFilter.value) clearModelFilter();
+  if (hasActiveTypeFilter.value) clearTypeFilter();
+  if (hasActiveSearchFilter.value) clearSearchFilter();
+}
+
 function applyInitialSearchQuery(query?: string) {
   searchQuery.value = (query || '').trim();
 }
@@ -396,6 +444,14 @@ function scheduleSearchEmit() {
   searchEmitTimer = setTimeout(() => {
     emit('searchQueryChange', searchQuery.value.trim());
   }, 400);
+}
+
+function scheduleSearchDeepen() {
+  if (!logsOnly.value) return;
+  if (searchDeepTimer) clearTimeout(searchDeepTimer);
+  searchDeepTimer = setTimeout(() => {
+    void deepenExploreListForFilters();
+  }, 500);
 }
 
 function openJobDetail(row: UsageListItem) {
@@ -491,6 +547,7 @@ watch(
 
 watch(searchQuery, () => {
   scheduleSearchEmit();
+  scheduleSearchDeepen();
 });
 
 watch(
@@ -652,7 +709,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="logsOnly && (hasActiveModelFilter || hasActiveTypeFilter)" class="or-usage-explore-filter-chips">
+    <div v-if="logsOnly && hasActiveExploreFilters" class="or-usage-explore-filter-chips">
       <div v-if="hasActiveModelFilter" class="or-usage-explore-filter-chip">
         <span class="or-usage-explore-filter-label">{{ isVi ? 'Model' : 'Model' }}</span>
         <code class="or-usage-model">{{ modelFilter }}</code>
@@ -666,6 +723,13 @@ onMounted(() => {
           {{ jobTypeLabel(typeFilter, isVi) }}
         </span>
         <button type="button" class="or-usage-explore-filter-clear" @click="clearTypeFilter">
+          {{ isVi ? 'Xóa lọc' : 'Clear filter' }}
+        </button>
+      </div>
+      <div v-if="hasActiveSearchFilter" class="or-usage-explore-filter-chip">
+        <span class="or-usage-explore-filter-label">{{ isVi ? 'Tìm' : 'Search' }}</span>
+        <code class="or-usage-model">{{ searchQuery.trim() }}</code>
+        <button type="button" class="or-usage-explore-filter-clear" @click="clearSearchFilter">
           {{ isVi ? 'Xóa lọc' : 'Clear filter' }}
         </button>
       </div>
@@ -802,9 +866,10 @@ onMounted(() => {
       <div class="or-usage-explore-head">
         <div>
           <h3 class="or-app-panel-title">{{ isVi ? 'Job logs' : 'Job logs' }}</h3>
-          <p v-if="logsOnly && exploreLogSummary" class="or-usage-explore-meta or-app-muted">
-            {{ exploreLogSummary }}
-            <span v-if="hasActiveModelFilter || searchQuery.trim()"> · {{ isVi ? 'đã lọc' : 'filtered' }}</span>
+          <p v-if="logsOnly && (exploreLogSummary || searchDeepening)" class="or-usage-explore-meta or-app-muted">
+            <template v-if="exploreLogSummary">{{ exploreLogSummary }}</template>
+            <span v-if="hasActiveExploreFilters && exploreFilterSummary"> · {{ exploreFilterSummary }}</span>
+            <span v-if="searchDeepening"> · {{ isVi ? 'Đang quét thêm trang…' : 'Scanning more pages…' }}</span>
           </p>
         </div>
         <a
@@ -817,17 +882,17 @@ onMounted(() => {
       </div>
 
       <div v-if="listLoading && filteredListItems.length === 0" class="or-activity-skeleton or-activity-skeleton--table" aria-hidden="true" />
-      <p v-else-if="!listLoading && filteredListItems.length === 0" class="or-app-muted or-usage-empty">
-        {{
-          hasActiveModelFilter || searchQuery.trim()
-            ? isVi
-              ? 'Không có job khớp bộ lọc.'
-              : 'No jobs match the current filters.'
-            : isVi
-              ? 'Chưa có bản ghi trong khoảng đã chọn.'
-              : 'No records in the selected range.'
-        }}
-      </p>
+      <div v-else-if="!listLoading && filteredListItems.length === 0" class="or-usage-explore-empty">
+        <p class="or-app-muted or-usage-empty">{{ exploreEmptyMessage }}</p>
+        <button
+          v-if="hasActiveExploreFilters"
+          type="button"
+          class="or-app-btn or-app-btn-ghost or-app-btn-sm"
+          @click="clearAllExploreFilters"
+        >
+          {{ isVi ? 'Xóa tất cả bộ lọc' : 'Clear all filters' }}
+        </button>
+      </div>
       <div v-else class="or-app-panel or-usage-explore-panel">
         <div class="or-usage-table-scroll">
           <table class="or-usage-table or-usage-table--explore">

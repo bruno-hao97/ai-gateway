@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { activityHubHref } from '../models/activity-hub-url';
 import {
   formatCredits,
   formatOrderDate,
@@ -7,6 +8,7 @@ import {
   type TopupOrder,
   type TopupOrderStatus,
 } from '../models/user-api';
+import type { UsageStatsPeriod, UsageStatsType } from '../models/usage-stats';
 import ProfileActivityHeatmap from './ProfileActivityHeatmap.vue';
 
 const props = defineProps<{
@@ -17,6 +19,8 @@ const props = defineProps<{
   ordersLoading: boolean;
   /** Activity hub billing tab — top-ups only */
   billingOnly?: boolean;
+  /** Shared period from Activity hub for cross-tab links */
+  activityPeriod?: UsageStatsPeriod;
 }>();
 
 const emit = defineEmits<{
@@ -60,10 +64,15 @@ function orderStatusClass(status: TopupOrderStatus): string {
   return 'or-app-order-status--pending';
 }
 
-function activityHref(tab: 'overview' | 'explore'): string {
-  const base = `${props.prefix}/app/activity/`;
-  if (tab === 'overview') return base;
-  return `${base}?tab=explore`;
+function activityHref(
+  tab: 'overview' | 'trends' | 'explore',
+  opts?: { type?: UsageStatsType },
+): string {
+  return activityHubHref(props.prefix, {
+    tab,
+    period: props.activityPeriod ?? '30d',
+    type: opts?.type,
+  });
 }
 </script>
 
@@ -114,8 +123,14 @@ function activityHref(tab: 'overview' | 'explore'): string {
         <a :href="activityHref('overview')" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
           {{ isVi ? 'Overview' : 'Overview' }}
         </a>
+        <a :href="activityHref('trends')" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
+          {{ isVi ? 'Trends' : 'Trends' }}
+        </a>
         <a :href="activityHref('explore')" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
           {{ isVi ? 'Job logs' : 'Job logs' }}
+        </a>
+        <a :href="`${prefix}/app/observability/`" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
+          {{ isVi ? 'Observability' : 'Observability' }}
         </a>
       </div>
     </template>

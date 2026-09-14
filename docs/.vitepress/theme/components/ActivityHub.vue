@@ -99,6 +99,7 @@ const chartDays = ref(14);
 const selectedJob = ref<UsageListItem | null>(null);
 const jobDetailOpen = ref(false);
 const overviewExporting = ref(false);
+const overviewExportType = ref<UsageStatsType | 'all'>('all');
 
 function readActivityTab(): ActivityTab {
   if (typeof window === 'undefined') return 'overview';
@@ -268,6 +269,14 @@ function exploreModelHref(model: string): string {
   return tabHref('explore', model);
 }
 
+function exploreTypeHref(jobType: UsageStatsType): string {
+  return activityHubHref(props.prefix, {
+    tab: 'explore',
+    period: sharedPeriod.value,
+    type: jobType,
+  });
+}
+
 function openJobDetail(row: UsageListItem) {
   selectedJob.value = row;
   jobDetailOpen.value = true;
@@ -296,24 +305,26 @@ const overviewJobShareHrefValue = computed(() =>
 async function exportOverviewCsv() {
   if (overviewExporting.value) return;
   overviewExporting.value = true;
+  const exportType = overviewExportType.value;
   try {
     const items: UsageListItem[] = [];
     for (let page = 1; page <= 10; page++) {
       const data = await fetchUsageLogs({
         period: sharedPeriod.value,
-        type: 'all',
+        type: exportType,
         language: 'VI',
         page,
         limit: 100,
       });
-      items.push(...data.items);
+      items.push(...data.items.map(normalizeUsageListItem));
       const pageFull = data.items.length >= (data.limit ?? 100);
       if (!data.has_more || data.items.length === 0 || !pageFull) break;
     }
     if (items.length === 0) return;
+    const typeSuffix = exportType === 'all' ? '' : `-${exportType}`;
     downloadTextFile(
       exportListCsv(items),
-      `activity-jobs-${sharedPeriod.value}.csv`,
+      `activity-jobs-${sharedPeriod.value}${typeSuffix}.csv`,
     );
   } finally {
     overviewExporting.value = false;
@@ -344,7 +355,7 @@ function typeBarClass(jobType: UsageStatsType): string {
   return `or-activity-type-fill--${jobType}`;
 }
 
-async function loadOverview() {
+async function loadOverview(forceRefresh = false) {
   overviewLoading.value = true;
   overviewError.value = '';
   chartDays.value = chartDaysForPeriod(sharedPeriod.value);
@@ -361,6 +372,7 @@ async function loadOverview() {
         type: 'all',
         language: 'VI',
         top: 5,
+        refresh: forceRefresh,
       }),
       fetchUsageLogs({
         period: sharedPeriod.value,
@@ -479,6 +491,20 @@ defineExpose({ reload: reloadAll });
           </button>
         </div>
         <div class="or-activity-overview-toolbar-actions">
+          <label class="or-usage-export-type-wrap">
+            <span class="or-usage-export-type-label">{{ isVi ? 'Xuất' : 'Export' }}</span>
+            <select
+              v-model="overviewExportType"
+              class="or-usage-export-type"
+              :disabled="overviewLoading || overviewExporting"
+            >
+              <option value="all">{{ isVi ? 'Tất cả' : 'All types' }}</option>
+              <option value="image">{{ isVi ? 'Ảnh' : 'Image' }}</option>
+              <option value="video">Video</option>
+              <option value="audio">Audio</option>
+              <option value="music">{{ isVi ? 'Nhạc' : 'Music' }}</option>
+            </select>
+          </label>
           <button
             type="button"
             class="or-app-btn or-app-btn-ghost or-app-btn-sm"
@@ -491,7 +517,7 @@ defineExpose({ reload: reloadAll });
             type="button"
             class="or-app-btn or-app-btn-ghost or-app-btn-sm"
             :disabled="overviewLoading"
-            @click="loadOverview"
+            @click="loadOverview(true)"
           >
             {{ overviewLoading ? (isVi ? 'Đang tải…' : 'Loading…') : isVi ? 'Làm mới' : 'Refresh' }}
           </button>
@@ -660,7 +686,9 @@ defineExpose({ reload: reloadAll });
           </p>
           <div v-else class="or-usage-type-bars">
             <div v-for="row in typeBreakdown" :key="row.jobType" class="or-usage-type-row">
-              <span class="or-usage-type-label">{{ jobTypeLabel(row.jobType, isVi) }}</span>
+              <a :href="exploreTypeHref(row.jobType)" class="or-usage-type-label or-activity-type-link">
+                {{ jobTypeLabel(row.jobType, isVi) }}
+              </a>
               <div class="or-usage-type-track" role="presentation">
                 <div
                   class="or-usage-type-fill"
@@ -811,6 +839,7 @@ defineExpose({ reload: reloadAll });
     <div v-else-if="activeTab === 'billing'" class="or-activity-hub-panel">
       <ProfileActivityPanel
         billing-only
+        :activity-period="sharedPeriod"
         :is-vi="isVi"
         :prefix="prefix"
         :credits="credits"

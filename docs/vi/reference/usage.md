@@ -59,6 +59,7 @@ Gateway paginate `action=logs` và gom theo `model` (tối đa 50 trang × 100 d
 | `groupBy` | `model` (bắt buộc) |
 | `top` | 1–20, mặc định `5` |
 | `maxPages` | 1–100, mặc định `50` |
+| `refresh` | `1` / `true` — bỏ qua cache bộ nhớ, quét lại logs |
 
 Response: `scanned_jobs`, `truncated`, `items[]` (`model`, `count`, `credit`, `percent`), `from_cache` tùy chọn khi gateway trả từ cache bộ nhớ (TTL mặc định 10 phút, `USAGE_AGGREGATE_CACHE_TTL_MS`).
 

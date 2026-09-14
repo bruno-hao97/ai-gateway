@@ -27,7 +27,7 @@ Chia sẻ hoặc bookmark view bằng query:
 | `model` | Slug model | Chỉ Explore; lọc danh sách job |
 | `job` | `id_base` job | Chỉ Explore; mở modal chi tiết job |
 | `type` | `image`, `video`, `audio`, `music` | Chỉ Explore; lọc theo loại job |
-| `q` | Từ khóa tìm | Chỉ Explore; lọc model/prompt (client-side) |
+| `q` | Từ khóa tìm | Chỉ Explore; lọc model/prompt (client-side, quét tối đa 30 trang log) |
 
 Ví dụ:
 
@@ -39,6 +39,8 @@ Ví dụ:
 
 Click **Top models** trên Overview để sang Explore với filter model tương ứng. **Copy link** trong modal job để chia sẻ URL `?job=`. **Xuất CSV** trên Overview tải tối đa 1.000 job theo period đang chọn.
 
+Trên Explore, bộ lọc active hiện chip (model, type, search). Tìm kiếm (`q`) tự quét thêm trang log (tối đa 30 trang) trước khi báo không có kết quả.
+
 ## API
 
 Biểu đồ portal gọi gateway — xem [Lịch sử usage](/vi/reference/usage.md):
@@ -48,3 +50,23 @@ Biểu đồ portal gọi gateway — xem [Lịch sử usage](/vi/reference/usag
 - `POST /gateway/usage/aggregate` — top models phía server (`groupBy=model`)
 
 Xem thêm [Billing & credits](./billing-credits.md) và [Authentication](/vi/authentication.md).
+
+## Smoke test checklist
+
+Sau khi sửa Activity hub hoặc API usage:
+
+```bash
+npm run theme:test
+npm run test:aggregate
+```
+
+Thủ công (đã login, `npm run docs:stack`):
+
+- [ ] Overview → đổi period → KPI/chart cập nhật; **Làm mới** bỏ cache top models (`from_cache` không còn trong Network → `usage/aggregate`)
+- [ ] **Xuất CSV** chọn loại → tên file có suffix type khi không phải “Tất cả”
+- [ ] **Theo loại job** → click label → Explore có `?type=`
+- [ ] Top models → Explore có `?model=`
+- [ ] Tab Billing → link giữ `?period=`; Observability mở đúng
+- [ ] Explore → chip filter + `?type=` / `?q=`; **Xóa tất cả bộ lọc** khi trống
+- [ ] Click job → modal; **Copy link** mỗi job `?job=` khác nhau
+- [ ] `npm run theme:test` — pass hết
