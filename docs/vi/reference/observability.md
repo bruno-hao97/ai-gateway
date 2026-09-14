@@ -42,14 +42,14 @@ Tối đa **5** endpoint HTTPS / tài khoản (mặc định). Gateway POST JSON
 | Kích hoạt | Event | Thời điểm |
 |-----------|-------|------------|
 | `POST /gateway/jobs/{type}` với **`wait: true`** | `job.completed` hoặc `job.failed` | Sau khi gateway poll xong (~3.5s × tối đa 80 lần) |
-| `POST /gateway/jobs/{type}` với **`wait: false`** | `job.completed` only | **Chỉ khi** response create đã có result URL (đường sync/tức thì) |
+| `POST /gateway/jobs/{type}` với **`wait: false`** | `job.completed` hoặc `job.failed` | **Tức thì** khi create có result URL; **poll nền** (~3.5s × 80) khi async và tài khoản có webhook job (`background: true` trong payload) |
 | `POST /gateway/observability/webhooks/{id}/test` | `webhook.test` | Test thủ công từ UI hoặc API |
 
 `{type}` giống [Media & jobs](./media.md) (`image`, `video`, `tts`, `music`, …).
 
 **Chưa hỗ trợ (không webhook):**
 
-- Job async `wait: false` hoàn thành sau (không có poller nền)
+- Job async `wait: false` khi tài khoản **chưa** đăng ký webhook job (không poll nền)
 - Chat (`/gateway/chat/*`, BYOK chat)
 - Audio, upload thuần, proxy `/v2` / `/ai`
 - Billing, credit, login
@@ -130,6 +130,7 @@ So sánh với `X-Gateway-Signature` (constant-time).
 | `OBSERVABILITY_STORE_FILE` | `data/observability-webhooks.json` |
 | `OBSERVABILITY_MAX_WEBHOOKS` | `5` |
 | `OBSERVABILITY_DELIVERY_TIMEOUT_MS` | `10000` |
+| `OBSERVABILITY_BACKGROUND_POLL` | `true` — poll server cho job async `wait: false` khi owner có webhook |
 
 ## Gợi ý tích hợp
 
@@ -137,9 +138,9 @@ So sánh với `X-Gateway-Signature` (constant-time).
 
 1. Ưu tiên **`wait: true`** trên `POST /gateway/jobs/{type}` và xử lý response HTTP, **hoặc**
 2. Poll client (3.5s, ~80 lần) như [integration modes](../routing/integration-modes.md), **tuỳ chọn**
-3. Thêm webhook beta như tín hiệu **phụ** khi dùng `wait: true` hoặc kết quả tức thì `wait: false`.
+3. Thêm webhook beta như tín hiệu **phụ** — gồm delivery nền cho `wait: false` khi đã cấu hình webhook.
 
-**Không** chỉ dựa webhook cho job async `wait: false` cho đến khi có delivery nền.
+Delivery nền cùng giới hạn poll gateway (không retry queue, file store single-instance). Production quan trọng vẫn nên `wait: true` hoặc poll client.
 
 ## UI
 

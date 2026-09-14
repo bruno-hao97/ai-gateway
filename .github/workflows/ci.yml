@@ -27,3 +27,6 @@ jobs:
 
       - name: Usage aggregate cache tests
         run: npm run test:aggregate
+
+      - name: Observability store tests
+        run: npm run test:observability

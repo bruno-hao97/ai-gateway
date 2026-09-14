@@ -184,3 +184,13 @@ export async function listEnabledWebhooksForOwner(
     (w) => w.ownerId === ownerId && w.enabled && w.events.includes(eventType),
   );
 }
+
+export async function ownerHasJobWebhooks(ownerId: string): Promise<boolean> {
+  const store = await readStore();
+  return store.webhooks.some(
+    (w) =>
+      w.ownerId === ownerId &&
+      w.enabled &&
+      (w.events.includes('job.completed') || w.events.includes('job.failed')),
+  );
+}

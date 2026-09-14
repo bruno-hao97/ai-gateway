@@ -8,6 +8,7 @@ import {
   readOptionalBearerToken,
   sendGommoError,
 } from '../middleware/gatewayAuth.js';
+import { scheduleBackgroundJobWebhookPoll } from '../services/observabilityJobBackground.js';
 import { dispatchObservabilityEvent } from '../services/observabilityWebhook.js';
 import { extractPollSnapshot } from '../services/mediaGenerationStatus.js';
 import { byokMediaAuthMiddleware } from '../middleware/byokMediaAuth.js';
@@ -167,6 +168,14 @@ router.post('/jobs/:type', async (req, res) => {
             coverUrl: snap.coverUrl,
             status: 'success',
           },
+        });
+      } else if (snap.idBase?.trim()) {
+        scheduleBackgroundJobWebhookPoll({
+          accessToken: auth.accessToken,
+          domain,
+          jobType: type,
+          modelSlug,
+          providerJobId: snap.idBase.trim(),
         });
       }
       res.json(envelope);

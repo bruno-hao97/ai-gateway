@@ -17,6 +17,8 @@ export interface JobObservabilityPayload {
   coverUrl?: string | null;
   status: 'success' | 'failed' | 'created';
   error?: string;
+  /** True when delivered after server-side poll for wait=false async jobs. */
+  background?: boolean;
 }
 
 export interface ObservabilityDispatchInput {

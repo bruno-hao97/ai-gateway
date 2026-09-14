@@ -89,6 +89,8 @@ export const config = {
       path.join(process.cwd(), 'data', 'observability-webhooks.json'),
     maxWebhooksPerOwner: Number(process.env.OBSERVABILITY_MAX_WEBHOOKS) || 5,
     deliveryTimeoutMs: Number(process.env.OBSERVABILITY_DELIVERY_TIMEOUT_MS) || 10_000,
+    /** Poll async wait=false jobs server-side when the owner has job webhooks (default on). */
+    backgroundJobPoll: process.env.OBSERVABILITY_BACKGROUND_POLL !== 'false',
   },
 };
 

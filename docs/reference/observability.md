@@ -42,14 +42,14 @@ Register up to **5** HTTPS endpoints per account (default). The gateway POSTs JS
 | Trigger | Event | When |
 |---------|-------|------|
 | `POST /gateway/jobs/{type}` with **`wait: true`** | `job.completed` or `job.failed` | After gateway poll finishes (~3.5s × up to 80 attempts) |
-| `POST /gateway/jobs/{type}` with **`wait: false`** | `job.completed` only | **Only if** the create response already includes a result URL (instant/sync path) |
+| `POST /gateway/jobs/{type}` with **`wait: false`** | `job.completed` or `job.failed` | **Immediate** when create response includes a result URL; **background poll** (~3.5s × up to 80) when async and the account has job webhooks (`background: true` in payload) |
 | `POST /gateway/observability/webhooks/{id}/test` | `webhook.test` | Manual test from UI or API |
 
 Supported `{type}` values match [Media & jobs](./media.md) (`image`, `video`, `tts`, `music`, `avatar-lipsync`, tool types, etc.).
 
 **Not covered (no webhook today):**
 
-- Async jobs submitted with `wait: false` that finish later (no background poller)
+- `wait: false` async jobs when the account has **no** job webhooks registered (no background poll)
 - Chat (`/gateway/chat/*`, BYOK chat)
 - Audio routes, upload-only calls, raw `/v2` or `/ai` proxy traffic
 - Billing, credits, login events
@@ -98,12 +98,13 @@ Secrets are encrypted at rest on the gateway (same crypto as BYOK). The API neve
     "jobId": "abc123",
     "resultUrl": "https://…",
     "coverUrl": "https://…",
-    "status": "success"
+    "status": "success",
+    "background": false
   }
 }
 ```
 
-`job.failed` includes `status: "failed"` and optional `error`.
+`job.failed` includes `status: "failed"` and optional `error`. Background deliveries for async `wait: false` jobs set `background: true`.
 
 Headers:
 
@@ -130,6 +131,7 @@ Compare to `X-Gateway-Signature` with a constant-time compare.
 | `OBSERVABILITY_STORE_FILE` | `data/observability-webhooks.json` |
 | `OBSERVABILITY_MAX_WEBHOOKS` | `5` |
 | `OBSERVABILITY_DELIVERY_TIMEOUT_MS` | `10000` |
+| `OBSERVABILITY_BACKGROUND_POLL` | `true` — server poll for `wait: false` async jobs when owner has webhooks |
 
 ## Recommended integration pattern
 
@@ -137,9 +139,9 @@ For reliable job notifications in production **today**:
 
 1. Prefer **`wait: true`** on `POST /gateway/jobs/{type}` and handle the HTTP response, **or**
 2. Poll job status client-side (3.5s interval, ~80 attempts) as documented in [integration modes](../routing/integration-modes.md), **and optionally**
-3. Add a beta webhook as a **secondary** signal when using `wait: true` or instant `wait: false` results.
+3. Add a beta webhook as a **secondary** signal — including background delivery for `wait: false` when webhooks are configured.
 
-Do **not** rely on webhooks alone for async `wait: false` jobs until a future release adds background delivery.
+Background delivery has the same limits as gateway poll (no retry queue, single-instance file store). Prefer `wait: true` or client poll for production-critical flows.
 
 ## UI
 
