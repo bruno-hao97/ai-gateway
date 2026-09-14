@@ -15,6 +15,7 @@ Run after changes to portal UI (`docs/.vitepress/theme/`) or gateway REST used b
 ```bash
 npm run theme:test
 npm run test:aggregate
+npm run portal:smoke   # HTTP 200 + HTML fragments (needs docs:stack)
 ```
 
 ## Overview (`/app/`)
@@ -84,6 +85,7 @@ See [Billing & credits](./billing-credits.md). Quick pass:
 ## Automated
 
 ```bash
-npm run theme:test    # URL helpers, usage normalize
+npm run theme:test      # URL helpers, usage normalize
 npm run test:aggregate  # usage aggregate cache (Activity Overview)
+npm run portal:smoke    # route + fragment checks (docs :5173 + API :3001)
 ```

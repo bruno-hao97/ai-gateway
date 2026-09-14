@@ -15,6 +15,7 @@ Chạy sau khi sửa UI portal (`docs/.vitepress/theme/`) hoặc gateway REST m�
 ```bash
 npm run theme:test
 npm run test:aggregate
+npm run portal:smoke   # HTTP 200 + HTML (cần docs:stack)
 ```
 
 ## Overview (`/app/`)
@@ -86,4 +87,5 @@ Xem [Billing & credits](./billing-credits.md). Kiểm tra nhanh:
 ```bash
 npm run theme:test
 npm run test:aggregate
+npm run portal:smoke
 ```

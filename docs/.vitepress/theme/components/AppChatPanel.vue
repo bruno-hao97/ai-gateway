@@ -83,8 +83,9 @@ import { modelAcceptsJobRefType } from '../models/media-job';
 import { attachmentBadgeLabel } from '../models/chat-attachment-label';
 import { getStoredToken } from '../models/auth-api';
 import { fetchByokStatus, type ByokStatus } from '../models/byok-api';
+import { PORTAL_LOW_CREDITS_THRESHOLD } from '../models/portal-credits';
 
-const LOW_CREDIT_THRESHOLD = 15_000;
+const LOW_CREDIT_THRESHOLD = PORTAL_LOW_CREDITS_THRESHOLD;
 const LOW_CREDIT_DISMISS_KEY = 'gw_portal_chat_low_credit_dismiss_v1';
 const BYOK_HINT_DISMISS_KEY = 'gw_portal_chat_byok_hint_dismiss_v1';
 

@@ -33,6 +33,7 @@ import FilesPanel from './FilesPanel.vue';
 import ObservabilityPanel from './ObservabilityPanel.vue';
 import { activityHubHref, PROFILE_USAGE_PREVIEW_PERIOD } from '../models/activity-hub-url';
 import { formatApproxUsd } from '../models/invoice-buyer';
+import { PORTAL_LOW_CREDITS_THRESHOLD } from '../models/portal-credits';
 
 const TOKEN_COPIED_STORAGE_KEY = 'gateway_token_copied';
 
@@ -49,7 +50,7 @@ type ProfileSection = 'general' | 'usage' | 'api' | 'activity' | 'logs';
 
 const PROFILE_SECTIONS = new Set<ProfileSection>(['general', 'usage', 'api', 'activity', 'logs']);
 
-const LOW_CREDITS_THRESHOLD = 10_000;
+const LOW_CREDITS_THRESHOLD = PORTAL_LOW_CREDITS_THRESHOLD;
 
 type OverviewUsageStats = {
   totalJobs: number;
