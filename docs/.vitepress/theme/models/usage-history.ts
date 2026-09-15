@@ -207,8 +207,10 @@ export function usageChartByDay(records: UsageRecord[], days: number): UsageDayP
 
 export function groupUsageByDate(
   records: UsageRecord[],
-  isVi: boolean,
+  localeOrVi: UsageLocale | boolean,
 ): { dateKey: string; label: string; items: UsageRecord[] }[] {
+  const locale = normalizeUsageLocale(localeOrVi);
+  const dateLocale = locale === 'vi' ? 'vi-VN' : locale === 'th' ? 'th-TH' : undefined;
   const groups = new Map<string, UsageRecord[]>();
   for (const r of records) {
     const key = r.createdAt.slice(0, 10);
@@ -219,7 +221,7 @@ export function groupUsageByDate(
     .sort((a, b) => b[0].localeCompare(a[0]))
     .map(([dateKey, items]) => ({
       dateKey,
-      label: new Date(dateKey).toLocaleDateString(isVi ? 'vi-VN' : undefined, {
+      label: new Date(dateKey).toLocaleDateString(dateLocale, {
         weekday: 'short',
         year: 'numeric',
         month: 'numeric',

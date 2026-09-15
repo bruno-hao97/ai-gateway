@@ -74,7 +74,8 @@ function normalizeBillingLocale(localeOrVi: BillingLocale | boolean): BillingLoc
 export function formatPayTotalLine(amountVnd: number, localeOrVi: BillingLocale | boolean): string {
   const locale = normalizeBillingLocale(localeOrVi);
   const totalVnd = calcBillingTotals(amountVnd).totalVnd;
-  const formatted = totalVnd.toLocaleString(locale === 'vi' ? 'vi-VN' : 'en-US');
+  const numLocale = locale === 'vi' ? 'vi-VN' : locale === 'th' ? 'th-TH' : 'en-US';
+  const formatted = totalVnd.toLocaleString(numLocale);
   if (locale === 'vi') return `Thanh toán ${formatted}đ VAT 5%`;
   if (locale === 'th') return `ชำระ ${formatted}đ รวม VAT 5%`;
   return `Pay ${formatted}đ incl. 5% VAT`;

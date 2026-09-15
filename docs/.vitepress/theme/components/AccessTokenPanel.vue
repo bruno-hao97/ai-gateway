@@ -440,7 +440,7 @@ defineExpose({
             :disabled="!token"
             @click="copyToken"
           >
-            {{ copied ? m('Copied!', 'Đã copy!', 'คัดลอกแล้ว!') : 'Copy token' }}
+            {{ copied ? m('Copied!', 'Đã copy!', 'คัดลอกแล้ว!') : m('Copy token', 'Copy token', 'คัดลอกโทเค็น') }}
           </button>
         </div>
       </div>
@@ -572,7 +572,7 @@ defineExpose({
         <pre class="or-app-code or-token-snippet-code"><code>{{ activeSnippet }}</code></pre>
         <div class="or-token-snippet-actions">
           <button type="button" class="or-app-btn or-app-btn-ghost or-app-btn-sm" @click="copySnippet(activeTab)">
-            {{ copiedSnippet === activeTab ? m('Copied!', 'Đã copy!', 'คัดลอกแล้ว!') : 'Copy snippet' }}
+            {{ copiedSnippet === activeTab ? m('Copied!', 'Đã copy!', 'คัดลอกแล้ว!') : m('Copy snippet', 'Copy snippet', 'คัดลอก snippet') }}
           </button>
           <a v-if="activeTab === 'gateway'" :href="mediaJobsDocsHref" class="or-token-snippet-link">
             {{ m('Media jobs (gateway)', 'Media jobs (gateway)', 'งานมีเดีย (เกตเวย์)') }} →

@@ -439,7 +439,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
                 </p>
                 <label v-if="!streamForced" class="or-chat-tool-row">
                   <span>
-                    <strong>{{ m('Stream tokens', 'Stream tokens', 'Stream tokens') }}</strong>
+                    <strong>{{ m('Stream tokens', 'Stream tokens', 'สตรีมโทเค็น') }}</strong>
                     <small>{{
                       m(
                         'On: typewriter. Off: one-shot JSON (agent models).',

@@ -482,7 +482,7 @@ onMounted(() => {
               </div>
             </dl>
             <div class="or-row-tags">
-              <span v-for="tag in modelTags(modalPreview)" :key="tag" class="or-tag">{{ tag }}</span>
+              <span v-for="tag in modelTags(modalPreview, catalogLang)" :key="tag" class="or-tag">{{ tag }}</span>
             </div>
             <button type="button" class="or-compare-select-btn" @click="selectModel(modalPreview)">
               {{ m('Select this model', 'Chọn model này', 'เลือกโมเดลนี้') }}

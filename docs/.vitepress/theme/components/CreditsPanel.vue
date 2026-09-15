@@ -186,7 +186,7 @@ defineExpose({ reload });
         <span class="or-activity-hub-kpi-label">{{ m('Balance', 'Số dư', 'ยอดคงเหลือ') }}</span>
         <strong class="or-activity-hub-kpi-value">{{ formatCredits(credits) }}</strong>
         <span v-if="creditsApproxUsd" class="or-activity-hub-kpi-sub">{{ creditsApproxUsd }}</span>
-        <span v-else class="or-activity-hub-kpi-sub">{{ m('Gommo credits', 'Gommo credits', 'Gommo credits') }}</span>
+        <span v-else class="or-activity-hub-kpi-sub">{{ m('Gommo credits', 'Gommo credits', 'เครดิต Gommo') }}</span>
       </div>
       <div class="or-activity-hub-kpi">
         <span class="or-activity-hub-kpi-label">{{ m('Total topped up', 'Đã nạp', 'เติมเงินรวม') }}</span>
@@ -221,10 +221,10 @@ defineExpose({ reload });
 
     <div class="or-credits-quicklinks">
       <a :href="activityBillingHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
-        {{ m('Activity Billing', 'Activity Billing', 'Activity Billing') }} →
+        {{ m('Activity Billing', 'Activity Billing', 'การเรียกเก็บเงินในกิจกรรม') }} →
       </a>
       <a :href="activityExploreHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
-        {{ m('Job logs', 'Job logs', 'Job logs') }} →
+        {{ m('Job logs', 'Job logs', 'บันทึกงาน') }} →
       </a>
       <a :href="overviewHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
         {{ m('Overview', 'Overview', 'ภาพรวม') }} →
@@ -258,7 +258,7 @@ defineExpose({ reload });
         :class="{ featured: pkg.featured }"
       >
         <span v-if="pkg.featured" class="or-app-pkg-ribbon">
-          {{ m('BEST', 'BEST', 'BEST') }}
+          {{ m('BEST', 'BEST', 'แนะนำ') }}
         </span>
         <div class="or-app-pkg-head">
           <h3>{{ pkg.name }}</h3>
@@ -335,7 +335,7 @@ defineExpose({ reload });
           <thead>
             <tr>
               <th>{{ m('Order', 'Mã đơn', 'คำสั่ง') }}</th>
-              <th>{{ m('Credits', 'Credits', 'Credits') }}</th>
+              <th>{{ m('Credits', 'Credits', 'เครดิต') }}</th>
               <th>{{ m('Amount', 'Số tiền', 'จำนวนเงิน') }}</th>
               <th>{{ m('Status', 'Trạng thái', 'สถานะ') }}</th>
               <th>{{ m('Date', 'Thời gian', 'วันที่') }}</th>

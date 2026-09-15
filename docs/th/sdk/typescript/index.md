@@ -1,5 +1,5 @@
 ---
-title: TypeScript SDK
+title: SDK TypeScript
 description: ภาพรวม resources ของ @ai-gateway/client
 ---
 

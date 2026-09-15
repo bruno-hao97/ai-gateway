@@ -1,5 +1,5 @@
 ---
-title: MCP use cases
+title: ?????????? MCP
 description: ตัวอย่าง prompt สำหรับ gommo_* tools ใน Cursor
 ---
 

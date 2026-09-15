@@ -1,5 +1,5 @@
 ---
-title: Best practices
+title: ???????????????
 description: รูปแบบ integration — polling, CORS, rate limits และพารามิเตอร์โมเดล
 ---
 

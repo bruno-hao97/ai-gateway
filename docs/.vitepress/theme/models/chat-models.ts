@@ -171,7 +171,7 @@ export function formatReplyMeta(
   if (!meta) return '';
   const parts: string[] = [];
   if (typeof meta.costCredits === 'number' && meta.costCredits > 0) {
-    parts.push(isVi ? `${formatCredits(meta.costCredits)} cr` : `${formatCredits(meta.costCredits)} cr`);
+    parts.push(`${formatCredits(meta.costCredits)} cr`);
   }
   if (typeof meta.totalTokens === 'number' && meta.totalTokens > 0) {
     parts.push(`${meta.totalTokens} tok`);

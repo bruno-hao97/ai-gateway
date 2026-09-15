@@ -311,13 +311,18 @@ export function dedupeCatalogModels(models: CatalogModel[]): CatalogModel[] {
   return [...bySlug.values()];
 }
 
-export function modelTags(m: CatalogModel): string[] {
+export function modelTags(m: CatalogModel, lang: CatalogLang = 'en'): string[] {
   const tags: string[] = [];
-  const typeMeta = JOB_TYPES.find((t) => t.id === m.jobType);
-  if (typeMeta) tags.push(typeMeta.label);
-  if (m.group === 'tools') tags.push('Tools');
-  if (m.ratios.length) tags.push(`${m.ratios.length} ratios`);
-  if (m.modes.length) tags.push(`${m.modes.length} modes`);
+  tags.push(catalogJobTypeLabel(m.jobType, lang));
+  if (m.group === 'tools') tags.push(pickMsg(lang, 'Tools', 'Tools', 'เครื่องมือ'));
+  if (m.ratios.length) {
+    const n = m.ratios.length;
+    tags.push(pickMsg(lang, `${n} ratios`, `${n} ratios`, `${n} อัตราส่วน`));
+  }
+  if (m.modes.length) {
+    const n = m.modes.length;
+    tags.push(pickMsg(lang, `${n} modes`, `${n} modes`, `${n} โหมด`));
+  }
   return tags.slice(0, 4);
 }
 

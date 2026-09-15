@@ -1,5 +1,5 @@
 ---
-title: Errors
+title: ??????????
 description: GatewayError และรหัสข้อผิดพลาด
 ---
 

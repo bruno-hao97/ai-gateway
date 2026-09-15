@@ -1,5 +1,5 @@
 ---
-title: Self-hosted MCP
+title: MCP ??? self-hosted
 description: รัน @ai-gateway/mcp-server กับ gateway ของคุณเอง
 ---
 

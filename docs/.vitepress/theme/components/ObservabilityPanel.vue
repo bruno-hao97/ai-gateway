@@ -530,7 +530,7 @@ defineExpose({ reload: reloadAll });
           </p>
           <pre class="or-obs-payload-pre"><code>{{ PAYLOAD_EXAMPLE }}</code></pre>
           <button type="button" class="or-app-btn or-app-btn-ghost or-app-btn-sm" @click="copyPayloadExample">
-            {{ copiedPayload ? m('Copied', 'Đã copy', 'คัดลอกแล้ว') : 'Copy JSON' }}
+            {{ copiedPayload ? m('Copied', 'Đã copy', 'คัดลอกแล้ว') : m('Copy JSON', 'Copy JSON', 'คัดลอก JSON') }}
           </button>
         </div>
       </details>

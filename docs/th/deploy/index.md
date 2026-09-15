@@ -1,5 +1,5 @@
 ---
-title: Deploy & ops
+title: Deploy ???????????????
 description: Docker, Railway, Fly.io, health checks และการตั้งค่า production
 ---
 

@@ -1,5 +1,5 @@
 ---
-title: BYOK production checklist
+title: ?????????? BYOK production
 description: Deploy hybrid BYOK อย่างปลอดภัย — encryption, persistence, model map และ smoke tests
 ---
 

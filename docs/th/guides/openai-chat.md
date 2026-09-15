@@ -1,5 +1,5 @@
 ---
-title: OpenAI-compatible chat
+title: ?????? OpenAI
 description: ใช้ POST /v1/chat/completions กับ OpenAI SDK และ agents มาตรฐาน
 ---
 

@@ -7,8 +7,10 @@ import {
   CATALOG_TABS,
   INPUT_MODALITIES,
   catalogCreditRange,
+  catalogJobTypeLabel,
   catalogProviders,
   catalogUniqueValues,
+  inputModalityLabel,
   fetchAllModels,
   fetchModelsForType,
   dedupeCatalogModels,
@@ -269,7 +271,7 @@ watch(activeTab, (tab) => {
     <aside
       class="or-sidebar"
       :class="{ 'or-sidebar--open': mobileFilters }"
-      aria-label="Filters"
+      :aria-label="t('Filters', 'Bộ lọc', 'ตัวกรอง')"
     >
       <div class="or-sidebar-head">
         <span>{{ t('Filters', 'Bộ lọc', 'ตัวกรอง') }}</span>
@@ -294,7 +296,7 @@ watch(activeTab, (tab) => {
               :checked="filterModalities.includes(mod.id)"
               @change="toggleModality(mod.id)"
             />
-            <span>{{ mod.label }}</span>
+            <span>{{ inputModalityLabel(mod.id, catalogLang) }}</span>
           </label>
         </div>
       </details>
@@ -407,7 +409,7 @@ watch(activeTab, (tab) => {
           <button
             type="button"
             class="or-filter-toggle"
-            aria-label="Filters"
+            :aria-label="t('Filters', 'Bộ lọc', 'ตัวกรอง')"
             @click="mobileFilters = true"
           >
             ☰
@@ -435,7 +437,7 @@ watch(activeTab, (tab) => {
             <button
               type="button"
               :class="{ active: viewMode === 'list' }"
-              title="List"
+              :title="t('List', 'Danh sách', 'รายการ')"
               @click="viewMode = 'list'"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="5" width="16" height="2" rx="1"/><rect x="4" y="11" width="16" height="2" rx="1"/><rect x="4" y="17" width="16" height="2" rx="1"/></svg>
@@ -443,7 +445,7 @@ watch(activeTab, (tab) => {
             <button
               type="button"
               :class="{ active: viewMode === 'table' }"
-              title="Table"
+              :title="t('Table', 'Bảng', 'ตาราง')"
               @click="viewMode = 'table'"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>
@@ -487,7 +489,7 @@ watch(activeTab, (tab) => {
                 {{ t('No description in catalog.', 'Không có mô tả trong catalog.', 'ไม่มีคำอธิบายในแคตตาล็อก') }}
               </p>
               <div class="or-row-tags">
-                <span v-for="tag in modelTags(m)" :key="tag" class="or-tag">{{ tag }}</span>
+                <span v-for="tag in modelTags(m, catalogLang)" :key="tag" class="or-tag">{{ tag }}</span>
               </div>
               <div class="or-row-meta">
                 <span class="or-row-price">{{ m.creditsLabel }}</span>
@@ -532,7 +534,7 @@ watch(activeTab, (tab) => {
                   </div>
                 </div>
               </td>
-              <td><span class="or-tag">{{ m.jobType }}</span></td>
+              <td><span class="or-tag">{{ catalogJobTypeLabel(m.jobType, catalogLang) }}</span></td>
               <td>{{ m.provider || '—' }}</td>
               <td>{{ m.creditsLabel }}</td>
               <td>
