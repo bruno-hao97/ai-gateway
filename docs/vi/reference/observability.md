@@ -56,9 +56,10 @@ Tối đa **5** endpoint HTTPS / tài khoản (mặc định). Gateway POST JSON
 
 **Cơ chế gửi:**
 
-- Fire-and-forget — **không retry queue**
+- **Retry** khi lỗi mạng hoặc HTTP ≠ 2xx — mặc định **3 lần** (`OBSERVABILITY_DELIVERY_RETRY_COUNT=2` retry sau lần đầu, backoff tuyến tính `OBSERVABILITY_DELIVERY_RETRY_DELAY_MS`)
 - Timeout 10s / lần gửi (`OBSERVABILITY_DELIVERY_TIMEOUT_MS`)
 - Cấu hình lưu **file JSON local** trên gateway (`data/observability-webhooks.json`) — không replicate giữa nhiều instance trừ khi bạn share file
+- Hàng đợi poll nền job `wait=false` lưu tại `data/observability-background-polls.json` (token user mã hóa — cùng key BYOK); **resume** khi gateway restart
 - Bắt buộc HTTPS; `http://` chỉ `localhost` / `127.0.0.1` (dev)
 
 ## API quản lý webhook

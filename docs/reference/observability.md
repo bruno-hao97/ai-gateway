@@ -56,9 +56,10 @@ Supported `{type}` values match [Media & jobs](./media.md) (`image`, `video`, `t
 
 **Delivery semantics:**
 
-- Fire-and-forget — **no retry queue**
-- 10s timeout per delivery (configurable via `OBSERVABILITY_DELIVERY_TIMEOUT_MS`)
+- **Retries** on network errors and non-2xx responses — default **3 attempts** (`OBSERVABILITY_DELIVERY_RETRY_COUNT=2` retries after the first try, linear backoff via `OBSERVABILITY_DELIVERY_RETRY_DELAY_MS`)
+- 10s timeout per attempt (configurable via `OBSERVABILITY_DELIVERY_TIMEOUT_MS`)
 - Webhook config stored in a **local JSON file** on the gateway host (`data/observability-webhooks.json`) — not replicated across multiple gateway instances unless you share that file
+- Background poll queue for `wait=false` async jobs persisted at `data/observability-background-polls.json` (encrypted user token at rest — same key material as BYOK); resumed on gateway restart
 - HTTPS required; `http://` allowed only for `localhost` / `127.0.0.1` (dev)
 
 ## Webhook management API

@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
-import { config } from '../config.js';
 import { resolveByokOwner } from './byokIdentity.js';
+import { postWithDeliveryRetries } from './observabilityDelivery.js';
 import {
   decryptWebhookSecret,
   listEnabledWebhooksForOwner,
@@ -32,12 +32,11 @@ function signBody(secret: string, timestamp: string, body: string): string {
   return createHmac('sha256', secret).update(`${timestamp}.${body}`).digest('hex');
 }
 
-async function deliverWebhook(
+function buildWebhookHeaders(
   webhook: WebhookDestination,
-  ownerId: string,
   envelope: { type: ObservabilityEventType; timestamp: string; data: unknown },
-): Promise<void> {
-  const body = JSON.stringify(envelope);
+  body: string,
+): Record<string, string> {
   const timestamp = envelope.timestamp;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -51,31 +50,31 @@ async function deliverWebhook(
     headers['X-Gateway-Signature'] = signBody(secret, timestamp, body);
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), config.observability.deliveryTimeoutMs);
+  return headers;
+}
 
-  try {
-    const res = await fetch(webhook.url, {
-      method: 'POST',
-      headers,
-      body,
-      signal: controller.signal,
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      await recordWebhookDelivery(ownerId, webhook.id, {
-        ok: false,
-        error: `HTTP ${res.status}${text ? `: ${text.slice(0, 200)}` : ''}`,
-      });
-      return;
-    }
+async function deliverWebhook(
+  webhook: WebhookDestination,
+  ownerId: string,
+  envelope: { type: ObservabilityEventType; timestamp: string; data: unknown },
+): Promise<void> {
+  const body = JSON.stringify(envelope);
+  const headers = buildWebhookHeaders(webhook, envelope, body);
+  const result = await postWithDeliveryRetries(webhook.url, {
+    method: 'POST',
+    headers,
+    body,
+  });
+
+  if (result.ok) {
     await recordWebhookDelivery(ownerId, webhook.id, { ok: true });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    await recordWebhookDelivery(ownerId, webhook.id, { ok: false, error: message });
-  } finally {
-    clearTimeout(timer);
+    return;
   }
+
+  await recordWebhookDelivery(ownerId, webhook.id, {
+    ok: false,
+    error: result.error,
+  });
 }
 
 export async function dispatchObservabilityEvent(input: ObservabilityDispatchInput): Promise<void> {
@@ -113,42 +112,18 @@ export async function sendTestWebhook(
   };
 
   const body = JSON.stringify(envelope);
-  const timestamp = envelope.timestamp;
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'User-Agent': 'ai-gateway-observability/1.0',
-    'X-Gateway-Event': envelope.type,
-    'X-Gateway-Timestamp': timestamp,
-  };
+  const headers = buildWebhookHeaders(webhook, envelope, body);
+  const result = await postWithDeliveryRetries(webhook.url, {
+    method: 'POST',
+    headers,
+    body,
+  });
 
-  const secret = decryptWebhookSecret(webhook);
-  if (secret) {
-    headers['X-Gateway-Signature'] = signBody(secret, timestamp, body);
-  }
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), config.observability.deliveryTimeoutMs);
-
-  try {
-    const res = await fetch(webhook.url, {
-      method: 'POST',
-      headers,
-      body,
-      signal: controller.signal,
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      const error = `HTTP ${res.status}${text ? `: ${text.slice(0, 200)}` : ''}`;
-      await recordWebhookDelivery(ownerId, webhook.id, { ok: false, error });
-      return { ok: false, error };
-    }
+  if (result.ok) {
     await recordWebhookDelivery(ownerId, webhook.id, { ok: true });
     return { ok: true };
-  } catch (err) {
-    const error = err instanceof Error ? err.message : String(err);
-    await recordWebhookDelivery(ownerId, webhook.id, { ok: false, error });
-    return { ok: false, error };
-  } finally {
-    clearTimeout(timer);
   }
+
+  await recordWebhookDelivery(ownerId, webhook.id, { ok: false, error: result.error });
+  return { ok: false, error: result.error };
 }

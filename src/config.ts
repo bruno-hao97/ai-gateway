@@ -87,8 +87,14 @@ export const config = {
     storeFile:
       process.env.OBSERVABILITY_STORE_FILE ||
       path.join(process.cwd(), 'data', 'observability-webhooks.json'),
+    pollQueueFile:
+      process.env.OBSERVABILITY_POLL_QUEUE_FILE ||
+      path.join(process.cwd(), 'data', 'observability-background-polls.json'),
     maxWebhooksPerOwner: Number(process.env.OBSERVABILITY_MAX_WEBHOOKS) || 5,
     deliveryTimeoutMs: Number(process.env.OBSERVABILITY_DELIVERY_TIMEOUT_MS) || 10_000,
+    /** Retries after the first failed delivery attempt (default 2 → 3 total attempts). */
+    deliveryRetryCount: Number(process.env.OBSERVABILITY_DELIVERY_RETRY_COUNT) || 2,
+    deliveryRetryDelayMs: Number(process.env.OBSERVABILITY_DELIVERY_RETRY_DELAY_MS) || 1_000,
     /** Poll async wait=false jobs server-side when the owner has job webhooks (default on). */
     backgroundJobPoll: process.env.OBSERVABILITY_BACKGROUND_POLL !== 'false',
   },

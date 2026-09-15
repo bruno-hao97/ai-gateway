@@ -20,6 +20,7 @@ import {
   isPayOsConfigured,
   isPortalEnabled,
 } from './config.js';
+import { resumeBackgroundPollQueue } from './services/observabilityJobBackground.js';
 import { gatewayCors } from './middleware/cors.js';
 import { adminRateLimit, billingRateLimit, gatewayRateLimit } from './middleware/rateLimit.js';
 import { sendError } from './utils/errors.js';
@@ -96,4 +97,7 @@ app.use((err: unknown, _req: express.Request, res: express.Response, next: expre
 app.listen(config.port, () => {
   const portal = isPortalEnabled() ? ` · portal http://localhost:${config.port}/portal/` : '';
   console.log(`AI gateway http://localhost:${config.port} (Gommo proxy + REST gateway + admin${portal})`);
+  void resumeBackgroundPollQueue().catch((err) => {
+    console.error('[observability] failed to resume background poll queue:', err);
+  });
 });

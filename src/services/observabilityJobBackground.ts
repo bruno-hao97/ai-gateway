@@ -1,6 +1,12 @@
 import { config } from '../config.js';
 import { resolveByokOwner } from './byokIdentity.js';
 import { GommoClient } from './gommoClient.js';
+import {
+  listPollQueueEntries,
+  pollQueueEntryToInput,
+  removePollQueueEntry,
+  upsertPollQueueEntry,
+} from './observabilityPollQueue.js';
 import { dispatchObservabilityEvent } from './observabilityWebhook.js';
 import { ownerHasJobWebhooks } from './observabilityStore.js';
 import { startPolling } from './polling.js';
@@ -21,7 +27,15 @@ export interface BackgroundJobWebhookInput {
   providerJobId: string;
 }
 
-async function runBackgroundJobWebhookPoll(input: BackgroundJobWebhookInput): Promise<void> {
+interface RunPollOptions {
+  /** Entry already persisted — skip upsert on queue file. */
+  fromQueue?: boolean;
+}
+
+async function runBackgroundJobWebhookPoll(
+  input: BackgroundJobWebhookInput,
+  options: RunPollOptions = {},
+): Promise<void> {
   if (!config.observability.backgroundJobPoll) return;
 
   const pollMedia = pollMediaForJobType(input.jobType);
@@ -42,6 +56,17 @@ async function runBackgroundJobWebhookPoll(input: BackgroundJobWebhookInput): Pr
   activePolls.add(key);
 
   try {
+    if (!options.fromQueue) {
+      await upsertPollQueueEntry({
+        ownerId,
+        domain: input.domain,
+        jobType: input.jobType,
+        modelSlug: input.modelSlug,
+        providerJobId: input.providerJobId,
+        accessToken: input.accessToken,
+      });
+    }
+
     const client = new GommoClient({
       accessToken: input.accessToken,
       domain: input.domain,
@@ -67,6 +92,11 @@ async function runBackgroundJobWebhookPoll(input: BackgroundJobWebhookInput): Pr
     });
   } finally {
     activePolls.delete(key);
+    if (ownerId) {
+      await removePollQueueEntry(ownerId, input.providerJobId).catch((err) => {
+        console.error('[observability] failed to remove poll queue entry:', err);
+      });
+    }
   }
 }
 
@@ -75,4 +105,25 @@ export function scheduleBackgroundJobWebhookPoll(input: BackgroundJobWebhookInpu
   void runBackgroundJobWebhookPoll(input).catch((err) => {
     console.error('[observability] background job poll failed:', err);
   });
+}
+
+/** Resume pending background polls after gateway restart. */
+export async function resumeBackgroundPollQueue(): Promise<void> {
+  if (!config.observability.backgroundJobPoll) return;
+
+  const entries = await listPollQueueEntries();
+  if (!entries.length) return;
+
+  console.log(`[observability] resuming ${entries.length} background poll(s) from queue`);
+  for (const entry of entries) {
+    try {
+      const input = pollQueueEntryToInput(entry);
+      void runBackgroundJobWebhookPoll(input, { fromQueue: true }).catch((err) => {
+        console.error('[observability] resumed background poll failed:', err);
+      });
+    } catch (err) {
+      console.error('[observability] skipped invalid poll queue entry:', err);
+      await removePollQueueEntry(entry.ownerId, entry.providerJobId).catch(() => undefined);
+    }
+  }
 }
