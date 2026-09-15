@@ -260,7 +260,13 @@ watch(
 <template>
   <div ref="containerRef" class="gw-api-playground">
     <p v-if="showLoading" class="gw-api-playground-loading">
-      {{ locale === 'vi' ? 'Đang tải playground…' : 'Loading playground…' }}
+      {{
+        locale === 'vi'
+          ? 'Đang tải playground…'
+          : locale === 'th'
+            ? 'กำลังโหลดสนามทดลอง…'
+            : 'Loading playground…'
+      }}
     </p>
   </div>
 </template>

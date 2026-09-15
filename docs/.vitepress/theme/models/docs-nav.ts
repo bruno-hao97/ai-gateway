@@ -1,3 +1,6 @@
+import type { PortalLocale } from './portal-locale';
+import { localeFromPath, stripLocaleFromPath } from './portal-locale';
+
 export type DocsZone = 'guide' | 'reference' | 'sdk' | 'cookbook';
 
 export function normalizePath(path: string): string {
@@ -8,13 +11,8 @@ export function normalizePath(path: string): string {
   return p || '/';
 }
 
-export function stripLocale(path: string): { locale: 'en' | 'vi'; path: string } {
-  const normalized = normalizePath(path);
-  if (normalized === '/vi' || normalized.startsWith('/vi/')) {
-    const rest = normalized.slice(3) || '/';
-    return { locale: 'vi', path: rest === '' ? '/' : rest };
-  }
-  return { locale: 'en', path: normalized };
+export function stripLocale(path: string): { locale: PortalLocale; path: string } {
+  return stripLocaleFromPath(normalizePath(path));
 }
 
 const GUIDE_PREFIXES = [
@@ -82,13 +80,9 @@ export function isChatImmersivePath(path: string): boolean {
   return p === '/app/chat' || p.startsWith('/app/chat/');
 }
 
-/** API Playground embed — full-height below VPNav at /app/playground (no docs sub-nav). */
 export function isPlaygroundImmersivePath(path: string): boolean {
   const { path: p } = stripLocale(path);
   return p === '/app/playground' || p.startsWith('/app/playground/');
 }
 
-/** @deprecated Use isPlaygroundImmersivePath — kept for Layout/CSS class names. */
-export function isApiPlaygroundImmersivePath(path: string): boolean {
-  return isPlaygroundImmersivePath(path);
-}
+export { localeFromPath };

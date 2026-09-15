@@ -1,6 +1,7 @@
 import { getStoredToken } from './auth-api';
 import { apiBase } from './gateway-base';
 import { listChatSessions, touchChatSession, type ChatMessageMeta } from './chat-storage';
+import { pickMsg, resolveLabelLocale, type PortalLocale } from './portal-locale';
 import { formatCredits } from './user-api';
 
 export interface ChatModelOption {
@@ -106,8 +107,12 @@ export function repairStaleModelIds(models: ChatModelOption[], defaultId: string
   return fixed;
 }
 
-export function modelPickerLabel(model: ChatModelOption | null, isVi: boolean): string {
-  if (!model) return isVi ? 'Chọn model' : 'Select model';
+export function modelPickerLabel(
+  model: ChatModelOption | null,
+  localeOrVi: PortalLocale | boolean,
+): string {
+  const locale = resolveLabelLocale(localeOrVi);
+  if (!model) return pickMsg(locale, 'Select model', 'Chọn model', 'เลือกโมเดล');
   return model.label;
 }
 
@@ -130,23 +135,29 @@ export function formatPriceCredit(credits: number | undefined, isVi: boolean): s
   return isVi ? `~${Math.round(credits)} cr/out` : `~${Math.round(credits)} cr/out`;
 }
 
-export function categoryLabel(category: string, isVi: boolean): string {
-  const map: Record<string, [string, string]> = {
-    for_coding: ['Code', 'Code'],
-    fast: ['Nhanh', 'Fast'],
-    reasoning: ['Suy luận', 'Reasoning'],
+export function categoryLabel(category: string, localeOrVi: PortalLocale | boolean): string {
+  const locale = resolveLabelLocale(localeOrVi);
+  const map: Record<string, [string, string, string]> = {
+    for_coding: ['Code', 'Code', 'โค้ด'],
+    fast: ['Fast', 'Nhanh', 'เร็ว'],
+    reasoning: ['Reasoning', 'Suy luận', 'ให้เหตุผล'],
   };
-  const pair = map[category];
-  return pair ? (isVi ? pair[0] : pair[1]) : category.replace(/_/g, ' ');
+  const triple = map[category];
+  if (triple) return pickMsg(locale, triple[0], triple[1], triple[2]);
+  return category.replace(/_/g, ' ');
 }
 
-export function modelCapabilityBadges(model: ChatModelOption, isVi: boolean): string[] {
+export function modelCapabilityBadges(
+  model: ChatModelOption,
+  localeOrVi: PortalLocale | boolean,
+): string[] {
+  const locale = resolveLabelLocale(localeOrVi);
   const badges: string[] = [];
-  if (model.reasoning) badges.push(isVi ? 'Suy luận' : 'Reasoning');
+  if (model.reasoning) badges.push(pickMsg(locale, 'Reasoning', 'Suy luận', 'ให้เหตุผล'));
   if (model.webSearch) badges.push('Web');
-  if (model.inputs?.includes('image')) badges.push(isVi ? 'Ảnh' : 'Vision');
+  if (model.inputs?.includes('image')) badges.push(pickMsg(locale, 'Vision', 'Ảnh', 'ภาพ'));
   if (model.inputs?.includes('file')) badges.push('File');
-  const price = formatPriceCredit(model.priceCredit, isVi);
+  const price = formatPriceCredit(model.priceCredit, localeOrVi);
   if (price) badges.push(price);
   return badges;
 }
@@ -155,7 +166,7 @@ export function formatReplyMeta(
   meta:
     | { latencyMs?: number; totalTokens?: number; costCredits?: number }
     | undefined,
-  isVi: boolean,
+  _localeOrVi: PortalLocale | boolean,
 ): string {
   if (!meta) return '';
   const parts: string[] = [];
@@ -184,42 +195,58 @@ function formatDurationSec(latencyMs: number): string {
 
 export function buildMessageMetaRows(
   meta: ChatMessageMeta | undefined,
-  isVi: boolean,
+  localeOrVi: PortalLocale | boolean,
 ): MetaDetailRow[] {
   if (!meta) return [];
+  const locale = resolveLabelLocale(localeOrVi);
   const rows: MetaDetailRow[] = [];
 
   if (meta.modelLabel) {
-    rows.push({ label: isVi ? 'Model' : 'Model', value: meta.modelLabel });
+    rows.push({
+      label: pickMsg(locale, 'Model', 'Model', 'โมเดล'),
+      value: meta.modelLabel,
+    });
   }
   if (meta.jobType === 'image') {
-    rows.push({ label: isVi ? 'Loại' : 'Type', value: isVi ? 'Tạo ảnh' : 'Image job' });
+    rows.push({
+      label: pickMsg(locale, 'Type', 'Loại', 'ประเภท'),
+      value: pickMsg(locale, 'Image job', 'Tạo ảnh', 'งานภาพ'),
+    });
     if (meta.imageRatio) {
-      rows.push({ label: isVi ? 'Tỷ lệ' : 'Ratio', value: meta.imageRatio });
+      rows.push({
+        label: pickMsg(locale, 'Ratio', 'Tỷ lệ', 'อัตราส่วน'),
+        value: meta.imageRatio,
+      });
     }
   }
   if (meta.jobType === 'video') {
-    rows.push({ label: isVi ? 'Loại' : 'Type', value: isVi ? 'Tạo video' : 'Video job' });
+    rows.push({
+      label: pickMsg(locale, 'Type', 'Loại', 'ประเภท'),
+      value: pickMsg(locale, 'Video job', 'Tạo video', 'งานวิดีโอ'),
+    });
     if (meta.videoDuration) {
-      rows.push({ label: isVi ? 'Thời lượng' : 'Duration', value: meta.videoDuration });
+      rows.push({
+        label: pickMsg(locale, 'Duration', 'Thời lượng', 'ความยาว'),
+        value: meta.videoDuration,
+      });
     }
   }
 
   if (typeof meta.promptTokens === 'number' && meta.promptTokens > 0) {
     rows.push({
-      label: isVi ? 'Input tokens' : 'Input tokens',
+      label: pickMsg(locale, 'Input tokens', 'Input tokens', 'Input tokens'),
       value: String(meta.promptTokens),
     });
   }
   if (typeof meta.completionTokens === 'number' && meta.completionTokens > 0) {
     rows.push({
-      label: isVi ? 'Output tokens' : 'Output tokens',
+      label: pickMsg(locale, 'Output tokens', 'Output tokens', 'Output tokens'),
       value: String(meta.completionTokens),
     });
   }
   if (typeof meta.totalTokens === 'number' && meta.totalTokens > 0) {
     rows.push({
-      label: isVi ? 'Tổng tokens' : 'Token count',
+      label: pickMsg(locale, 'Token count', 'Tổng tokens', 'จำนวนโทเค็น'),
       value: `${meta.totalTokens} tokens`,
     });
   }
@@ -232,28 +259,28 @@ export function buildMessageMetaRows(
   ) {
     const tps = meta.completionTokens / (meta.latencyMs / 1000);
     rows.push({
-      label: isVi ? 'Tokens/giây' : 'Tokens per second',
+      label: pickMsg(locale, 'Tokens per second', 'Tokens/giây', 'โทเค็น/วินาที'),
       value: `~${tps.toFixed(1)} tok/s`,
     });
   }
 
   if (typeof meta.costCredits === 'number' && meta.costCredits > 0) {
     rows.push({
-      label: isVi ? 'Đã trừ' : 'Credits charged',
+      label: pickMsg(locale, 'Credits charged', 'Đã trừ', 'เครดิตที่ใช้'),
       value: `${formatCredits(meta.costCredits)} credits`,
     });
   }
 
   if (typeof meta.balanceAfter === 'number' && meta.balanceAfter >= 0) {
     rows.push({
-      label: isVi ? 'Số dư còn' : 'Balance after',
+      label: pickMsg(locale, 'Balance after', 'Số dư còn', 'ยอดคงเหลือหลังใช้'),
       value: `${formatCredits(meta.balanceAfter)} credits`,
     });
   }
 
   if (typeof meta.latencyMs === 'number' && meta.latencyMs > 0) {
     rows.push({
-      label: isVi ? 'Thời gian' : 'Duration',
+      label: pickMsg(locale, 'Duration', 'Thời gian', 'ระยะเวลา'),
       value: formatDurationSec(meta.latencyMs),
     });
   }

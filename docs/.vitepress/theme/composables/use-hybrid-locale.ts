@@ -2,11 +2,16 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useData, useRoute } from 'vitepress';
 import { isAppShellPath } from '../models/docs-nav';
 import {
+  localeFromVitepressLang,
+  localePrefix,
+  pickMsg,
+  type PortalLocale,
+} from '../models/portal-locale';
+import {
   normalizePlaygroundPortalLocale,
   PLAYGROUND_LOCALE_EVENT,
   playgroundLocaleFromPath,
   syncPlaygroundStorageFromUrl,
-  type PlaygroundPortalLocale,
 } from '../models/playground-locale-bridge';
 
 function currentPath(routePath: string): string {
@@ -17,7 +22,7 @@ function currentPath(routePath: string): string {
 export function useHybridLocale() {
   const { lang } = useData();
   const route = useRoute();
-  const uiLocale = ref<PlaygroundPortalLocale>('en');
+  const uiLocale = ref<PortalLocale>('en');
 
   const usesHybridLocale = computed(() => isAppShellPath(currentPath(route.path)));
 
@@ -30,7 +35,7 @@ export function useHybridLocale() {
   }
 
   function onLocaleEvent(event: Event) {
-    const detail = (event as CustomEvent<{ locale?: PlaygroundPortalLocale }>).detail;
+    const detail = (event as CustomEvent<{ locale?: PortalLocale }>).detail;
     if (!detail?.locale || !usesHybridLocale.value) return;
     uiLocale.value = normalizePlaygroundPortalLocale(detail.locale);
   }
@@ -44,13 +49,19 @@ export function useHybridLocale() {
     window.removeEventListener(PLAYGROUND_LOCALE_EVENT, onLocaleEvent);
   });
 
-  const isVi = computed(() => {
-    if (usesHybridLocale.value) return uiLocale.value === 'vi';
-    return lang.value === 'vi-VN';
+  const locale = computed((): PortalLocale => {
+    if (usesHybridLocale.value) return uiLocale.value;
+    return localeFromVitepressLang(lang.value);
   });
 
-  const prefix = computed((): '' | '/vi' => (isVi.value ? '/vi' : ''));
-  const locale = computed(() => uiLocale.value);
+  const isVi = computed(() => locale.value === 'vi');
+  const isTh = computed(() => locale.value === 'th');
+  const isEn = computed(() => locale.value === 'en');
+  const prefix = computed(() => localePrefix(locale.value));
 
-  return { isVi, prefix, locale, usesHybridLocale, syncUiLocaleFromUrl };
+  function t(en: string, vi: string, th?: string): string {
+    return pickMsg(locale.value, en, vi, th);
+  }
+
+  return { isVi, isTh, isEn, locale, prefix, t, usesHybridLocale, syncUiLocaleFromUrl };
 }

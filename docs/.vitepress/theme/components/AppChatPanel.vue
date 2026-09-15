@@ -94,13 +94,13 @@ const props = defineProps<{
   onCreditsRefresh?: () => void | Promise<void>;
 }>();
 
-const { isVi, prefix } = useHybridLocale();
+const { locale, prefix, t } = useHybridLocale();
 
-const GROUP_LABELS = computed(() =>
-  isVi.value
-    ? { today: 'Hôm nay', yesterday: 'Hôm qua', older: 'Cũ hơn' }
-    : { today: 'Today', yesterday: 'Yesterday', older: 'Older' },
-);
+const GROUP_LABELS = computed(() => ({
+  today: t('Today', 'Hôm nay', 'วันนี้'),
+  yesterday: t('Yesterday', 'Hôm qua', 'เมื่อวาน'),
+  older: t('Older', 'Cũ hơn', 'เก่ากว่า'),
+}));
 
 const sessions = ref<ChatSession[]>([]);
 const activeSessionId = ref('');
@@ -281,22 +281,28 @@ const showByokHint = computed(() => {
 const byokHintMessage = computed(() => {
   const count = byokStatus.value?.supportedChatModels?.length ?? 0;
   if (!hasProviderByok.value) {
-    return isVi.value
-      ? `Chat BYOK: ${count} model trong gateway map — thêm provider key để dùng key của bạn (phí platform vẫn trừ credit Gommo).`
-      : `Chat BYOK: ${count} mapped models — add a provider key to use your own key (platform fees still use Gommo credits).`;
+    return t(
+      `Chat BYOK: ${count} mapped models — add a provider key to use your own key (platform fees still use Gommo credits).`,
+      `Chat BYOK: ${count} model trong gateway map — thêm provider key để dùng key của bạn (phí platform vẫn trừ credit Gommo).`,
+      `Chat BYOK: ${count} โมเดลใน gateway — เพิ่ม provider key เพื่อใช้ key ของคุณ (ค่าธรรมเนียมแพลตฟอร์มยังใช้เครดิต Gommo)`,
+    );
   }
   if (activeModelUsesByok.value) {
     const mapped = byokStatus.value?.supportedChatModels?.find(
       (m) => m.gatewayModelId === activeModelId.value,
     );
     const provider = mapped?.byokProvider ?? 'provider';
-    return isVi.value
-      ? `Model này chạy BYOK (${provider}) — token tính trên key của bạn; gateway vẫn kiểm tra credit Gommo.`
-      : `This model uses BYOK (${provider}) — tokens bill to your key; gateway still checks Gommo credits.`;
+    return t(
+      `This model uses BYOK (${provider}) — tokens bill to your key; gateway still checks Gommo credits.`,
+      `Model này chạy BYOK (${provider}) — token tính trên key của bạn; gateway vẫn kiểm tra credit Gommo.`,
+      `โมเดลนี้ใช้ BYOK (${provider}) — คิดค่าโทเค็นจาก key ของคุณ; gateway ยังตรวจสอบเครดิต Gommo`,
+    );
   }
-  return isVi.value
-    ? `Có ${count} model chat BYOK — chọn trong menu model. Media vẫn dùng Gommo.`
-    : `${count} BYOK chat models available — pick one in the model menu. Media still uses Gommo.`;
+  return t(
+    `${count} BYOK chat models available — pick one in the model menu. Media still uses Gommo.`,
+    `Có ${count} model chat BYOK — chọn trong menu model. Media vẫn dùng Gommo.`,
+    `มี ${count} โมเดลแชท BYOK — เลือกในเมนูโมเดล มีเดียยังใช้ Gommo`,
+  );
 });
 
 const filteredSessions = computed(() => {
@@ -364,14 +370,15 @@ async function ensureImageCatalog() {
         : imageModels.value.find((m) => !modelCatalogUnavailable(m))?.slug || hint;
     const model = resolveImageModel(imageModels.value, preferred);
     if (!model) {
-      throw new Error(
-        isVi.value ? 'Không có model image trong catalog.' : 'No image models in catalog.',
-      );
+      throw new Error(t('No image models in catalog.', 'Không có model image trong catalog.', 'ไม่มีโมเดลภาพในแคตตาล็อก'));
     }
     imageModelSlug.value = model.slug;
     syncImageFieldValues(model);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not load image models';
+    error.value =
+      err instanceof Error
+        ? err.message
+        : t('Could not load image models.', 'Không tải được model image.', 'โหลดโมเดลภาพไม่ได้');
     imageGenMode.value = false;
   } finally {
     imageModelsLoading.value = false;
@@ -390,14 +397,15 @@ async function ensureVideoCatalog() {
         : videoModels.value.find((m) => !modelCatalogUnavailable(m))?.slug || hint;
     const model = resolveVideoModel(videoModels.value, preferred);
     if (!model) {
-      throw new Error(
-        isVi.value ? 'Không có model video trong catalog.' : 'No video models in catalog.',
-      );
+      throw new Error(t('No video models in catalog.', 'Không có model video trong catalog.', 'ไม่มีโมเดลวิดีโอในแคตตาล็อก'));
     }
     videoModelSlug.value = model.slug;
     syncVideoFieldValues(model);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not load video models';
+    error.value =
+      err instanceof Error
+        ? err.message
+        : t('Could not load video models.', 'Không tải được model video.', 'โหลดโมเดลวิดีโอไม่ได้');
     videoGenMode.value = false;
   } finally {
     videoModelsLoading.value = false;
@@ -508,10 +516,12 @@ function handleSelect(sessionId: string) {
 function handleDelete(sessionId: string) {
   const session = getChatSession(sessionId);
   if (!session) return;
-  const label = session.title || (isVi.value ? 'phòng chat' : 'chat');
-  const msg = isVi.value
-    ? `Xóa "${label}"? Không thể hoàn tác.`
-    : `Delete "${label}"? This cannot be undone.`;
+  const label = session.title || t('chat', 'phòng chat', 'ห้องแชท');
+  const msg = t(
+    `Delete "${label}"? This cannot be undone.`,
+    `Xóa "${label}"? Không thể hoàn tác.`,
+    `ลบ "${label}"? ไม่สามารถย้อนกลับได้`,
+  );
   if (!confirm(msg)) return;
 
   if (editingRoomId.value === sessionId) {
@@ -556,7 +566,7 @@ function commitRenameRoom(sessionId: string) {
   editingRoomId.value = '';
   refreshSessions();
   if (activeSessionId.value === sessionId) {
-    titleDraft.value = trimmed || getChatSession(sessionId)?.title || 'Chat';
+    titleDraft.value = trimmed || getChatSession(sessionId)?.title || t('Chat', 'Chat', 'แชท');
   }
 }
 
@@ -649,14 +659,19 @@ async function loadChatModelCatalog() {
     defaultModelId.value = catalog.defaultId;
     const fixed = repairStaleModelIds(catalog.models, catalog.defaultId);
     if (fixed > 0) {
-      staleModelNotice.value = isVi.value
-        ? `Đã đổi ${fixed} phòng sang model mặc định (catalog đã cập nhật).`
-        : `Reset ${fixed} room(s) to default model (catalog updated).`;
+      staleModelNotice.value = t(
+        `Reset ${fixed} room(s) to default model (catalog updated).`,
+        `Đã đổi ${fixed} phòng sang model mặc định (catalog đã cập nhật).`,
+        `รีเซ็ต ${fixed} ห้องเป็นโมเดลเริ่มต้น (แคตตาล็อกอัปเดตแล้ว)`,
+      );
       refreshSessions();
     }
     ensureStaleSessionModels();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not load chat models';
+    error.value =
+      err instanceof Error
+        ? err.message
+        : t('Could not load chat models.', 'Không tải được model chat.', 'โหลดโมเดลแชทไม่ได้');
   } finally {
     modelsLoading.value = false;
   }
@@ -698,7 +713,8 @@ async function handleImportFile(e: Event) {
     ensureSession();
     error.value = '';
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Import failed';
+    error.value =
+      err instanceof Error ? err.message : t('Import failed.', 'Import thất bại.', 'นำเข้าไม่สำเร็จ');
   }
 }
 
@@ -739,17 +755,21 @@ async function handleImageSelected(e: Event) {
   inputEl.value = '';
   if (!picked.length) return;
   if (!files.length) {
-    error.value = isVi.value
-      ? 'Không nhận diện được file ảnh. Thử .jpg, .png hoặc .webp.'
-      : 'Unrecognized image file. Try .jpg, .png, or .webp.';
+    error.value = t(
+      'Unrecognized image file. Try .jpg, .png, or .webp.',
+      'Không nhận diện được file ảnh. Thử .jpg, .png hoặc .webp.',
+      'ไม่รู้จักไฟล์ภาพ — ลอง .jpg, .png หรือ .webp',
+    );
     return;
   }
 
   const slotsLeft = MAX_PENDING_ATTACHMENTS - pendingAttachments.value.length;
   if (slotsLeft <= 0) {
-    error.value = isVi.value
-      ? `Tối đa ${MAX_PENDING_ATTACHMENTS} ảnh đính kèm.`
-      : `Maximum ${MAX_PENDING_ATTACHMENTS} attached images.`;
+    error.value = t(
+      `Maximum ${MAX_PENDING_ATTACHMENTS} attached images.`,
+      `Tối đa ${MAX_PENDING_ATTACHMENTS} ảnh đính kèm.`,
+      `สูงสุด ${MAX_PENDING_ATTACHMENTS} ภาพแนบ`,
+    );
     return;
   }
 
@@ -783,19 +803,28 @@ async function handleImageSelected(e: Event) {
     const skipped = files.length - batch.length;
     const parts: string[] = [];
     if (failed) {
-      parts.push(isVi.value ? `${failed} ảnh upload thất bại` : `${failed} image(s) failed to upload`);
+      parts.push(
+        t(
+          `${failed} image(s) failed to upload`,
+          `${failed} ảnh upload thất bại`,
+          `อัปโหลดภาพล้มเหลว ${failed} ไฟล์`,
+        ),
+      );
       if (firstError) parts.push(firstError);
     }
     if (skipped) {
       parts.push(
-        isVi.value
-          ? `chỉ thêm được ${slotsLeft} ảnh (giới hạn ${MAX_PENDING_ATTACHMENTS})`
-          : `only ${slotsLeft} added (limit ${MAX_PENDING_ATTACHMENTS})`,
+        t(
+          `only ${slotsLeft} added (limit ${MAX_PENDING_ATTACHMENTS})`,
+          `chỉ thêm được ${slotsLeft} ảnh (giới hạn ${MAX_PENDING_ATTACHMENTS})`,
+          `เพิ่มได้เพียง ${slotsLeft} ภาพ (จำกัด ${MAX_PENDING_ATTACHMENTS})`,
+        ),
       );
     }
     if (parts.length) error.value = parts.join(' · ');
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Upload failed';
+    error.value =
+      err instanceof Error ? err.message : t('Upload failed.', 'Upload thất bại.', 'อัปโหลดไม่สำเร็จ');
   } finally {
     uploadingAttachments.value = false;
   }
@@ -824,9 +853,11 @@ async function uploadJobRefs(
   const existing = jobRefs.value.filter((r) => r.type === type).length;
   const slotsLeft = maxCount - existing;
   if (slotsLeft <= 0) {
-    error.value = isVi.value
-      ? `Tối đa ${maxCount} ref ${type === 'image' ? 'ảnh' : 'video'} cho job.`
-      : `Maximum ${maxCount} ${type} ref(s) for job.`;
+    error.value = t(
+      `Maximum ${maxCount} ${type} ref(s) for job.`,
+      `Tối đa ${maxCount} ref ${type === 'image' ? 'ảnh' : 'video'} cho job.`,
+      `สูงสุด ${maxCount} ref ${type === 'image' ? 'ภาพ' : 'วิดีโอ'} สำหรับงาน`,
+    );
     return;
   }
 
@@ -866,12 +897,19 @@ async function uploadJobRefs(
 
     const parts: string[] = [];
     if (failed) {
-      parts.push(isVi.value ? `${failed} ref upload thất bại` : `${failed} ref(s) failed to upload`);
+      parts.push(
+        t(
+          `${failed} ref(s) failed to upload`,
+          `${failed} ref upload thất bại`,
+          `อัปโหลด ref ล้มเหลว ${failed} ไฟล์`,
+        ),
+      );
       if (firstError) parts.push(firstError);
     }
     if (parts.length) error.value = parts.join(' · ');
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Upload failed';
+    error.value =
+      err instanceof Error ? err.message : t('Upload failed.', 'Upload thất bại.', 'อัปโหลดไม่สำเร็จ');
   } finally {
     uploadingJobRefs.value = false;
   }
@@ -884,9 +922,11 @@ async function handleJobImageRefSelected(e: Event) {
   inputEl.value = '';
   if (!picked.length) return;
   if (!files.length) {
-    error.value = isVi.value
-      ? 'Không nhận diện được file ảnh ref.'
-      : 'Unrecognized image ref file.';
+    error.value = t(
+      'Unrecognized image ref file.',
+      'Không nhận diện được file ảnh ref.',
+      'ไม่รู้จักไฟล์ ref ภาพ',
+    );
     return;
   }
   await uploadJobRefs(files, 'image', MAX_JOB_IMAGE_REFS, uploadChatImage);
@@ -899,9 +939,11 @@ async function handleJobVideoRefSelected(e: Event) {
   inputEl.value = '';
   if (!picked.length) return;
   if (!files.length) {
-    error.value = isVi.value
-      ? 'Không nhận diện được file video ref.'
-      : 'Unrecognized video ref file.';
+    error.value = t(
+      'Unrecognized video ref file.',
+      'Không nhận diện được file video ref.',
+      'ไม่รู้จักไฟล์ ref วิดีโอ',
+    );
     return;
   }
   await uploadJobRefs(files, 'video', MAX_JOB_VIDEO_REFS, uploadChatVideo);
@@ -909,11 +951,9 @@ async function handleJobVideoRefSelected(e: Event) {
 
 function attachmentTitle(count: number, type: ChatAttachment['type']): string {
   if (type === 'video') {
-    return isVi.value
-      ? `${count} video`
-      : `${count} video${count > 1 ? 's' : ''}`;
+    return t(`${count} video${count > 1 ? 's' : ''}`, `${count} video`, `${count} วิดีโอ`);
   }
-  return isVi.value ? `${count} ảnh` : `${count} image${count > 1 ? 's' : ''}`;
+  return t(`${count} image${count > 1 ? 's' : ''}`, `${count} ảnh`, `${count} ภาพ`);
 }
 
 async function handleVideoSelected(e: Event) {
@@ -923,17 +963,21 @@ async function handleVideoSelected(e: Event) {
   inputEl.value = '';
   if (!picked.length) return;
   if (!files.length) {
-    error.value = isVi.value
-      ? 'Không nhận diện được file video. Thử .mp4 hoặc .webm.'
-      : 'Unrecognized video file. Try .mp4 or .webm.';
+    error.value = t(
+      'Unrecognized video file. Try .mp4 or .webm.',
+      'Không nhận diện được file video. Thử .mp4 hoặc .webm.',
+      'ไม่รู้จักไฟล์วิดีโอ — ลอง .mp4 หรือ .webm',
+    );
     return;
   }
 
   const slotsLeft = MAX_PENDING_ATTACHMENTS - pendingAttachments.value.length;
   if (slotsLeft <= 0) {
-    error.value = isVi.value
-      ? `Tối đa ${MAX_PENDING_ATTACHMENTS} video đính kèm.`
-      : `Maximum ${MAX_PENDING_ATTACHMENTS} attached videos.`;
+    error.value = t(
+      `Maximum ${MAX_PENDING_ATTACHMENTS} attached videos.`,
+      `Tối đa ${MAX_PENDING_ATTACHMENTS} video đính kèm.`,
+      `สูงสุด ${MAX_PENDING_ATTACHMENTS} วิดีโอแนบ`,
+    );
     return;
   }
 
@@ -967,19 +1011,28 @@ async function handleVideoSelected(e: Event) {
     const skipped = files.length - batch.length;
     const parts: string[] = [];
     if (failed) {
-      parts.push(isVi.value ? `${failed} video upload thất bại` : `${failed} video(s) failed to upload`);
+      parts.push(
+        t(
+          `${failed} video(s) failed to upload`,
+          `${failed} video upload thất bại`,
+          `อัปโหลดวิดีโอล้มเหลว ${failed} ไฟล์`,
+        ),
+      );
       if (firstError) parts.push(firstError);
     }
     if (skipped) {
       parts.push(
-        isVi.value
-          ? `chỉ thêm được ${slotsLeft} video (giới hạn ${MAX_PENDING_ATTACHMENTS})`
-          : `only ${slotsLeft} added (limit ${MAX_PENDING_ATTACHMENTS})`,
+        t(
+          `only ${slotsLeft} added (limit ${MAX_PENDING_ATTACHMENTS})`,
+          `chỉ thêm được ${slotsLeft} video (giới hạn ${MAX_PENDING_ATTACHMENTS})`,
+          `เพิ่มได้เพียง ${slotsLeft} วิดีโอ (จำกัด ${MAX_PENDING_ATTACHMENTS})`,
+        ),
       );
     }
     if (parts.length) error.value = parts.join(' · ');
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Upload failed';
+    error.value =
+      err instanceof Error ? err.message : t('Upload failed.', 'Upload thất bại.', 'อัปโหลดไม่สำเร็จ');
   } finally {
     uploadingAttachments.value = false;
   }
@@ -1061,7 +1114,7 @@ async function runTurn(history: ChatMessage[], userMsg: ChatMessage, assistantId
       saveChatMessages(sessionId, messages.value);
       return;
     }
-    const formatted = formatChatError(err, isVi.value);
+    const formatted = formatChatError(err, locale.value);
     chatErrorHint.value = formatted;
     error.value = formatted.message;
     messages.value = messages.value.map((m) =>
@@ -1085,14 +1138,16 @@ async function runImageTurn(history: ChatMessage[], userMsg: ChatMessage, assist
     (a) => a.purpose === 'job' && a.jobTarget === 'image',
   );
   if (!sessionId || !model) {
-    error.value = isVi.value ? 'Chọn model image.' : 'Pick an image model.';
+    error.value = t('Pick an image model.', 'Chọn model image.', 'เลือกโมเดลภาพ');
     return;
   }
 
   if (modelCatalogUnavailable(model)) {
-    const msg = isVi.value
-      ? 'Model ảnh đang tạm ngưng trên upstream. Chọn model khác.'
-      : 'Image model temporarily unavailable upstream. Pick another model.';
+    const msg = t(
+      'Image model temporarily unavailable upstream. Pick another model.',
+      'Model ảnh đang tạm ngưng trên upstream. Chọn model khác.',
+      'โมเดลภาพไม่พร้อมใช้งานชั่วคราว — เลือกโมเดลอื่น',
+    );
     error.value = msg;
     chatErrorHint.value = { message: msg, suggestModel: true, suggestRetry: false };
     messages.value = messages.value.map((m) =>
@@ -1103,7 +1158,7 @@ async function runImageTurn(history: ChatMessage[], userMsg: ChatMessage, assist
   }
 
   const fieldValues = { ...imageFieldValues.value };
-  const validationError = validateCatalogJobFields(model, fieldValues, isVi.value);
+  const validationError = validateCatalogJobFields(model, fieldValues, locale.value);
   if (validationError) {
     error.value = validationError;
     messages.value = messages.value.map((m) =>
@@ -1125,7 +1180,7 @@ async function runImageTurn(history: ChatMessage[], userMsg: ChatMessage, assist
       );
     },
     'image',
-    isVi.value,
+    locale.value,
   );
 
   try {
@@ -1136,10 +1191,12 @@ async function runImageTurn(history: ChatMessage[], userMsg: ChatMessage, assist
       controller.signal,
       toMediaJobRefs(jobRefAttachments),
     );
-    const fieldSummary = formatImageJobFieldSummary(result.fields, isVi.value);
-    const caption = isVi.value
-      ? `Ảnh từ **${result.modelLabel}**${fieldSummary ? ` · ${fieldSummary}` : ''}`
-      : `Image from **${result.modelLabel}**${fieldSummary ? ` · ${fieldSummary}` : ''}`;
+    const fieldSummary = formatImageJobFieldSummary(result.fields, locale.value);
+    const caption = t(
+      `Image from **${result.modelLabel}**${fieldSummary ? ` · ${fieldSummary}` : ''}`,
+      `Ảnh từ **${result.modelLabel}**${fieldSummary ? ` · ${fieldSummary}` : ''}`,
+      `ภาพจาก **${result.modelLabel}**${fieldSummary ? ` · ${fieldSummary}` : ''}`,
+    );
     const meta = {
       latencyMs: result.latencyMs,
       modelLabel: result.modelLabel,
@@ -1182,7 +1239,7 @@ async function runImageTurn(history: ChatMessage[], userMsg: ChatMessage, assist
       saveChatMessages(sessionId, messages.value);
       return;
     }
-    const formatted = formatChatError(err, isVi.value);
+    const formatted = formatChatError(err, locale.value);
     chatErrorHint.value = formatted;
     error.value = formatted.message;
     messages.value = messages.value.map((m) =>
@@ -1212,14 +1269,16 @@ async function runVideoTurn(history: ChatMessage[], userMsg: ChatMessage, assist
     (a) => a.purpose === 'job' && a.jobTarget === 'video',
   );
   if (!sessionId || !model) {
-    error.value = isVi.value ? 'Chọn model video.' : 'Pick a video model.';
+    error.value = t('Pick a video model.', 'Chọn model video.', 'เลือกโมเดลวิดีโอ');
     return;
   }
 
   if (modelCatalogUnavailable(model)) {
-    const msg = isVi.value
-      ? 'Model video đang tạm ngưng trên upstream. Chọn model khác.'
-      : 'Video model temporarily unavailable upstream. Pick another model.';
+    const msg = t(
+      'Video model temporarily unavailable upstream. Pick another model.',
+      'Model video đang tạm ngưng trên upstream. Chọn model khác.',
+      'โมเดลวิดีโอไม่พร้อมใช้งานชั่วคราว — เลือกโมเดลอื่น',
+    );
     error.value = msg;
     chatErrorHint.value = { message: msg, suggestModel: true, suggestRetry: false };
     messages.value = messages.value.map((m) =>
@@ -1230,7 +1289,7 @@ async function runVideoTurn(history: ChatMessage[], userMsg: ChatMessage, assist
   }
 
   const fieldValues = { ...videoFieldValues.value };
-  const validationError = validateCatalogJobFields(model, fieldValues, isVi.value);
+  const validationError = validateCatalogJobFields(model, fieldValues, locale.value);
   if (validationError) {
     error.value = validationError;
     messages.value = messages.value.map((m) =>
@@ -1252,7 +1311,7 @@ async function runVideoTurn(history: ChatMessage[], userMsg: ChatMessage, assist
       );
     },
     'video',
-    isVi.value,
+    locale.value,
   );
 
   try {
@@ -1263,10 +1322,12 @@ async function runVideoTurn(history: ChatMessage[], userMsg: ChatMessage, assist
       controller.signal,
       toMediaJobRefs(jobRefAttachments),
     );
-    const fieldSummary = formatImageJobFieldSummary(result.fields, isVi.value);
-    const caption = isVi.value
-      ? `Video từ **${result.modelLabel}**${fieldSummary ? ` · ${fieldSummary}` : ''}`
-      : `Video from **${result.modelLabel}**${fieldSummary ? ` · ${fieldSummary}` : ''}`;
+    const fieldSummary = formatImageJobFieldSummary(result.fields, locale.value);
+    const caption = t(
+      `Video from **${result.modelLabel}**${fieldSummary ? ` · ${fieldSummary}` : ''}`,
+      `Video từ **${result.modelLabel}**${fieldSummary ? ` · ${fieldSummary}` : ''}`,
+      `วิดีโอจาก **${result.modelLabel}**${fieldSummary ? ` · ${fieldSummary}` : ''}`,
+    );
     const meta = {
       latencyMs: result.latencyMs,
       modelLabel: result.modelLabel,
@@ -1309,7 +1370,7 @@ async function runVideoTurn(history: ChatMessage[], userMsg: ChatMessage, assist
       saveChatMessages(sessionId, messages.value);
       return;
     }
-    const formatted = formatChatError(err, isVi.value);
+    const formatted = formatChatError(err, locale.value);
     chatErrorHint.value = formatted;
     error.value = formatted.message;
     messages.value = messages.value.map((m) =>
@@ -1424,7 +1485,7 @@ async function handleRegenerate(assistantMessageId: string) {
 async function copyMessage(text: string) {
   try {
     await navigator.clipboard.writeText(text);
-    copiedToast.value = isVi.value ? 'Đã copy' : 'Copied';
+    copiedToast.value = t('Copied', 'Đã copy', 'คัดลอกแล้ว');
     window.setTimeout(() => {
       copiedToast.value = '';
     }, 1500);
@@ -1438,12 +1499,12 @@ async function shareChatLink() {
   const url = `${window.location.origin}${chatAppPath(prefix.value, activeSessionId.value)}`;
   try {
     await navigator.clipboard.writeText(url);
-    copiedToast.value = isVi.value ? 'Đã copy link phòng' : 'Room link copied';
+    copiedToast.value = t('Room link copied', 'Đã copy link phòng', 'คัดลอกลิงก์ห้องแล้ว');
     window.setTimeout(() => {
       copiedToast.value = '';
     }, 1500);
   } catch {
-    copiedToast.value = isVi.value ? 'Không copy được link' : 'Could not copy link';
+    copiedToast.value = t('Could not copy link', 'Không copy được link', 'คัดลอกลิงก์ไม่ได้');
   }
 }
 
@@ -1542,9 +1603,11 @@ function onGlobalKeydown(e: KeyboardEvent) {
 }
 
 function handleClearAll() {
-  const msg = isVi.value
-    ? 'Xóa tất cả phòng chat trên máy này? Không thể hoàn tác.'
-    : 'Delete all chat rooms on this device? This cannot be undone.';
+  const msg = t(
+    'Delete all chat rooms on this device? This cannot be undone.',
+    'Xóa tất cả phòng chat trên máy này? Không thể hoàn tác.',
+    'ลบห้องแชททั้งหมดบนอุปกรณ์นี้? ไม่สามารถย้อนกลับได้',
+  );
   if (!confirm(msg)) return;
   clearAllChatSessions();
   refreshSessions();
@@ -1554,7 +1617,7 @@ function handleClearAll() {
 
 function startRenameTitle() {
   if (streaming.value || !activeSessionId.value) return;
-  titleDraft.value = activeSession.value?.title || 'Chat';
+  titleDraft.value = activeSession.value?.title || t('Chat', 'Chat', 'แชท');
   editingTitle.value = true;
   nextTick(() => {
     titleInputRef.value?.focus();
@@ -1652,20 +1715,20 @@ onUnmounted(() => {
       </div>
       <div class="or-app-chat-sidebar-head">
         <button type="button" class="or-app-btn or-app-btn-ghost or-app-chat-new" @click="handleNewChat">
-          {{ isVi ? '+ Chat mới' : '+ New chat' }}
+          {{ t('+ New chat', '+ Chat mới', '+ แชทใหม่') }}
         </button>
         <input
           ref="searchInputRef"
           v-model="search"
           type="search"
           class="or-app-chat-search"
-          :placeholder="isVi ? 'Tìm phòng chat…' : 'Search chats…'"
+          :placeholder="t('Search chats…', 'Tìm phòng chat…', 'ค้นหาแชท…')"
         />
       </div>
 
       <div class="or-app-chat-rooms">
         <template v-if="filteredSessions.length === 0">
-          <p class="or-app-chat-empty">{{ isVi ? 'Chưa có chat' : 'No chats yet' }}</p>
+          <p class="or-app-chat-empty">{{ t('No chats yet', 'Chưa có chat', 'ยังไม่มีแชท') }}</p>
         </template>
         <template v-else>
           <div v-for="key in dateGroupKeys" :key="key">
@@ -1687,7 +1750,7 @@ onUnmounted(() => {
                         type="text"
                         class="or-app-chat-room-title-input"
                         maxlength="80"
-                        :aria-label="isVi ? 'Tên phòng chat' : 'Chat room name'"
+                        :aria-label="t('Chat room name', 'Tên phòng chat', 'ชื่อห้องแชท')"
                         @keydown="onRoomTitleKeydown($event, session.id)"
                         @blur="commitRenameRoom(session.id)"
                       />
@@ -1706,7 +1769,7 @@ onUnmounted(() => {
                     </button>
                     <ChatRoomMenu
                       :pinned="session.pinned"
-                      :is-vi="isVi"
+                      :locale="locale"
                       :disabled="streaming && session.id === activeSessionId"
                       @pin="handlePinRoom(session.id)"
                       @rename="startRenameRoom(session.id)"
@@ -1728,7 +1791,7 @@ onUnmounted(() => {
         <button
           type="button"
           class="or-app-chat-mobile-toggle"
-          :aria-label="isVi ? 'Danh sách chat' : 'Chat list'"
+          :aria-label="t('Chat list', 'Danh sách chat', 'รายการแชท')"
           @click="sidebarOpen = !sidebarOpen"
         >
           ☰
@@ -1739,8 +1802,8 @@ onUnmounted(() => {
             type="button"
             class="or-chat-toolbar-icon"
             :disabled="streaming"
-            :aria-label="isVi ? 'Chat mới' : 'New chat'"
-            :title="isVi ? 'Chat mới' : 'New chat'"
+            :aria-label="t('New chat', 'Chat mới', 'แชทใหม่')"
+            :title="t('New chat', 'Chat mới', 'แชทใหม่')"
             @click="handleNewChat"
           >
             <ChatIcon name="plus" />
@@ -1761,16 +1824,16 @@ onUnmounted(() => {
           <div v-else-if="activeSessionId" class="or-chat-thread-tab is-active">
             <span
               class="or-chat-thread-tab-label"
-              :title="activeSession?.title || 'Chat'"
+              :title="activeSession?.title || t('Chat', 'Chat', 'แชท')"
               @dblclick="startRenameTitle"
             >
-              {{ activeSession?.title || 'Chat' }}
+              {{ activeSession?.title || t('Chat', 'Chat', 'แชท') }}
             </span>
             <button
               type="button"
               class="or-chat-thread-tab-close"
               :disabled="streaming"
-              :aria-label="isVi ? 'Đóng phòng' : 'Close chat'"
+              :aria-label="t('Close chat', 'Đóng phòng', 'ปิดแชท')"
               @click="closeActiveTab"
             >
               <ChatIcon name="x" />
@@ -1785,13 +1848,13 @@ onUnmounted(() => {
             :models="chatModels"
             :byok-model-ids="byokModelIdList"
             :disabled="streaming || modelsLoading || chatModels.length === 0"
-            :is-vi="isVi"
+            :locale="locale"
           />
           <button
             v-if="activeSessionId"
             type="button"
             class="or-chat-toolbar-icon"
-            :aria-label="isVi ? 'Chia sẻ link' : 'Share link'"
+            :aria-label="t('Share link', 'Chia sẻ link', 'แชร์ลิงก์')"
             :disabled="streaming"
             @click="shareChatLink"
           >
@@ -1801,7 +1864,7 @@ onUnmounted(() => {
             v-if="activeSessionId"
             type="button"
             class="or-chat-toolbar-icon"
-            :aria-label="isVi ? 'Đổi tên' : 'Rename'"
+            :aria-label="t('Rename', 'Đổi tên', 'เปลี่ยนชื่อ')"
             :disabled="streaming"
             @click="startRenameTitle"
           >
@@ -1818,14 +1881,16 @@ onUnmounted(() => {
         <div class="or-app-chat-low-credit">
           <p>
             {{
-              isVi
-                ? `Còn ${formatCredits(creditsBalance ?? 0)} credits — nạp thêm để tránh gián đoạn khi chat hoặc tạo ảnh.`
-                : `${formatCredits(creditsBalance ?? 0)} credits left — top up to avoid interruptions while chatting or generating images.`
+              t(
+                `${formatCredits(creditsBalance ?? 0)} credits left — top up to avoid interruptions while chatting or generating images.`,
+                `Còn ${formatCredits(creditsBalance ?? 0)} credits — nạp thêm để tránh gián đoạn khi chat hoặc tạo ảnh.`,
+                `เหลือ ${formatCredits(creditsBalance ?? 0)} เครดิต — เติมเครดิตเพื่อหลีกเลี่ยงการหยุดชะงักขณะแชทหรือสร้างภาพ`,
+              )
             }}
           </p>
           <div class="or-app-chat-low-credit-actions">
             <a :href="`${prefix}/app/credits/`" class="or-app-btn or-app-btn-ghost or-app-chat-low-credit-link">
-              {{ isVi ? 'Nạp credits' : 'Top up' }}
+              {{ t('Top up', 'Nạp credits', 'เติมเครดิต') }}
             </a>
             <button type="button" class="or-app-chat-action" @click="dismissLowCreditBanner">×</button>
           </div>
@@ -1837,7 +1902,7 @@ onUnmounted(() => {
           <p>{{ byokHintMessage }}</p>
           <div class="or-app-chat-low-credit-actions">
             <a :href="byokHref" class="or-app-btn or-app-btn-ghost or-app-chat-low-credit-link">
-              {{ isVi ? 'Mở BYOK' : 'Open BYOK' }}
+              {{ t('Open BYOK', 'Mở BYOK', 'เปิด BYOK') }}
             </a>
             <button type="button" class="or-app-chat-action" @click="dismissByokHint">×</button>
           </div>
@@ -1857,7 +1922,7 @@ onUnmounted(() => {
               class="or-app-btn or-app-btn-ghost or-app-chat-error-btn"
               @click="switchToNextImageModel"
             >
-              {{ isVi ? 'Thử model ảnh khác' : 'Try another image model' }}
+              {{ t('Try another image model', 'Thử model ảnh khác', 'ลองโมเดลภาพอื่น') }}
             </button>
             <button
               v-else-if="chatErrorHint.suggestModel"
@@ -1865,7 +1930,7 @@ onUnmounted(() => {
               class="or-app-btn or-app-btn-ghost or-app-chat-error-btn"
               @click="switchToDefaultModel"
             >
-              {{ isVi ? 'Đổi sang Auto Router' : 'Switch to Auto Router' }}
+              {{ t('Switch to Auto Router', 'Đổi sang Auto Router', 'เปลี่ยนเป็น Auto Router') }}
             </button>
           </div>
         </div>
@@ -1875,12 +1940,14 @@ onUnmounted(() => {
         <div class="or-app-chat-col or-app-chat-thread">
         <template v-if="messages.length === 0">
           <div class="or-app-chat-welcome">
-            <p class="or-app-chat-welcome-title">{{ isVi ? 'Hỏi bất cứ điều gì' : 'Ask anything' }}</p>
+            <p class="or-app-chat-welcome-title">{{ t('Ask anything', 'Hỏi bất cứ điều gì', 'ถามอะไรก็ได้') }}</p>
             <p class="or-app-chat-welcome-desc">
               {{
-                isVi
-                  ? '+ tạo ảnh · ∞ memory/stream · ⚙ web tools.'
-                  : '+ generate image · ∞ memory/stream · ⚙ web tools.'
+                t(
+                  '+ generate image · ∞ memory/stream · ⚙ web tools.',
+                  '+ tạo ảnh · ∞ memory/stream · ⚙ web tools.',
+                  '+ สร้างภาพ · ∞ memory/stream · ⚙ web tools',
+                )
               }}
             </p>
           </div>
@@ -1911,7 +1978,7 @@ onUnmounted(() => {
                       class="or-attach-badge"
                       :class="att.purpose === 'job' ? 'is-job' : 'is-chat'"
                     >
-                      {{ attachmentBadgeLabel(att, isVi) }}
+                      {{ attachmentBadgeLabel(att, locale) }}
                     </span>
                     <img
                       v-if="att.type === 'image' || !att.type"
@@ -1943,19 +2010,18 @@ onUnmounted(() => {
                   :text="message.text || (streaming ? '' : '')"
                   :markdown="message.role === 'assistant' && !message.isError"
                   :streaming="isStreamingMessage(message.id)"
-                  :is-vi="isVi"
                 />
               </div>
               <ChatMessageActionBar
                 v-if="(message.text || (message.attachments?.length ?? 0) > 0) && editingMessageId !== message.id"
                 :role="message.role"
                 :actions-locked="messageActionsLocked(message.id)"
-                :is-vi="isVi"
+                :locale="locale"
                 :message-meta="message.role === 'assistant' ? message.meta : undefined"
                 :created-at="message.createdAt"
                 :meta-summary="
                   message.role === 'assistant' && message.meta
-                    ? formatReplyMeta(message.meta, isVi)
+                    ? formatReplyMeta(message.meta, locale)
                     : undefined
                 "
                 @copy="copyMessage(message.text)"
@@ -1974,7 +2040,7 @@ onUnmounted(() => {
         v-if="showScrollDown"
         type="button"
         class="or-chat-scroll-fab"
-        :aria-label="isVi ? 'Cuộn xuống' : 'Scroll to bottom'"
+        :aria-label="t('Scroll to bottom', 'Cuộn xuống', 'เลื่อนลงล่าง')"
         @click="scrollToBottom"
       >
         <ChatIcon name="chevron-down" />
@@ -1982,11 +2048,11 @@ onUnmounted(() => {
 
       <div v-if="imageGenMode" class="or-app-chat-col">
         <div class="or-chat-image-gen-bar gw-job-panel gw-job-panel--compact">
-          <p class="gw-job-panel-kicker">{{ isVi ? 'Ảnh' : 'Image' }}</p>
+          <p class="gw-job-panel-kicker">{{ t('Image', 'Ảnh', 'ภาพ') }}</p>
           <label class="gw-job-field">
             <span class="gw-job-label">
               <span class="gw-job-label-prefix" aria-hidden="true">//</span>
-              {{ isVi ? 'Model' : 'Model' }}
+              {{ t('Model', 'Model', 'โมเดล') }}
             </span>
             <select v-model="imageModelSlug" class="gw-job-input" :disabled="streaming || imageModelsLoading || !imageModels.length">
               <option
@@ -1995,7 +2061,7 @@ onUnmounted(() => {
                 :value="m.slug"
                 :disabled="modelCatalogUnavailable(m)"
               >
-                {{ m.name }} · {{ m.creditsLabel }}{{ modelUnavailableSuffix(m, isVi) }}
+                {{ m.name }} · {{ m.creditsLabel }}{{ modelUnavailableSuffix(m, locale) }}
               </option>
             </select>
           </label>
@@ -2006,7 +2072,7 @@ onUnmounted(() => {
           >
             <span class="gw-job-label">
               <span class="gw-job-label-prefix" aria-hidden="true">//</span>
-              {{ catalogJobFieldLabel(def.field, isVi) }}
+              {{ catalogJobFieldLabel(def.field, locale) }}
             </span>
             <select
               class="gw-job-input"
@@ -2020,18 +2086,18 @@ onUnmounted(() => {
             </select>
           </label>
           <span v-if="imageModelsLoading" class="or-chat-image-gen-loading">
-            {{ isVi ? 'Đang tải catalog…' : 'Loading catalog…' }}
+            {{ t('Loading catalog…', 'Đang tải catalog…', 'กำลังโหลดแคตตาล็อก…') }}
           </span>
         </div>
       </div>
 
       <div v-if="videoGenMode" class="or-app-chat-col">
         <div class="or-chat-image-gen-bar gw-job-panel gw-job-panel--compact">
-          <p class="gw-job-panel-kicker">{{ isVi ? 'Video' : 'Video' }}</p>
+          <p class="gw-job-panel-kicker">{{ t('Video', 'Video', 'วิดีโอ') }}</p>
           <label class="gw-job-field">
             <span class="gw-job-label">
               <span class="gw-job-label-prefix" aria-hidden="true">//</span>
-              {{ isVi ? 'Model' : 'Model' }}
+              {{ t('Model', 'Model', 'โมเดล') }}
             </span>
             <select v-model="videoModelSlug" class="gw-job-input" :disabled="streaming || videoModelsLoading || !videoModels.length">
               <option
@@ -2040,7 +2106,7 @@ onUnmounted(() => {
                 :value="m.slug"
                 :disabled="modelCatalogUnavailable(m)"
               >
-                {{ m.name }} · {{ m.creditsLabel }}{{ modelUnavailableSuffix(m, isVi) }}
+                {{ m.name }} · {{ m.creditsLabel }}{{ modelUnavailableSuffix(m, locale) }}
               </option>
             </select>
           </label>
@@ -2051,7 +2117,7 @@ onUnmounted(() => {
           >
             <span class="gw-job-label">
               <span class="gw-job-label-prefix" aria-hidden="true">//</span>
-              {{ catalogJobFieldLabel(def.field, isVi) }}
+              {{ catalogJobFieldLabel(def.field, locale) }}
             </span>
             <select
               class="gw-job-input"
@@ -2065,7 +2131,7 @@ onUnmounted(() => {
             </select>
           </label>
           <span v-if="videoModelsLoading" class="or-chat-image-gen-loading">
-            {{ isVi ? 'Đang tải catalog…' : 'Loading catalog…' }}
+            {{ t('Loading catalog…', 'Đang tải catalog…', 'กำลังโหลดแคตตาล็อก…') }}
           </span>
         </div>
       </div>
@@ -2106,7 +2172,7 @@ onUnmounted(() => {
       <ChatComposer
         v-model:input="input"
         :streaming="streaming"
-        :is-vi="isVi"
+        :locale="locale"
         :active-model="activeModel"
         :pending-attachments="pendingAttachments"
         :job-refs="jobRefs"

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue';
-import { useData } from 'vitepress';
+import { useHybridLocale } from '../composables/use-hybrid-locale';
 import { modelCatalogUnavailable, modelUnavailableSuffix, type CatalogModel } from '../models/catalog-api';
 import {
   catalogJobFieldDefs,
@@ -34,13 +34,11 @@ const props = defineProps<{
   onCreditsRefresh?: () => Promise<void>;
 }>();
 
-const { lang } = useData();
-const isVi = computed(() => lang.value === 'vi-VN');
-const prefix = computed(() => (isVi.value ? '/vi' : ''));
+const { locale, prefix, t } = useHybridLocale();
 
-const MEDIA_TABS: Array<{ id: PlaygroundMediaType; labelEn: string; labelVi: string }> = [
-  { id: 'image', labelEn: 'Image', labelVi: 'Ảnh' },
-  { id: 'video', labelEn: 'Video', labelVi: 'Video' },
+const MEDIA_TABS: Array<{ id: PlaygroundMediaType; labelEn: string; labelVi: string; labelTh: string }> = [
+  { id: 'image', labelEn: 'Image', labelVi: 'Ảnh', labelTh: 'รูปภาพ' },
+  { id: 'video', labelEn: 'Video', labelVi: 'Video', labelTh: 'วิดีโอ' },
 ];
 
 const mediaType = ref<PlaygroundMediaType>('image');
@@ -100,7 +98,7 @@ function startProgressTimer(jobType: PlaygroundMediaType) {
       progressLabel.value = label;
     },
     jobType,
-    isVi.value,
+    locale.value,
   );
 }
 
@@ -164,14 +162,16 @@ async function handleGenerate() {
   if (!model || !text || running.value || generateLock) return;
 
   if (modelCatalogUnavailable(model)) {
-    error.value = isVi.value
-      ? 'Model đang tạm ngưng trên upstream. Chọn model khác.'
-      : 'Model is temporarily unavailable upstream. Pick another model.';
+    error.value = t(
+      'Model is temporarily unavailable upstream. Pick another model.',
+      'Model đang tạm ngưng trên upstream. Chọn model khác.',
+      'โมเดลไม่พร้อมใช้งานชั่วคราวบน upstream เลือกโมเดลอื่น',
+    );
     jobErrorHint.value = { message: error.value, suggestModel: true, suggestRetry: false };
     return;
   }
 
-  const validation = validateCatalogJobFields(model, fieldValues.value, isVi.value);
+  const validation = validateCatalogJobFields(model, fieldValues.value, locale.value);
   if (validation) {
     error.value = validation;
     jobErrorHint.value = null;
@@ -210,7 +210,7 @@ async function handleGenerate() {
     });
   } catch (err) {
     if (controller.signal.aborted) return;
-    const formatted = formatMediaJobError(err, isVi.value);
+    const formatted = formatMediaJobError(err, locale.value);
     jobErrorHint.value = formatted;
     error.value = formatted.message;
     appendUsageRecord({
@@ -277,11 +277,11 @@ watch(
           :disabled="running"
           @click="switchMediaType(tab.id)"
         >
-          {{ isVi ? tab.labelVi : tab.labelEn }}
+          {{ t(tab.labelEn, tab.labelVi, tab.labelTh) }}
         </button>
       </div>
       <a :href="apiExplorerUrl" target="_blank" rel="noreferrer" class="or-pg-api-link">
-        {{ isVi ? 'API explorer ↗' : 'API explorer ↗' }}
+        {{ t('API explorer ↗', 'API explorer ↗', 'API explorer ↗') }}
       </a>
     </div>
 
@@ -290,7 +290,7 @@ watch(
         <label class="gw-job-field">
           <span class="gw-job-label">
             <span class="gw-job-label-prefix" aria-hidden="true">//</span>
-            {{ isVi ? 'Prompt' : 'Prompt' }}
+            {{ t('Prompt', 'Prompt', 'Prompt') }}
           </span>
           <textarea
             v-model="prompt"
@@ -299,12 +299,8 @@ watch(
             :disabled="running"
             :placeholder="
               mediaType === 'image'
-                ? isVi
-                  ? 'Mô tả ảnh muốn tạo…'
-                  : 'Describe the image you want…'
-                : isVi
-                  ? 'Mô tả video muốn tạo…'
-                  : 'Describe the video you want…'
+                ? t('Describe the image you want…', 'Mô tả ảnh muốn tạo…', 'อธิบายรูปที่ต้องการ…')
+                : t('Describe the video you want…', 'Mô tả video muốn tạo…', 'อธิบายวิดีโอที่ต้องการ…')
             "
           />
         </label>
@@ -312,7 +308,7 @@ watch(
         <label class="gw-job-field">
           <span class="gw-job-label">
             <span class="gw-job-label-prefix" aria-hidden="true">//</span>
-            {{ isVi ? 'Model' : 'Model' }}
+            {{ t('Model', 'Model', 'โมเดล') }}
           </span>
           <select v-model="modelSlug" class="or-pg-select gw-job-input" :disabled="running || modelsLoading || !models.length">
             <option
@@ -321,27 +317,29 @@ watch(
               :value="m.slug"
               :disabled="modelCatalogUnavailable(m)"
             >
-              {{ m.name }} · {{ m.creditsLabel }}{{ modelUnavailableSuffix(m, isVi) }}
+              {{ m.name }} · {{ m.creditsLabel }}{{ modelUnavailableSuffix(m, locale.value) }}
             </option>
           </select>
         </label>
 
         <p v-if="activeModelUnavailable" class="or-pg-hint or-pg-warn">
           {{
-            isVi
-              ? 'Model này đang tạm ngưng trên upstream — chọn model khác trước khi Generate.'
-              : 'This model is temporarily unavailable upstream — pick another before Generate.'
+            t(
+              'This model is temporarily unavailable upstream — pick another before Generate.',
+              'Model này đang tạm ngưng trên upstream — chọn model khác trước khi Generate.',
+              'โมเดลนี้ไม่พร้อมใช้งานชั่วคราวบน upstream — เลือกโมเดลอื่นก่อน Generate',
+            )
           }}
         </p>
 
         <div v-if="fieldDefs.length" class="gw-job-params">
           <p class="gw-job-params-head">
-            {{ isVi ? 'Tham số catalog' : 'Catalog parameters' }}
+            {{ t('Catalog parameters', 'Tham số catalog', 'พารามิเตอร์แคตตาล็อก') }}
           </p>
           <label v-for="def in fieldDefs" :key="def.field" class="gw-job-field">
             <span class="gw-job-label">
               <span class="gw-job-label-prefix" aria-hidden="true">//</span>
-              {{ catalogJobFieldLabel(def.field, isVi) }}
+              {{ catalogJobFieldLabel(def.field, locale.value) }}
             </span>
             <select
               class="or-pg-select gw-job-input"
@@ -356,9 +354,9 @@ watch(
           </label>
         </div>
 
-        <p v-if="modelsLoading" class="or-pg-hint">{{ isVi ? 'Đang tải catalog…' : 'Loading catalog…' }}</p>
+        <p v-if="modelsLoading" class="or-pg-hint">{{ t('Loading catalog…', 'Đang tải catalog…', 'กำลังโหลดแคตตาล็อก…') }}</p>
         <p v-else-if="activeModel?.credits != null" class="or-pg-hint">
-          {{ isVi ? 'Ước tính' : 'Est.' }} ~{{ formatCredits(activeModel.credits) }} credits
+          {{ t('Est.', 'Ước tính', 'ประมาณ') }} ~{{ formatCredits(activeModel.credits) }} credits
         </p>
 
         <div class="or-pg-actions">
@@ -368,7 +366,7 @@ watch(
             class="or-app-btn or-pg-btn-stop"
             @click="handleStop"
           >
-            {{ isVi ? 'Dừng' : 'Stop' }}
+            {{ t('Stop', 'Dừng', 'หยุด') }}
           </button>
           <button
             v-else
@@ -377,7 +375,7 @@ watch(
             :disabled="!prompt.trim() || !activeModel || modelsLoading || activeModelUnavailable"
             @click="handleGenerate"
           >
-            {{ isVi ? 'Tạo' : 'Generate' }}
+            {{ t('Generate', 'Tạo', 'สร้าง') }}
           </button>
         </div>
 
@@ -390,7 +388,7 @@ watch(
               class="or-app-btn or-app-btn-ghost or-pg-error-btn"
               @click="switchToNextModel"
             >
-              {{ isVi ? 'Thử model khác' : 'Try another model' }}
+              {{ t('Try another model', 'Thử model khác', 'ลองโมเดลอื่น') }}
             </button>
           </div>
         </div>
@@ -400,7 +398,7 @@ watch(
         <div v-if="running" class="or-pg-result-empty">
           <div class="or-pg-progress">
             <span class="or-pg-progress-spinner" aria-hidden="true" />
-            <p class="or-pg-result-status">{{ progressLabel || (isVi ? 'Đang tạo…' : 'Generating…') }}</p>
+            <p class="or-pg-result-status">{{ progressLabel || t('Generating…', 'Đang tạo…', 'กำลังสร้าง…') }}</p>
           </div>
         </div>
         <div v-else-if="result" class="or-pg-result-media">
@@ -421,24 +419,26 @@ watch(
           <div class="or-pg-result-meta">
             <span>{{ result.modelLabel }}</span>
             <span v-if="result.latencyMs">{{ (result.latencyMs / 1000).toFixed(1) }}s</span>
-            <span v-if="formatImageJobFieldSummary(result.fields, isVi)">{{ formatImageJobFieldSummary(result.fields, isVi) }}</span>
+            <span v-if="formatImageJobFieldSummary(result.fields, locale.value)">{{ formatImageJobFieldSummary(result.fields, locale.value) }}</span>
           </div>
           <div class="or-pg-result-actions">
             <a :href="result.resultUrl" target="_blank" rel="noreferrer" class="or-app-btn or-app-btn-ghost">
-              {{ isVi ? 'Mở' : 'Open' }} ↗
+              {{ t('Open', 'Mở', 'เปิด') }} ↗
             </a>
             <button type="button" class="or-app-btn or-app-btn-ghost" @click="copyResultUrl">
-              {{ isVi ? 'Copy URL' : 'Copy URL' }}
+              {{ t('Copy URL', 'Copy URL', 'คัดลอก URL') }}
             </button>
           </div>
         </div>
         <div v-else class="or-pg-result-empty">
-          <p>{{ isVi ? 'Kết quả hiện ở đây' : 'Result will appear here' }}</p>
+          <p>{{ t('Result will appear here', 'Kết quả hiện ở đây', 'ผลลัพธ์จะแสดงที่นี่') }}</p>
           <p class="or-pg-hint">
             {{
-              isVi
-                ? 'Chọn model và tham số từ catalog — không đoán ratio/mode.'
-                : 'Pick model and params from catalog — never guess ratio/mode.'
+              t(
+                'Pick model and params from catalog — never guess ratio/mode.',
+                'Chọn model và tham số từ catalog — không đoán ratio/mode.',
+                'เลือกโมเดลและพารามิเตอร์จากแคตตาล็อก — ไม่เดา ratio/mode',
+              )
             }}
           </p>
         </div>
@@ -446,9 +446,9 @@ watch(
     </div>
 
     <p class="or-pg-foot">
-      <a :href="`${prefix}/models/`">{{ isVi ? 'Xem catalog' : 'Browse catalog' }}</a>
+      <a :href="`${prefix}/models/`">{{ t('Browse catalog', 'Xem catalog', 'ดูแคตตาล็อก') }}</a>
       ·
-      <a :href="`${prefix}/app/activity/?tab=trends`">{{ isVi ? 'Activity' : 'Activity' }}</a>
+      <a :href="`${prefix}/app/activity/?tab=trends`">{{ t('Activity', 'Activity', 'กิจกรรม') }}</a>
     </p>
   </div>
 </template>

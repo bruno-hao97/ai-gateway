@@ -1,12 +1,15 @@
+import type { PortalLocale } from './portal-locale';
 import type { PlaygroundMediaType } from './media-job';
 
 export function mediaJobProgressLabel(
   elapsedSec: number,
   jobType: PlaygroundMediaType,
-  isVi: boolean,
+  localeOrVi: PortalLocale | boolean = false,
 ): string {
+  const locale =
+    typeof localeOrVi === 'boolean' ? (localeOrVi ? 'vi' : 'en') : localeOrVi;
   const creating = elapsedSec < 8;
-  if (isVi) {
+  if (locale === 'vi') {
     if (jobType === 'video') {
       return creating
         ? `Đang tạo job video… ${elapsedSec}s`
@@ -15,6 +18,16 @@ export function mediaJobProgressLabel(
     return creating
       ? `Đang tạo job ảnh… ${elapsedSec}s`
       : `Đang chờ render ảnh… ${elapsedSec}s`;
+  }
+  if (locale === 'th') {
+    if (jobType === 'video') {
+      return creating
+        ? `กำลังสร้างงานวิดีโอ… ${elapsedSec}s`
+        : `กำลังรอ render วิดีโอ… ${elapsedSec}s (มัก 3–5 นาที)`;
+    }
+    return creating
+      ? `กำลังสร้างงานรูป… ${elapsedSec}s`
+      : `กำลังรอ render รูป… ${elapsedSec}s`;
   }
   if (jobType === 'video') {
     return creating
@@ -29,12 +42,12 @@ export function mediaJobProgressLabel(
 export function startMediaJobProgressTimer(
   onTick: (label: string) => void,
   jobType: PlaygroundMediaType,
-  isVi: boolean,
+  localeOrVi: PortalLocale | boolean = false,
 ): () => void {
   const started = Date.now();
   const tick = () => {
     const sec = Math.floor((Date.now() - started) / 1000);
-    onTick(mediaJobProgressLabel(sec, jobType, isVi));
+    onTick(mediaJobProgressLabel(sec, jobType, localeOrVi));
   };
   tick();
   const id = window.setInterval(tick, 1000);

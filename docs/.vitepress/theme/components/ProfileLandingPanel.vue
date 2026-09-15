@@ -3,12 +3,14 @@ import { computed, ref } from 'vue';
 import OverviewUsageSection from './OverviewUsageSection.vue';
 import OverviewRecentTopups from './OverviewRecentTopups.vue';
 import ProfileActivityHeatmap from './ProfileActivityHeatmap.vue';
+import { usePortalCopy } from '../composables/use-portal-copy';
 import { activityHubHref, PROFILE_USAGE_PREVIEW_PERIOD } from '../models/activity-hub-url';
+import type { PortalLocale } from '../models/portal-locale';
 import { formatCredits } from '../models/user-api';
 import type { TopupOrder } from '../models/user-api';
 
 const props = defineProps<{
-  isVi: boolean;
+  locale: PortalLocale;
   prefix: string;
   credits: number;
   email: string;
@@ -24,6 +26,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   copyToken: [];
 }>();
+
+const { m } = usePortalCopy(computed(() => props.locale));
 
 const usageRef = ref<InstanceType<typeof OverviewUsageSection> | null>(null);
 const heatmapRef = ref<InstanceType<typeof ProfileActivityHeatmap> | null>(null);
@@ -42,10 +46,10 @@ const authDocsHref = computed(() => `${props.prefix}/authentication`);
 const creditsHref = computed(() => `${props.prefix}/app/credits/`);
 
 const anchorNav = computed(() => [
-  { id: 'profile-usage', label: 'Usage' },
-  { id: 'profile-activity', label: 'Activity' },
-  { id: 'profile-api', label: props.isVi ? 'API access' : 'API access' },
-  { id: 'profile-account', label: props.isVi ? 'Tài khoản' : 'Account' },
+  { id: 'profile-usage', label: m('Usage', 'Usage', 'การใช้งาน') },
+  { id: 'profile-activity', label: m('Activity', 'Activity', 'กิจกรรม') },
+  { id: 'profile-api', label: m('API access', 'API access', 'การเข้าถึง API') },
+  { id: 'profile-account', label: m('Account', 'Tài khoản', 'บัญชี') },
 ]);
 
 async function reload() {
@@ -57,7 +61,7 @@ defineExpose({ reload });
 
 <template>
   <div class="or-profile-landing">
-    <nav class="or-profile-anchor-nav" :aria-label="isVi ? 'Mục hồ sơ' : 'Profile sections'">
+    <nav class="or-profile-anchor-nav" :aria-label="m('Profile sections', 'Mục hồ sơ', 'ส่วนโปรไฟล์')">
       <a
         v-for="item in anchorNav"
         :key="item.id"
@@ -72,31 +76,33 @@ defineExpose({ reload });
       <div class="or-profile-section-head">
         <div>
           <h2 class="or-profile-section-title or-profile-section-title--lg">
-            Usage
+            {{ m('Usage', 'Usage', 'การใช้งาน') }}
             <span class="or-profile-period-pill">7d</span>
           </h2>
           <p class="or-profile-section-sub">
             {{
-              isVi
-                ? 'Jobs và credit từ Gommo usage-history — cùng period với Activity khi mở từ đây.'
-                : 'Jobs and credits from Gommo usage-history — same period as Activity links from here.'
+              m(
+                'Jobs and credits from Gommo usage-history — same period as Activity links from here.',
+                'Jobs và credit từ Gommo usage-history — cùng period với Activity khi mở từ đây.',
+                'งานและเครดิตจาก Gommo usage-history — ช่วงเวลาเดียวกับลิงก์ Activity จากที่นี่',
+              )
             }}
           </p>
         </div>
         <a :href="usageDetailHref" class="or-profile-section-link">
-          {{ isVi ? 'Mở Trends' : 'Open Trends' }} →
+          {{ m('Open Trends', 'Mở Trends', 'เปิด Trends') }} →
         </a>
       </div>
       <OverviewUsageSection
         ref="usageRef"
         :credits="credits"
-        :is-vi="isVi"
+        :locale="locale"
         :prefix="prefix"
         show-metric-toggle
       />
       <p class="or-profile-section-foot">
         <a :href="logsDetailHref" class="or-profile-section-link or-profile-section-link--sm">
-          {{ isVi ? 'Xem toàn bộ job logs' : 'View all job logs' }} →
+          {{ m('View all job logs', 'Xem toàn bộ job logs', 'ดู job logs ทั้งหมด') }} →
         </a>
       </p>
     </section>
@@ -104,35 +110,39 @@ defineExpose({ reload });
     <section id="profile-activity" class="or-profile-section or-profile-section-card">
       <div class="or-profile-section-head">
         <div>
-          <h2 class="or-profile-section-title or-profile-section-title--lg">Activity</h2>
+          <h2 class="or-profile-section-title or-profile-section-title--lg">
+            {{ m('Activity', 'Activity', 'กิจกรรม') }}
+          </h2>
           <p class="or-profile-section-sub">
             {{
-              isVi
-                ? 'Nạp credit và hoạt động billing trên gateway này.'
-                : 'Top-ups and billing activity on this gateway.'
+              m(
+                'Top-ups and billing activity on this gateway.',
+                'Nạp credit và hoạt động billing trên gateway này.',
+                'เติมเครดิตและกิจกรรม billing บน gateway นี้',
+              )
             }}
           </p>
         </div>
         <a :href="activityDetailHref" class="or-profile-section-link">
-          {{ isVi ? 'Full activity' : 'Full activity' }} →
+          {{ m('Full activity', 'Full activity', 'กิจกรรมทั้งหมด') }} →
         </a>
       </div>
-      <ProfileActivityHeatmap ref="heatmapRef" :is-vi="isVi" />
+      <ProfileActivityHeatmap ref="heatmapRef" :locale="locale" />
 
       <div class="or-profile-activity-kpi">
         <div class="or-profile-activity-kpi-item">
-          <span class="or-profile-activity-kpi-label">{{ isVi ? 'Số dư' : 'Balance' }}</span>
+          <span class="or-profile-activity-kpi-label">{{ m('Balance', 'Số dư', 'ยอดคงเหลือ') }}</span>
           <strong class="or-profile-activity-kpi-value">{{ formatCredits(credits) }}</strong>
         </div>
         <div class="or-profile-activity-kpi-item">
-          <span class="or-profile-activity-kpi-label">{{ isVi ? 'Đơn nạp' : 'Top-ups' }}</span>
+          <span class="or-profile-activity-kpi-label">{{ m('Top-ups', 'Đơn nạp', 'การเติมเงิน') }}</span>
           <strong class="or-profile-activity-kpi-value">{{ topupOrders.length }}</strong>
         </div>
       </div>
       <OverviewRecentTopups
         :orders="topupOrders"
         :loading="ordersLoading"
-        :is-vi="isVi"
+        :locale="locale"
         :prefix="prefix"
       />
     </section>
@@ -141,61 +151,63 @@ defineExpose({ reload });
       <div class="or-profile-section-head or-profile-section-head--panel">
         <div>
           <h2 class="or-profile-section-title or-profile-section-title--lg">
-            {{ isVi ? 'API access' : 'API access' }}
+            {{ m('API access', 'API access', 'การเข้าถึง API') }}
           </h2>
           <p class="or-profile-section-sub">
             {{
-              isVi
-                ? 'Bearer token cho /gateway/* — snippet, health check và MCP trên trang Access token.'
-                : 'Bearer token for /gateway/* — snippets, health checks, and MCP on the Access token page.'
+              m(
+                'Bearer token for /gateway/* — snippets, health checks, and MCP on the Access token page.',
+                'Bearer token cho /gateway/* — snippet, health check và MCP trên trang Access token.',
+                'Bearer token สำหรับ /gateway/* — snippet, health check และ MCP ในหน้า Access token',
+              )
             }}
           </p>
         </div>
         <a :href="tokenHref" class="or-app-btn or-app-btn-primary or-app-btn-sm">
-          {{ isVi ? 'Access token' : 'Access token' }} →
+          {{ m('Access token', 'Access token', 'Access token') }} →
         </a>
       </div>
       <div class="or-app-token-row">
         <code class="or-app-token-value">{{ maskedToken }}</code>
         <button type="button" class="or-app-btn or-app-btn-ghost" @click="emit('copyToken')">
-          {{ copied ? (isVi ? 'Đã copy' : 'Copied') : isVi ? 'Copy' : 'Copy' }}
+          {{ copied ? m('Copied', 'Đã copy', 'คัดลอกแล้ว') : m('Copy', 'Copy', 'คัดลอก') }}
         </button>
       </div>
       <div class="or-profile-api-actions">
         <a :href="authDocsHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
-          {{ isVi ? 'Tài liệu auth' : 'Auth docs' }}
+          {{ m('Auth docs', 'Tài liệu auth', 'เอกสาร auth') }}
         </a>
       </div>
     </section>
 
     <section id="profile-account" class="or-profile-section or-profile-section-card">
       <h2 class="or-profile-section-title or-profile-section-title--lg">
-        {{ isVi ? 'Chi tiết tài khoản' : 'Account details' }}
+        {{ m('Account details', 'Chi tiết tài khoản', 'รายละเอียดบัญชี') }}
       </h2>
       <p class="or-profile-section-sub">
-        {{ isVi ? 'Thông tin Gommo từ /ai/me (read-only).' : 'Gommo account info from /ai/me (read-only).' }}
+        {{ m('Gommo account info from /ai/me (read-only).', 'Thông tin Gommo từ /ai/me (read-only).', 'ข้อมูลบัญชี Gommo จาก /ai/me (read-only)') }}
       </p>
       <dl class="or-app-profile-dl or-profile-account-dl">
         <div class="or-app-profile-row">
-          <dt>{{ isVi ? 'Email' : 'Email' }}</dt>
+          <dt>{{ m('Email', 'Email', 'อีเมล') }}</dt>
           <dd>{{ email || '—' }}</dd>
         </div>
         <div class="or-app-profile-row">
-          <dt>{{ isVi ? 'Username' : 'Username' }}</dt>
+          <dt>{{ m('Username', 'Username', 'ชื่อผู้ใช้') }}</dt>
           <dd>{{ username || '—' }}</dd>
         </div>
         <div class="or-app-profile-row">
-          <dt>{{ isVi ? 'Tên hiển thị' : 'Display name' }}</dt>
+          <dt>{{ m('Display name', 'Tên hiển thị', 'ชื่อที่แสดง') }}</dt>
           <dd>{{ displayName }}</dd>
         </div>
         <div class="or-app-profile-row">
-          <dt>{{ isVi ? 'Domain Gommo' : 'Gommo domain' }}</dt>
+          <dt>{{ m('Gommo domain', 'Domain Gommo', 'โดเมน Gommo') }}</dt>
           <dd><code>{{ loginDomain }}</code></dd>
         </div>
       </dl>
       <div class="or-profile-account-actions">
         <a :href="creditsHref" class="or-app-btn or-app-btn-primary or-app-btn-sm">
-          {{ isVi ? 'Nạp credits' : 'Top up credits' }}
+          {{ m('Top up credits', 'Nạp credits', 'เติมเครดิต') }}
         </a>
       </div>
     </section>

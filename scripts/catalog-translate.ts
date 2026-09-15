@@ -1,24 +1,34 @@
 #!/usr/bin/env tsx
 /**
- * Warm cache/catalog-descriptions.en.json from live Gommo catalog.
+ * Warm catalog description cache from live Gommo catalog.
  * Uses Gommo chat (GOMMO_ACCESS_TOKEN) — no OpenRouter key required.
  * Optional fallback: OPENROUTER_API_KEY / CATALOG_TRANSLATE_API_KEY.
  *
- * Usage: npm run catalog:translate
+ * Usage:
+ *   npm run catalog:translate          # EN → cache/catalog-descriptions.en.json
+ *   npm run catalog:translate-th       # TH → cache/catalog-descriptions.th.json
  */
 import 'dotenv/config';
 import path from 'node:path';
 import { config, isGommoMerchantConfigured } from '../src/config.js';
 import { fetchModelsCatalog } from '../src/services/gommoClient.js';
 import {
+  descriptionCachePathForLocale,
   getCachedEnglish,
+  getCachedLocaleText,
   hashDescription,
   loadDescriptionCache,
+  loadDescriptionCacheForLocale,
   queueCacheUpdates,
+  queueCacheUpdatesForLocale,
   type DescriptionCacheEntry,
 } from '../src/services/catalogDescriptionCache.js';
 import { looksVietnamese, modelDescriptionVi } from '../src/services/catalogLang.js';
-import { isCatalogTranslateConfigured, translateDescriptionsBatch } from '../src/services/catalogTranslate.js';
+import {
+  isCatalogTranslateConfigured,
+  translateDescriptionsBatch,
+  type CatalogTranslateTarget,
+} from '../src/services/catalogTranslate.js';
 import { modelSlug, parseModelsList, type JobType } from '../src/types/gommo.js';
 
 const JOB_TYPES: JobType[] = [
@@ -35,7 +45,15 @@ const JOB_TYPES: JobType[] = [
   'video-cut',
 ];
 
+function parseTargetLocale(): CatalogTranslateTarget {
+  const arg = process.argv.find((a) => a.startsWith('--lang='));
+  const raw = arg?.split('=')[1]?.toLowerCase();
+  return raw === 'th' ? 'th' : 'en';
+}
+
 async function main() {
+  const target = parseTargetLocale();
+
   if (!isCatalogTranslateConfigured()) {
     console.error('Set GOMMO_ACCESS_TOKEN (+ GOMMO_API_DOMAIN) in .env');
     console.error('Optional fallback: OPENROUTER_API_KEY or CATALOG_TRANSLATE_API_KEY');
@@ -43,9 +61,12 @@ async function main() {
   }
 
   const provider = isGommoMerchantConfigured() ? 'Gommo chat' : 'OpenRouter';
+  const cacheFile = descriptionCachePathForLocale(target);
   console.log(`Translate provider: ${provider}`);
+  console.log(`Target locale: ${target} → ${path.relative(process.cwd(), cacheFile)}`);
 
-  const cache = await loadDescriptionCache();
+  const cache =
+    target === 'th' ? await loadDescriptionCacheForLocale('th') : await loadDescriptionCache();
   const pending: Array<{ slug: string; text: string }> = [];
   const seen = new Set<string>();
 
@@ -58,7 +79,7 @@ async function main() {
       if (!slug || !vi || seen.has(slug)) continue;
       seen.add(slug);
 
-      if (!looksVietnamese(vi)) {
+      if (target === 'en' && !looksVietnamese(vi)) {
         if (!getCachedEnglish(cache, slug, vi)) {
           cache[slug] = {
             hash: hashDescription(vi),
@@ -69,7 +90,12 @@ async function main() {
         continue;
       }
 
-      if (getCachedEnglish(cache, slug, vi)) continue;
+      const cached =
+        target === 'en'
+          ? getCachedEnglish(cache, slug, vi)
+          : getCachedLocaleText(cache, slug, vi, 'th');
+      if (cached) continue;
+
       pending.push({ slug, text: vi });
     }
   }
@@ -77,30 +103,36 @@ async function main() {
   console.log(`Cache hits: ${seen.size - pending.length}, to translate: ${pending.length}`);
 
   if (!pending.length) {
-    await queueCacheUpdates({});
-    console.log(`Done — cache file: ${path.relative(process.cwd(), config.catalog.descriptionCacheFile)}`);
+    if (target === 'en') await queueCacheUpdates({});
+    else await queueCacheUpdatesForLocale('th', {});
+    console.log(`Done — cache file: ${path.relative(process.cwd(), cacheFile)}`);
     return;
   }
 
-  const translated = await translateDescriptionsBatch(pending);
+  const translated = await translateDescriptionsBatch(pending, target);
   const updates: Record<string, DescriptionCacheEntry> = {};
   const now = new Date().toISOString();
   let ok = 0;
 
   for (const item of pending) {
-    const en = translated[item.slug];
-    if (!en) {
+    const text = translated[item.slug];
+    if (!text) {
       console.warn(`  skip (no translation): ${item.slug}`);
       continue;
     }
-    updates[item.slug] = { hash: hashDescription(item.text), en, updatedAt: now };
+    updates[item.slug] = {
+      hash: hashDescription(item.text),
+      ...(target === 'en' ? { en: text } : { th: text }),
+      updatedAt: now,
+    };
     ok++;
   }
 
   Object.assign(cache, updates);
-  await queueCacheUpdates(updates);
+  if (target === 'en') await queueCacheUpdates(updates);
+  else await queueCacheUpdatesForLocale('th', updates);
 
-  console.log(`Translated ${ok}/${pending.length} → ${config.catalog.descriptionCacheFile}`);
+  console.log(`Translated ${ok}/${pending.length} → ${cacheFile}`);
 }
 
 main().catch((err) => {

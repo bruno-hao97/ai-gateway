@@ -1,4 +1,5 @@
 import { playgroundAppPath, type LocalePrefix } from './gateway-base';
+import { pickMsg, resolveLabelLocale, type PortalLocale } from './portal-locale';
 
 export const JOB_TYPES = [
   { id: 'image', label: 'Image', group: 'media' as const },
@@ -128,19 +129,39 @@ export function providerInitials(provider: string): string {
   return p.slice(0, 2).toUpperCase();
 }
 
-export function formatRelativeTime(ts: number, isVi = false): string {
+export function formatRelativeTime(ts: number, localeOrVi: CatalogLang | boolean = false): string {
   if (!ts) return '';
+  const locale =
+    typeof localeOrVi === 'boolean' ? (localeOrVi ? 'vi' : 'en') : localeOrVi;
   const diff = Date.now() - ts;
   const sec = Math.floor(diff / 1000);
-  if (sec < 60) return isVi ? 'vừa xong' : 'just now';
+  if (sec < 60) {
+    if (locale === 'vi') return 'vừa xong';
+    if (locale === 'th') return 'เมื่อกี้';
+    return 'just now';
+  }
   const min = Math.floor(sec / 60);
-  if (min < 60) return isVi ? `${min} phút trước` : `${min}m ago`;
+  if (min < 60) {
+    if (locale === 'vi') return `${min} phút trước`;
+    if (locale === 'th') return `${min} นาทีที่แล้ว`;
+    return `${min}m ago`;
+  }
   const hr = Math.floor(min / 60);
-  if (hr < 48) return isVi ? `${hr} giờ trước` : `${hr}h ago`;
+  if (hr < 48) {
+    if (locale === 'vi') return `${hr} giờ trước`;
+    if (locale === 'th') return `${hr} ชม. ที่แล้ว`;
+    return `${hr}h ago`;
+  }
   const day = Math.floor(hr / 24);
-  if (day < 30) return isVi ? `${day} ngày trước` : `${day}d ago`;
+  if (day < 30) {
+    if (locale === 'vi') return `${day} ngày trước`;
+    if (locale === 'th') return `${day} วันที่แล้ว`;
+    return `${day}d ago`;
+  }
   const mo = Math.floor(day / 30);
-  return isVi ? `${mo} tháng trước` : `${mo}mo ago`;
+  if (locale === 'vi') return `${mo} tháng trước`;
+  if (locale === 'th') return `${mo} เดือนที่แล้ว`;
+  return `${mo}mo ago`;
 }
 
 export type SortKey =
@@ -164,6 +185,7 @@ export interface CatalogModel {
   durations: string[];
   descriptionVi: string;
   descriptionEn: string;
+  descriptionTh: string;
   provider: string;
   credits: number | null;
   creditsLabel: string;
@@ -208,7 +230,7 @@ export function looksVietnamese(text: string): boolean {
   return /\b(chuyên|cho|các|tác vụ|tạo|thế hệ|hỗ trợ|model là|bước tiến)\b/i.test(t);
 }
 
-function pickDescriptionFields(m: Record<string, unknown>): { vi: string; en: string } {
+function pickDescriptionFields(m: Record<string, unknown>): { vi: string; en: string; th: string } {
   const vi = String(m.description || m.desc || m.summary || m.intro || '').trim();
   const en = String(
     m.description_en ||
@@ -219,13 +241,16 @@ function pickDescriptionFields(m: Record<string, unknown>): { vi: string; en: st
       m.descEn ||
       '',
   ).trim();
+  const th = String(
+    m.description_th || m.desc_th || m.summary_th || m.descriptionTh || m.descTh || '',
+  ).trim();
 
-  if (en) return { vi, en };
+  if (en || th) return { vi, en, th };
 
   const html = stripHtml(String(m.content_html || m.content_html_en || ''));
-  if (html && !looksVietnamese(html)) return { vi, en: html };
+  if (html && !looksVietnamese(html)) return { vi, en: html, th: '' };
 
-  return { vi, en: '' };
+  return { vi, en: '', th: '' };
 }
 
 export function modelCatalogUnavailable(m: CatalogModel): boolean {
@@ -238,15 +263,20 @@ export function modelCatalogUnavailable(m: CatalogModel): boolean {
   return msg.includes('không khả dụng') || msg.includes('not available');
 }
 
-export function modelUnavailableSuffix(m: CatalogModel, isVi: boolean): string {
+export function modelUnavailableSuffix(
+  m: CatalogModel,
+  localeOrVi: PortalLocale | boolean,
+): string {
   if (!modelCatalogUnavailable(m)) return '';
-  return isVi ? ' · tạm ngưng' : ' · unavailable';
+  const locale = resolveLabelLocale(localeOrVi);
+  return pickMsg(locale, ' · unavailable', ' · tạm ngưng', ' · ไม่พร้อมใช้');
 }
 
-/** Locale-aware catalog description (EN from gateway cache / translate). */
-export function modelDescription(m: CatalogModel, isVi: boolean): string {
-  if (isVi) return m.descriptionVi || m.descriptionEn;
-  return m.descriptionEn || m.descriptionVi || '';
+/** Locale-aware catalog description (EN/TH from gateway cache). */
+export function modelDescription(m: CatalogModel, lang: CatalogLang): string {
+  if (lang === 'vi') return m.descriptionVi || m.descriptionEn || m.descriptionTh;
+  if (lang === 'th') return m.descriptionTh || m.descriptionEn || '';
+  return m.descriptionEn || m.descriptionVi || m.descriptionTh || '';
 }
 
 function mergeCatalogModels(a: CatalogModel, b: CatalogModel): CatalogModel {
@@ -259,6 +289,7 @@ function mergeCatalogModels(a: CatalogModel, b: CatalogModel): CatalogModel {
     ...primary,
     descriptionVi: primary.descriptionVi || secondary.descriptionVi,
     descriptionEn: primary.descriptionEn || secondary.descriptionEn,
+    descriptionTh: primary.descriptionTh || secondary.descriptionTh,
     ratios: uniqStrings([...primary.ratios, ...secondary.ratios]),
     modes: uniqStrings([...primary.modes, ...secondary.modes]),
     resolutions: uniqStrings([...primary.resolutions, ...secondary.resolutions]),
@@ -469,7 +500,7 @@ export function normalizeCatalogModel(
   const slug = modelSlug(m);
   if (!slug) return null;
   const { credits, label } = parseCredits(m);
-  const { vi, en } = pickDescriptionFields(m);
+  const { vi, en, th } = pickDescriptionFields(m);
   const modes = uniqStrings([
     ...pickCatalogOptionList(m, 'modes', 'mode').map((o) => o.value),
     ...pickModesFromPrices(m),
@@ -485,6 +516,7 @@ export function normalizeCatalogModel(
     durations: pickCatalogOptionList(m, 'durations', 'duration').map((o) => o.value),
     descriptionVi: vi,
     descriptionEn: en,
+    descriptionTh: th,
     provider: String(m.provider || m.server || m.vendor || m.brand || '').trim(),
     credits,
     creditsLabel: label,
@@ -501,7 +533,7 @@ export function gatewayBaseUrl(): string {
   return 'https://api.yourdomain.com';
 }
 
-export type CatalogLang = 'en' | 'vi';
+export type CatalogLang = 'en' | 'vi' | 'th';
 
 export async function fetchModelsForType(
   jobType: JobTypeId,
@@ -512,7 +544,7 @@ export async function fetchModelsForType(
 
   const base = gatewayBaseUrl();
   const params = new URLSearchParams({ type: jobType });
-  if (lang === 'en') params.set('lang', 'en');
+  if (lang === 'en' || lang === 'th') params.set('lang', lang);
   const res = await fetch(`${base}/gateway/models?${params}`, {
     headers: { Accept: 'application/json' },
   });
@@ -575,12 +607,16 @@ export function formatFieldList(values: string[]): string {
   return values.join(', ');
 }
 
-export function monthGroupLabel(ts: number, isVi = false): string {
-  if (!ts) return isVi ? 'Khác' : 'Other';
-  return new Date(ts).toLocaleDateString(isVi ? 'vi-VN' : 'en-US', {
-    month: 'long',
-    year: 'numeric',
-  });
+export function monthGroupLabel(ts: number, localeOrVi: CatalogLang | boolean = false): string {
+  const locale =
+    typeof localeOrVi === 'boolean' ? (localeOrVi ? 'vi' : 'en') : localeOrVi;
+  if (!ts) {
+    if (locale === 'vi') return 'Khác';
+    if (locale === 'th') return 'อื่นๆ';
+    return 'Other';
+  }
+  const tag = locale === 'vi' ? 'vi-VN' : locale === 'th' ? 'th-TH' : 'en-US';
+  return new Date(ts).toLocaleDateString(tag, { month: 'long', year: 'numeric' });
 }
 
 export interface ComparePreset {
@@ -642,9 +678,9 @@ export interface CompareRow {
   diff?: boolean;
 }
 
-export function buildCompareRows(a: CatalogModel, b: CatalogModel, isVi: boolean): CompareRow[] {
-  const L = (en: string, vi: string) => (isVi ? vi : en);
-  const desc = (m: CatalogModel) => modelDescription(m, isVi) || '—';
+export function buildCompareRows(a: CatalogModel, b: CatalogModel, lang: CatalogLang): CompareRow[] {
+  const L = (en: string, vi: string) => (lang === 'vi' ? vi : en);
+  const desc = (m: CatalogModel) => modelDescription(m, lang) || '—';
   const mods = (m: CatalogModel) =>
     modelInputModalities(m)
       .map((id) => INPUT_MODALITIES.find((x) => x.id === id)?.label ?? id)
@@ -736,8 +772,8 @@ export function buildCompareRows(a: CatalogModel, b: CatalogModel, isVi: boolean
       key: 'added',
       labelEn: 'Added',
       labelVi: 'Thêm',
-      valueA: formatRelativeTime(a.sortDate, isVi) || '—',
-      valueB: formatRelativeTime(b.sortDate, isVi) || '—',
+      valueA: formatRelativeTime(a.sortDate, lang) || '—',
+      valueB: formatRelativeTime(b.sortDate, lang) || '—',
     },
     {
       key: 'slug',

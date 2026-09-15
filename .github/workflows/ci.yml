@@ -36,3 +36,6 @@ jobs:
 
       - name: BYOK production guard tests
         run: npm run test:byok
+
+      - name: Gommo language helper tests
+        run: npm run test:gommoLanguage

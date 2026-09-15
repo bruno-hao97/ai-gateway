@@ -1,13 +1,20 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref } from 'vue';
+import { usePortalCopy } from '../composables/use-portal-copy';
 import type { ChatMessageMeta } from '../models/chat-storage';
 import { hasMessageMetaDetails } from '../models/chat-models';
+import type { PortalLocale } from '../models/portal-locale';
 import ChatMetaPanel from './ChatMetaPanel.vue';
 
 const props = defineProps<{
   meta?: ChatMessageMeta;
+  locale?: PortalLocale;
   isVi?: boolean;
 }>();
+
+const { m } = usePortalCopy(
+  computed(() => props.locale ?? (props.isVi ? 'vi' : 'en')),
+);
 
 const triggerRef = ref<HTMLElement | null>(null);
 const visible = ref(false);
@@ -75,7 +82,7 @@ onUnmounted(() => {
       class="or-chat-msg-toolbar-meta"
       :class="{ 'is-active': visible }"
       :tabindex="canHover ? 0 : -1"
-      :aria-label="isVi ? 'Metadata — di chuột để xem chi tiết' : 'Metadata — hover for details'"
+      :aria-label="m('Metadata — hover for details', 'Metadata — di chuột để xem chi tiết', 'เมทาดาทา — วางเมาส์เพื่อดูรายละเอียด')"
     >
       <slot />
     </button>
@@ -87,7 +94,7 @@ onUnmounted(() => {
         @mouseenter="cancelClose"
         @mouseleave="scheduleClose"
       >
-        <ChatMetaPanel :meta="meta" :is-vi="isVi" :title="isVi ? 'Metadata' : 'Metadata'" />
+        <ChatMetaPanel :meta="meta" :locale="locale" :title="m('Metadata', 'Metadata', 'เมทาดาทา')" />
       </div>
     </Teleport>
   </span>

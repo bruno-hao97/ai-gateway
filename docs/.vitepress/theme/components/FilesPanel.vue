@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { usePortalCopy } from '../composables/use-portal-copy';
 import { uploadChatImage, uploadChatVideo, isImageUploadFile, isVideoUploadFile } from '../models/chat-api';
 import { playgroundAppPath } from '../models/gateway-base';
+import type { PortalLocale } from '../models/portal-locale';
 import {
   fetchAlbumLibrary,
   jobFieldsSnippet,
@@ -12,9 +14,11 @@ import {
 } from '../models/library-api';
 
 const props = defineProps<{
-  isVi: boolean;
+  locale: PortalLocale;
   prefix: string;
 }>();
+
+const { m } = usePortalCopy(computed(() => props.locale));
 
 type FilesFilter = 'images' | 'videos' | 'uploads';
 
@@ -31,7 +35,7 @@ const copiedFieldsId = ref('');
 const fileInputRef = ref<HTMLInputElement | null>(null);
 
 const playgroundHref = computed(() =>
-  playgroundAppPath(props.prefix as '' | '/vi', {
+  playgroundAppPath(props.prefix as '' | '/vi' | '/th', {
     type: filter.value === 'videos' ? 'video' : 'image',
   }),
 );
@@ -51,7 +55,7 @@ const visibleItems = computed(() => {
 
 const itemCountLabel = computed(() => {
   const n = visibleItems.value.length;
-  return props.isVi ? `${n} mục` : `${n} item${n === 1 ? '' : 's'}`;
+  return m(`${n} item${n === 1 ? '' : 's'}`, `${n} mục`, `${n} รายการ`);
 });
 
 const acceptUpload = computed(() => {
@@ -65,7 +69,9 @@ function formatCreated(value: string): string {
   const ms = /^\d+$/.test(value) ? Number(value) : Date.parse(value);
   if (!Number.isFinite(ms)) return '';
   const d = ms < 1e12 ? ms * 1000 : ms;
-  return new Date(d).toLocaleString(props.isVi ? 'vi-VN' : undefined, {
+  const dateLocale =
+    props.locale === 'vi' ? 'vi-VN' : props.locale === 'th' ? 'th-TH' : undefined;
+  return new Date(d).toLocaleString(dateLocale, {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
@@ -121,11 +127,11 @@ async function onFilePicked(event: Event) {
   const isVideo =
     filter.value === 'videos' || (filter.value === 'uploads' && isVideoUploadFile(file));
   if (isVideo && !isVideoUploadFile(file)) {
-    uploadError.value = props.isVi ? 'Chọn file video.' : 'Pick a video file.';
+    uploadError.value = m('Pick a video file.', 'Chọn file video.', 'เลือกไฟล์วิดีโอ');
     return;
   }
   if (!isVideo && !isImageUploadFile(file)) {
-    uploadError.value = props.isVi ? 'Chọn file ảnh.' : 'Pick an image file.';
+    uploadError.value = m('Pick an image file.', 'Chọn file ảnh.', 'เลือกไฟล์รูปภาพ');
     return;
   }
 
@@ -140,7 +146,11 @@ async function onFilePicked(event: Event) {
     ].slice(0, 24);
     saveRecentUploads(uploadItems.value);
     filter.value = 'uploads';
-    uploadSuccess.value = props.isVi ? 'Upload thành công — URL đã sẵn sàng.' : 'Upload complete — URL is ready.';
+    uploadSuccess.value = m(
+      'Upload complete — URL is ready.',
+      'Upload thành công — URL đã sẵn sàng.',
+      'อัปโหลดสำเร็จ — URL พร้อมใช้งาน',
+    );
   } catch (e) {
     uploadError.value = e instanceof Error ? e.message : String(e);
   } finally {
@@ -158,7 +168,7 @@ async function copyUrl(item: LibraryFileItem) {
       copiedId.value = '';
     }, 2000);
   } catch {
-    uploadError.value = props.isVi ? 'Không copy được URL' : 'Could not copy URL';
+    uploadError.value = m('Could not copy URL', 'Không copy được URL', 'ไม่สามารถคัดลอก URL');
   }
 }
 
@@ -172,7 +182,7 @@ async function copyJobFields(item: LibraryFileItem) {
       copiedFieldsId.value = '';
     }, 2000);
   } catch {
-    uploadError.value = props.isVi ? 'Không copy được snippet' : 'Could not copy snippet';
+    uploadError.value = m('Could not copy snippet', 'Không copy được snippet', 'ไม่สามารถคัดลอก snippet');
   }
 }
 
@@ -195,7 +205,7 @@ defineExpose({ reload });
 <template>
   <div class="or-files-page">
     <div class="or-files-toolbar">
-      <div class="or-files-filters" role="tablist" aria-label="File type">
+      <div class="or-files-filters" role="tablist" :aria-label="m('File type', 'Loại file', 'ประเภทไฟล์')">
         <button
           type="button"
           role="tab"
@@ -204,7 +214,7 @@ defineExpose({ reload });
           :aria-selected="filter === 'images'"
           @click="setFilter('images')"
         >
-          {{ isVi ? 'Ảnh' : 'Images' }}
+          {{ m('Images', 'Ảnh', 'รูปภาพ') }}
         </button>
         <button
           type="button"
@@ -214,7 +224,7 @@ defineExpose({ reload });
           :aria-selected="filter === 'videos'"
           @click="setFilter('videos')"
         >
-          {{ isVi ? 'Video' : 'Videos' }}
+          {{ m('Videos', 'Video', 'วิดีโอ') }}
         </button>
         <button
           type="button"
@@ -224,7 +234,7 @@ defineExpose({ reload });
           :aria-selected="filter === 'uploads'"
           @click="setFilter('uploads')"
         >
-          {{ isVi ? 'Upload gần đây' : 'Recent uploads' }}
+          {{ m('Recent uploads', 'Upload gần đây', 'อัปโหลดล่าสุด') }}
         </button>
       </div>
       <div class="or-files-toolbar-actions">
@@ -234,7 +244,7 @@ defineExpose({ reload });
           :disabled="loading || filter === 'uploads'"
           @click="reload"
         >
-          {{ loading ? (isVi ? 'Đang tải…' : 'Loading…') : isVi ? 'Làm mới' : 'Refresh' }}
+          {{ loading ? m('Loading…', 'Đang tải…', 'กำลังโหลด…') : m('Refresh', 'Làm mới', 'รีเฟรช') }}
         </button>
         <button
           type="button"
@@ -242,7 +252,7 @@ defineExpose({ reload });
           :disabled="uploading"
           @click="openUploadPicker"
         >
-          {{ uploading ? (isVi ? 'Đang upload…' : 'Uploading…') : isVi ? 'Upload' : 'Upload' }}
+          {{ uploading ? m('Uploading…', 'Đang upload…', 'กำลังอัปโหลด…') : m('Upload', 'Upload', 'อัปโหลด') }}
         </button>
         <input
           ref="fileInputRef"
@@ -276,25 +286,29 @@ defineExpose({ reload });
           </svg>
         </div>
         <p class="or-files-empty-title">
-          {{ isVi ? 'Chưa có file ở đây!' : 'No files here yet!' }}
+          {{ m('No files here yet!', 'Chưa có file ở đây!', 'ยังไม่มีไฟล์ที่นี่!') }}
         </p>
         <p class="or-files-empty-sub">
           {{
             filter === 'uploads'
-              ? isVi
-                ? 'Upload ảnh hoặc video — file xuất hiện trong tab Upload gần đây.'
-                : 'Upload an image or video — files appear under Recent uploads.'
-              : isVi
-                ? 'Upload asset mới hoặc tạo job trong Playground để thấy album Gommo.'
-                : 'Upload a new asset or run jobs in Playground to populate your Gommo album.'
+              ? m(
+                  'Upload an image or video — files appear under Recent uploads.',
+                  'Upload ảnh hoặc video — file xuất hiện trong tab Upload gần đây.',
+                  'อัปโหลดรูปหรือวิดีโอ — ไฟล์จะแสดงในแท็บอัปโหลดล่าสุด',
+                )
+              : m(
+                  'Upload a new asset or run jobs in Playground to populate your Gommo album.',
+                  'Upload asset mới hoặc tạo job trong Playground để thấy album Gommo.',
+                  'อัปโหลด asset ใหม่หรือรันงานใน Playground เพื่อเติม album Gommo',
+                )
           }}
         </p>
         <div class="or-files-empty-actions">
           <button type="button" class="or-app-btn or-app-btn-primary" @click="openUploadPicker">
-            {{ isVi ? 'Upload file' : 'Upload file' }}
+            {{ m('Upload file', 'Upload file', 'อัปโหลดไฟล์') }}
           </button>
           <a :href="playgroundHref" class="or-app-btn or-app-btn-ghost">
-            {{ isVi ? 'Mở Playground' : 'Open Playground' }}
+            {{ m('Open Playground', 'Mở Playground', 'เปิดสนามทดลอง') }}
           </a>
         </div>
       </div>
@@ -320,7 +334,7 @@ defineExpose({ reload });
               loading="lazy"
             />
             <div v-else class="or-files-thumb or-files-thumb--video">
-              <span>{{ isVi ? 'Video' : 'Video' }}</span>
+              <span>{{ m('Video', 'Video', 'วิดีโอ') }}</span>
             </div>
           </a>
           <div v-else class="or-files-thumb-wrap">
@@ -343,29 +357,21 @@ defineExpose({ reload });
               >
                 {{
                   copiedId === itemKey(item)
-                    ? isVi
-                      ? 'Đã copy'
-                      : 'Copied'
-                    : isVi
-                      ? 'Copy URL'
-                      : 'Copy URL'
+                    ? m('Copied', 'Đã copy', 'คัดลอกแล้ว')
+                    : m('Copy URL', 'Copy URL', 'คัดลอก URL')
                 }}
               </button>
               <button
                 type="button"
                 class="or-files-card-btn"
                 :disabled="!item.mediaUrl && !item.thumbnailUrl"
-                :title="isVi ? 'JSON fields cho POST /gateway/jobs/*' : 'JSON fields for POST /gateway/jobs/*'"
+                :title="m('JSON fields for POST /gateway/jobs/*', 'JSON fields cho POST /gateway/jobs/*', 'JSON fields สำหรับ POST /gateway/jobs/*')"
                 @click="copyJobFields(item)"
               >
                 {{
                   copiedFieldsId === itemKey(item)
-                    ? isVi
-                      ? 'Đã copy'
-                      : 'Copied'
-                    : isVi
-                      ? 'Copy fields'
-                      : 'Copy fields'
+                    ? m('Copied', 'Đã copy', 'คัดลอกแล้ว')
+                    : m('Copy fields', 'Copy fields', 'คัดลอก fields')
                 }}
               </button>
               <a
@@ -375,7 +381,7 @@ defineExpose({ reload });
                 rel="noopener noreferrer"
                 class="or-files-card-btn or-files-card-btn--link"
               >
-                {{ isVi ? 'Mở' : 'Open' }}
+                {{ m('Open', 'Mở', 'เปิด') }}
               </a>
             </div>
           </div>
@@ -387,23 +393,25 @@ defineExpose({ reload });
 
     <div class="or-files-quicklinks">
       <a :href="playgroundHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
-        {{ isVi ? 'Playground' : 'Playground' }} →
+        {{ m('Playground', 'Playground', 'สนามทดลอง') }} →
       </a>
       <a :href="`${prefix}/app/token/`" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
-        {{ isVi ? 'Access token' : 'Access token' }} →
+        {{ m('Access token', 'Access token', 'Access token') }} →
       </a>
       <a :href="`${prefix}/features/upload`" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
-        {{ isVi ? 'Upload docs' : 'Upload docs' }} →
+        {{ m('Upload docs', 'Upload docs', 'เอกสารอัปโหลด') }} →
       </a>
     </div>
 
     <p class="or-app-muted or-files-footnote">
       {{
-        isVi
-          ? 'Album Gommo từ library API; upload gần đây lưu localStorage trên trình duyệt này.'
-          : 'Gommo album from library API; recent uploads persist in this browser’s localStorage.'
+        m(
+          "Gommo album from library API; recent uploads persist in this browser's localStorage.",
+          'Album Gommo từ library API; upload gần đây lưu localStorage trên trình duyệt này.',
+          'Album Gommo จาก library API; อัปโหลดล่าสุดเก็บใน localStorage ของเบราว์เซอร์นี้',
+        )
       }}
-      <a :href="`${prefix}/reference/gommo-public-api`">{{ isVi ? 'Gommo library API' : 'Gommo library API' }}</a>
+      <a :href="`${prefix}/reference/gommo-public-api`">{{ m('Gommo library API', 'Gommo library API', 'Gommo library API') }}</a>
     </p>
   </div>
 </template>

@@ -1,4 +1,7 @@
 import type { InvoiceBuyer } from './user-api';
+import { pickMsg, type PortalLocale } from './portal-locale';
+
+type BillingLocale = PortalLocale;
 
 export type InvoiceTab = 'consumer' | 'personal' | 'company';
 
@@ -62,21 +65,34 @@ export function formatApproxUsd(amountVnd: number): string {
   return `~${formatted}`;
 }
 
+function normalizeBillingLocale(localeOrVi: BillingLocale | boolean): BillingLocale {
+  if (typeof localeOrVi === 'boolean') return localeOrVi ? 'vi' : 'en';
+  return localeOrVi;
+}
+
 /** 79ai /prices footer: total incl. 5% VAT. */
-export function formatPayTotalLine(amountVnd: number, isVi: boolean): string {
+export function formatPayTotalLine(amountVnd: number, localeOrVi: BillingLocale | boolean): string {
+  const locale = normalizeBillingLocale(localeOrVi);
   const totalVnd = calcBillingTotals(amountVnd).totalVnd;
-  const formatted = totalVnd.toLocaleString(isVi ? 'vi-VN' : 'en-US');
-  return isVi ? `Thanh toán ${formatted}đ VAT 5%` : `Pay ${formatted}đ incl. 5% VAT`;
+  const formatted = totalVnd.toLocaleString(locale === 'vi' ? 'vi-VN' : 'en-US');
+  if (locale === 'vi') return `Thanh toán ${formatted}đ VAT 5%`;
+  if (locale === 'th') return `ชำระ ${formatted}đ รวม VAT 5%`;
+  return `Pay ${formatted}đ incl. 5% VAT`;
 }
 
-export function billingCurrencyDisclaimer(isVi: boolean): string {
-  return isVi
-    ? ''
-    : 'USD amounts are approximate. You will be charged in Vietnamese đồng (VND) via bank transfer.';
+export function billingCurrencyDisclaimer(localeOrVi: BillingLocale | boolean): string {
+  const locale = normalizeBillingLocale(localeOrVi);
+  if (locale === 'vi') return '';
+  if (locale === 'th') {
+    return 'ยอด USD เป็นค่าประมาณ — เรียกเก็บเป็นดองเวียด (VND) ผ่านการโอนเงิน';
+  }
+  return 'USD amounts are approximate. You will be charged in Vietnamese đồng (VND) via bank transfer.';
 }
 
-export function formatVnd(amount: number, isVi: boolean): string {
-  return `${amount.toLocaleString(isVi ? 'vi-VN' : 'en-US')}đ`;
+export function formatVnd(amount: number, localeOrVi: BillingLocale | boolean): string {
+  const locale = normalizeBillingLocale(localeOrVi);
+  const numLocale = locale === 'vi' ? 'vi-VN' : locale === 'th' ? 'th-TH' : 'en-US';
+  return `${amount.toLocaleString(numLocale)}đ`;
 }
 
 /** 79ai-style mask: `96247NFHR0` → `962****HR0` */
@@ -94,20 +110,24 @@ export function formatAccountDisplay(acc: string, _store?: string): string {
 /** Shorter note on payment step to avoid modal scroll. */
 export function formatInvoiceDeliveryNoteShort(
   buyer: InvoiceBuyer,
-  isVi: boolean,
+  localeOrVi: BillingLocale | boolean,
 ): string {
+  const locale = normalizeBillingLocale(localeOrVi);
   if (buyer.type === 'consumer') {
-    return isVi
-      ? 'Gửi tới: Bán cho người tiêu dùng — không gửi email'
-      : 'Recipient: Consumer — no email';
+    return pickMsg(
+      locale,
+      'Recipient: Consumer — no email',
+      'Gửi tới: Bán cho người tiêu dùng — không gửi email',
+      'ผู้รับ: ผู้บริโภค — ไม่ส่งอีเมล',
+    );
   }
   if (buyer.type === 'personal') {
     const parts = [buyer.name, buyer.national_id, buyer.email].filter(Boolean);
     const target = parts.join(' - ');
-    return isVi ? `Gửi tới: ${target}` : `Sent to: ${target}`;
+    return pickMsg(locale, `Sent to: ${target}`, `Gửi tới: ${target}`, `ส่งถึง: ${target}`);
   }
   const target = [buyer.name, buyer.tax_code, buyer.email].filter(Boolean).join(' - ');
-  return isVi ? `Gửi tới: ${target}` : `Sent to: ${target}`;
+  return pickMsg(locale, `Sent to: ${target}`, `Gửi tới: ${target}`, `ส่งถึง: ${target}`);
 }
 
 export function buildInvoiceBuyer(tab: InvoiceTab, form: InvoiceFormState): InvoiceBuyer {
@@ -145,31 +165,53 @@ export function buildInvoiceBuyer(tab: InvoiceTab, form: InvoiceFormState): Invo
 export function validateInvoiceForm(
   tab: InvoiceTab,
   form: InvoiceFormState,
-  isVi: boolean,
+  localeOrVi: BillingLocale | boolean,
 ): string | null {
+  const locale = normalizeBillingLocale(localeOrVi);
   if (tab === 'consumer') return null;
 
   if (tab === 'personal') {
-    if (!form.name.trim()) return isVi ? 'Vui lòng nhập họ và tên.' : 'Please enter your full name.';
-    if (!form.address.trim()) return isVi ? 'Vui lòng nhập địa chỉ.' : 'Please enter your address.';
-    if (!form.phone.trim()) return isVi ? 'Vui lòng nhập số điện thoại.' : 'Please enter your phone number.';
-    if (!form.email.trim()) return isVi ? 'Vui lòng nhập email.' : 'Please enter your email.';
+    if (!form.name.trim()) {
+      return pickMsg(locale, 'Please enter your full name.', 'Vui lòng nhập họ và tên.', 'กรุณากรอกชื่อ-นามสกุล');
+    }
+    if (!form.address.trim()) {
+      return pickMsg(locale, 'Please enter your address.', 'Vui lòng nhập địa chỉ.', 'กรุณากรอกที่อยู่');
+    }
+    if (!form.phone.trim()) {
+      return pickMsg(locale, 'Please enter your phone number.', 'Vui lòng nhập số điện thoại.', 'กรุณากรอกเบอร์โทร');
+    }
+    if (!form.email.trim()) {
+      return pickMsg(locale, 'Please enter your email.', 'Vui lòng nhập email.', 'กรุณากรอกอีเมล');
+    }
     if (!form.nationalId.trim()) {
-      return isVi ? 'Vui lòng nhập CCCD / CMND.' : 'Please enter your national ID.';
+      return pickMsg(locale, 'Please enter your national ID.', 'Vui lòng nhập CCCD / CMND.', 'กรุณากรอกเลขบัตรประชาชน');
     }
     return null;
   }
 
   if (!form.companyName.trim()) {
-    return isVi ? 'Vui lòng nhập tên công ty hoặc hộ kinh doanh.' : 'Please enter company name.';
+    return pickMsg(locale, 'Please enter company name.', 'Vui lòng nhập tên công ty hoặc hộ kinh doanh.', 'กรุณากรอกชื่อบริษัท');
   }
-  if (!form.taxCode.trim()) return isVi ? 'Vui lòng nhập mã số thuế.' : 'Please enter tax code.';
-  if (!form.address.trim()) return isVi ? 'Vui lòng nhập địa chỉ công ty.' : 'Please enter company address.';
+  if (!form.taxCode.trim()) {
+    return pickMsg(locale, 'Please enter tax code.', 'Vui lòng nhập mã số thuế.', 'กรุณากรอกเลขประจำตัวผู้เสียภาษี');
+  }
+  if (!form.address.trim()) {
+    return pickMsg(locale, 'Please enter company address.', 'Vui lòng nhập địa chỉ công ty.', 'กรุณากรอกที่อยู่บริษัท');
+  }
   if (!form.recipientName.trim()) {
-    return isVi ? 'Vui lòng nhập họ tên người nhận hóa đơn.' : 'Please enter invoice recipient name.';
+    return pickMsg(
+      locale,
+      'Please enter invoice recipient name.',
+      'Vui lòng nhập họ tên người nhận hóa đơn.',
+      'กรุณากรอกชื่อผู้รับใบแจ้งหนี้',
+    );
   }
-  if (!form.email.trim()) return isVi ? 'Vui lòng nhập email nhận hóa đơn.' : 'Please enter invoice email.';
-  if (!form.phone.trim()) return isVi ? 'Vui lòng nhập số điện thoại.' : 'Please enter phone number.';
+  if (!form.email.trim()) {
+    return pickMsg(locale, 'Please enter invoice email.', 'Vui lòng nhập email nhận hóa đơn.', 'กรุณากรอกอีเมลรับใบแจ้งหนี้');
+  }
+  if (!form.phone.trim()) {
+    return pickMsg(locale, 'Please enter phone number.', 'Vui lòng nhập số điện thoại.', 'กรุณากรอกเบอร์โทร');
+  }
   return null;
 }
 

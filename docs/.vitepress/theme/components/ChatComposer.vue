@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { usePortalCopy } from '../composables/use-portal-copy';
 import type { ChatModelOption } from '../models/chat-models';
 import { modelRequiresStream } from '../models/chat-models';
 import { readChatSettings, writeChatSettings, type ChatSettings } from '../models/chat-settings';
 import type { ChatAttachment } from '../models/chat-storage';
 import { attachmentBadgeLabel } from '../models/chat-attachment-label';
+import type { PortalLocale } from '../models/portal-locale';
 import ChatIcon from './ChatIcon.vue';
 
 type PlusTab = 'add' | 'options';
@@ -12,7 +14,8 @@ type PlusTab = 'add' | 'options';
 const props = defineProps<{
   input: string;
   streaming: boolean;
-  isVi: boolean;
+  locale?: PortalLocale;
+  isVi?: boolean;
   activeModel: ChatModelOption | null;
   pendingAttachments?: ChatAttachment[];
   jobRefs?: ChatAttachment[];
@@ -43,6 +46,10 @@ const emit = defineEmits<{
   clearAll: [];
   settingsChange: [settings: ChatSettings];
 }>();
+
+const { m, locale: copyLocale } = usePortalCopy(
+  computed(() => props.locale ?? (props.isVi ? 'vi' : 'en')),
+);
 
 const pendingAttachments = computed(() => props.pendingAttachments ?? []);
 const jobRefs = computed(() => props.jobRefs ?? []);
@@ -174,15 +181,15 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
   <footer ref="root" class="or-chat-composer-wrap">
     <div class="or-chat-composer-inner">
       <div v-if="imageGenMode" class="or-chat-composer-mode-hint">
-        <span>{{ isVi ? 'Tạo ảnh — chọn ref Job · Ảnh trong composer (tuỳ chọn)' : 'Image job — optional Job · Image refs in composer' }}</span>
+        <span>{{ m('Image job — optional Job · Image refs in composer', 'Tạo ảnh — chọn ref Job · Ảnh trong composer (tuỳ chọn)', 'งานภาพ — ref Job · ภาพใน composer (ไม่บังคับ)') }}</span>
         <button type="button" class="or-chat-composer-mode-exit" @click="emit('cancelImageGen')">×</button>
       </div>
       <div v-else-if="videoGenMode" class="or-chat-composer-mode-hint">
-        <span>{{ isVi ? 'Tạo video — ref Job · Ảnh/Video trong composer (tuỳ chọn)' : 'Video job — optional Job refs in composer' }}</span>
+        <span>{{ m('Video job — optional Job refs in composer', 'Tạo video — ref Job · Ảnh/Video trong composer (tuỳ chọn)', 'งานวิดีโอ — ref Job · ภาพ/วิดีโอใน composer (ไม่บังคับ)') }}</span>
         <button type="button" class="or-chat-composer-mode-exit" @click="emit('cancelVideoGen')">×</button>
       </div>
       <p v-else-if="isUploading" class="or-chat-composer-upload-hint">
-        {{ isVi ? 'Đang upload…' : 'Uploading…' }}
+        {{ m('Uploading…', 'Đang upload…', 'กำลังอัปโหลด…') }}
       </p>
       <div
         class="or-chat-composer-box"
@@ -192,7 +199,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
           v-if="mediaGenMode && (genAllowsImageRef || genAllowsVideoRef)"
           class="or-chat-composer-job-ref-actions"
         >
-          <span class="or-chat-composer-job-ref-label">{{ isVi ? 'Ref job' : 'Job ref' }}</span>
+          <span class="or-chat-composer-job-ref-label">{{ m('Job ref', 'Ref job', 'ref งาน') }}</span>
           <button
             v-if="genAllowsImageRef"
             type="button"
@@ -200,7 +207,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
             :disabled="streaming || isUploading"
             @click="emit('attachJobImageRef')"
           >
-            + {{ isVi ? 'Ảnh' : 'Image' }}
+            + {{ m('Image', 'Ảnh', 'ภาพ') }}
           </button>
           <button
             v-if="genAllowsVideoRef"
@@ -209,14 +216,14 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
             :disabled="streaming || isUploading"
             @click="emit('attachJobVideoRef')"
           >
-            + {{ isVi ? 'Video' : 'Video' }}
+            + {{ m('Video', 'Video', 'วิดีโอ') }}
           </button>
         </div>
         <p
           v-else-if="mediaGenMode && !genAllowsImageRef && !genAllowsVideoRef"
           class="or-chat-composer-job-ref-hint"
         >
-          {{ isVi ? 'Model này không hỗ trợ ref job.' : 'This model does not accept job references.' }}
+          {{ m('This model does not accept job references.', 'Model này không hỗ trợ ref job.', 'โมเดลนี้ไม่รองรับ ref งาน') }}
         </p>
 
         <div v-if="hasAnyStaging" class="or-chat-composer-previews">
@@ -225,7 +232,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
             :key="`pending-${i}-${att.url}`"
             class="or-chat-composer-preview-item"
           >
-            <span class="or-attach-badge is-chat">{{ attachmentBadgeLabel(att, isVi) }}</span>
+            <span class="or-attach-badge is-chat">{{ attachmentBadgeLabel(att, copyLocale) }}</span>
             <img
               v-if="att.type === 'image'"
               :src="att.url"
@@ -243,7 +250,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
             <button
               type="button"
               class="or-chat-composer-preview-remove"
-              :aria-label="isVi ? 'Gỡ đính kèm' : 'Remove attachment'"
+              :aria-label="m('Remove attachment', 'Gỡ đính kèm', 'ลบไฟล์แนบ')"
               :disabled="streaming || isUploading"
               @click="emit('removePending', i)"
             >
@@ -255,7 +262,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
             :key="`job-ref-${i}-${ref.url}`"
             class="or-chat-composer-preview-item"
           >
-            <span class="or-attach-badge is-job">{{ attachmentBadgeLabel(ref, isVi) }}</span>
+            <span class="or-attach-badge is-job">{{ attachmentBadgeLabel(ref, copyLocale) }}</span>
             <img
               v-if="ref.type === 'image'"
               :src="ref.url"
@@ -273,7 +280,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
             <button
               type="button"
               class="or-chat-composer-preview-remove"
-              :aria-label="isVi ? 'Gỡ ref job' : 'Remove job ref'"
+              :aria-label="m('Remove job ref', 'Gỡ ref job', 'ลบ ref งาน')"
               :disabled="streaming || isUploading"
               @click="emit('removeJobRef', i)"
             >
@@ -290,7 +297,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
               class="or-chat-composer-icon"
               :class="{ active: plusActive }"
               :disabled="streaming || isUploading"
-              :aria-label="isVi ? 'Thêm' : 'Add'"
+              :aria-label="m('Add', 'Thêm', 'เพิ่ม')"
               :aria-expanded="plusOpen"
               @click.stop="togglePlusMenu"
             >
@@ -306,7 +313,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
                   :aria-selected="plusTab === 'add'"
                   @click="plusTab = 'add'"
                 >
-                  {{ isVi ? 'Thêm' : 'Add' }}
+                  {{ m('Add', 'Thêm', 'เพิ่ม') }}
                 </button>
                 <button
                   type="button"
@@ -316,7 +323,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
                   :aria-selected="plusTab === 'options'"
                   @click="plusTab = 'options'"
                 >
-                  {{ isVi ? 'Tùy chọn' : 'Options' }}
+                  {{ m('Options', 'Tùy chọn', 'ตัวเลือก') }}
                 </button>
               </div>
 
@@ -328,8 +335,8 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
                 >
                   <span class="or-chat-composer-sheet-icon"><ChatIcon name="attach" /></span>
                   <span class="or-chat-composer-sheet-copy">
-                    <strong>{{ isVi ? 'Tải ảnh' : 'Upload image' }}</strong>
-                    <small>{{ isVi ? 'Badge Chat — agent trả lời về ảnh' : 'Chat badge — agent answers about the image' }}</small>
+                    <strong>{{ m('Upload image', 'Tải ảnh', 'อัปโหลดภาพ') }}</strong>
+                    <small>{{ m('Chat badge — agent answers about the image', 'Badge Chat — agent trả lời về ảnh', 'ป้าย Chat — agent ตอบเกี่ยวกับภาพ') }}</small>
                   </span>
                 </button>
                 <button
@@ -339,14 +346,14 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
                 >
                   <span class="or-chat-composer-sheet-icon"><ChatIcon name="attach" /></span>
                   <span class="or-chat-composer-sheet-copy">
-                    <strong>{{ isVi ? 'Tải video' : 'Upload video' }}</strong>
-                    <small>{{ isVi ? 'Badge Chat — agent trả lời về video' : 'Chat badge — agent answers about the video' }}</small>
+                    <strong>{{ m('Upload video', 'Tải video', 'อัปโหลดวิดีโอ') }}</strong>
+                    <small>{{ m('Chat badge — agent answers about the video', 'Badge Chat — agent trả lời về video', 'ป้าย Chat — agent ตอบเกี่ยวกับวิดีโอ') }}</small>
                   </span>
                 </button>
 
                 <div class="or-chat-composer-sheet-divider" />
 
-                <p class="or-chat-composer-pop-title">{{ isVi ? 'Tạo job' : 'Create job' }}</p>
+                <p class="or-chat-composer-pop-title">{{ m('Create job', 'Tạo job', 'สร้างงาน') }}</p>
                 <button
                   type="button"
                   class="or-chat-composer-sheet-item"
@@ -354,8 +361,8 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
                 >
                   <span class="or-chat-composer-sheet-icon"><ChatIcon name="image" /></span>
                   <span class="or-chat-composer-sheet-copy">
-                    <strong>{{ isVi ? 'Tạo ảnh' : 'Generate image' }}</strong>
-                    <small>{{ isVi ? 'Ref Job · Ảnh trong composer (tuỳ chọn)' : 'Optional Job · Image refs in composer' }}</small>
+                    <strong>{{ m('Generate image', 'Tạo ảnh', 'สร้างภาพ') }}</strong>
+                    <small>{{ m('Optional Job · Image refs in composer', 'Ref Job · Ảnh trong composer (tuỳ chọn)', 'Job ref · ภาพใน composer (ไม่บังคับ)') }}</small>
                   </span>
                 </button>
                 <button
@@ -365,21 +372,21 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
                 >
                   <span class="or-chat-composer-sheet-icon"><ChatIcon name="attach" /></span>
                   <span class="or-chat-composer-sheet-copy">
-                    <strong>{{ isVi ? 'Tạo video' : 'Generate video' }}</strong>
-                    <small>{{ isVi ? 'Ref Job · Ảnh/Video trong composer (tuỳ chọn)' : 'Optional Job · Image/Video refs in composer' }}</small>
+                    <strong>{{ m('Generate video', 'Tạo video', 'สร้างวิดีโอ') }}</strong>
+                    <small>{{ m('Optional Job · Image/Video refs in composer', 'Ref Job · Ảnh/Video trong composer (tuỳ chọn)', 'Job ref · ภาพ/วิดีโอใน composer (ไม่บังคับ)') }}</small>
                   </span>
                 </button>
               </div>
 
               <div v-else class="or-chat-composer-sheet-body" role="tabpanel">
-                <p class="or-chat-composer-pop-title">{{ isVi ? 'Công cụ & bộ nhớ' : 'Tools & memory' }}</p>
+                <p class="or-chat-composer-pop-title">{{ m('Tools & memory', 'Công cụ & bộ nhớ', 'เครื่องมือและหน่วยความจำ') }}</p>
                 <p v-if="!streamCapable" class="or-chat-composer-pop-hint">
-                  {{ isVi ? 'Bật Stream bên dưới hoặc chọn model stream để dùng web tools.' : 'Enable Stream below or pick a stream model for web tools.' }}
+                  {{ m('Enable Stream below or pick a stream model for web tools.', 'Bật Stream bên dưới hoặc chọn model stream để dùng web tools.', 'เปิด Stream ด้านล่างหรือเลือกโมเดล stream เพื่อใช้ web tools') }}
                 </p>
                 <label class="or-chat-tool-row" :class="{ disabled: !canWebSearch || !toolsNeedStream }">
                   <span>
-                    <strong>{{ isVi ? 'Tìm kiếm trên mạng' : 'Web search' }}</strong>
-                    <small>{{ settings.webSearch ? (isVi ? 'Đang bật' : 'On') : isVi ? 'Tắt' : 'Off' }}</small>
+                    <strong>{{ m('Web search', 'Tìm kiếm trên mạng', 'ค้นหาเว็บ') }}</strong>
+                    <small>{{ settings.webSearch ? m('On', 'Đang bật', 'เปิด') : m('Off', 'Tắt', 'ปิด') }}</small>
                   </span>
                   <input
                     type="checkbox"
@@ -390,8 +397,8 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
                 </label>
                 <label class="or-chat-tool-row" :class="{ disabled: !canWebFetch || !toolsNeedStream }">
                   <span>
-                    <strong>{{ isVi ? 'Fetch URL' : 'Fetch URL' }}</strong>
-                    <small>{{ isVi ? 'Tự bật khi prompt có link public' : 'Auto when prompt has a public URL' }}</small>
+                    <strong>{{ m('Fetch URL', 'Fetch URL', 'ดึง URL') }}</strong>
+                    <small>{{ m('Auto when prompt has a public URL', 'Tự bật khi prompt có link public', 'เปิดอัตโนมัติเมื่อ prompt มี URL สาธารณะ') }}</small>
                   </span>
                   <input
                     type="checkbox"
@@ -404,7 +411,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
                 <div class="or-chat-composer-sheet-divider" />
 
                 <div class="or-chat-memory-head">
-                  <p class="or-chat-composer-pop-title">{{ isVi ? 'Bộ nhớ chat' : 'Chat memory' }}</p>
+                  <p class="or-chat-composer-pop-title">{{ m('Chat memory', 'Bộ nhớ chat', 'หน่วยความจำแชท') }}</p>
                   <label class="or-chat-memory-toggle">
                     <span>∞</span>
                     <input v-model="memoryUnlimited" type="checkbox" :disabled="streaming" />
@@ -422,21 +429,23 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
                 <p class="or-chat-composer-pop-hint">
                   {{
                     memoryUnlimited
-                      ? isVi
-                        ? 'Gửi toàn bộ lịch sử mỗi lần.'
-                        : 'Sends all messages each request.'
-                      : isVi
-                        ? `Gửi tối đa ${memoryTurns} lượt user gần nhất.`
-                        : `Sends up to ${memoryTurns} recent user turns.`
+                      ? m('Sends all messages each request.', 'Gửi toàn bộ lịch sử mỗi lần.', 'ส่งข้อความทั้งหมดทุกครั้ง')
+                      : m(
+                          `Sends up to ${memoryTurns} recent user turns.`,
+                          `Gửi tối đa ${memoryTurns} lượt user gần nhất.`,
+                          `ส่งได้สูงสุด ${memoryTurns} เทิร์นผู้ใช้ล่าสุด`,
+                        )
                   }}
                 </p>
                 <label v-if="!streamForced" class="or-chat-tool-row">
                   <span>
-                    <strong>{{ isVi ? 'Stream tokens' : 'Stream tokens' }}</strong>
+                    <strong>{{ m('Stream tokens', 'Stream tokens', 'Stream tokens') }}</strong>
                     <small>{{
-                      isVi
-                        ? 'Bật: gõ dần. Tắt: một cục JSON (model agent).'
-                        : 'On: typewriter. Off: one-shot JSON (agent models).'
+                      m(
+                        'On: typewriter. Off: one-shot JSON (agent models).',
+                        'Bật: gõ dần. Tắt: một cục JSON (model agent).',
+                        'เปิด: พิมพ์ทีละคำ ปิด: JSON ครั้งเดียว (โมเดล agent)',
+                      )
                     }}</small>
                   </span>
                   <input
@@ -449,12 +458,12 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
 
                 <div class="or-chat-composer-sheet-divider" />
 
-                <p class="or-chat-composer-pop-title">{{ isVi ? 'Dữ liệu chat' : 'Chat data' }}</p>
+                <p class="or-chat-composer-pop-title">{{ m('Chat data', 'Dữ liệu chat', 'ข้อมูลแชท') }}</p>
                 <button type="button" class="or-chat-composer-pop-item" @click="emit('exportBackup'); closeMenus()">
-                  {{ isVi ? 'Export backup' : 'Export backup' }}
+                  {{ m('Export backup', 'Export backup', 'ส่งออก backup') }}
                 </button>
                 <button type="button" class="or-chat-composer-pop-item" @click="emit('importBackup'); closeMenus()">
-                  {{ isVi ? 'Import backup' : 'Import backup' }}
+                  {{ m('Import backup', 'Import backup', 'นำเข้า backup') }}
                 </button>
                 <button
                   type="button"
@@ -462,7 +471,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
                   :disabled="streaming || isUploading"
                   @click="emit('clearAll'); closeMenus()"
                 >
-                  {{ isVi ? 'Xóa hết phòng' : 'Clear all chats' }}
+                  {{ m('Clear all chats', 'Xóa hết phòng', 'ล้างห้องแชททั้งหมด') }}
                 </button>
               </div>
             </div>
@@ -476,16 +485,10 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
           rows="1"
           :placeholder="
             imageGenMode
-              ? isVi
-                ? 'Mô tả ảnh muốn tạo…'
-                : 'Describe the image to generate…'
+              ? m('Describe the image to generate…', 'Mô tả ảnh muốn tạo…', 'อธิบายภาพที่ต้องการสร้าง…')
               : videoGenMode
-                ? isVi
-                  ? 'Mô tả video muốn tạo…'
-                  : 'Describe the video to generate…'
-                : isVi
-                  ? 'Hỏi bất cứ điều gì…'
-                  : 'Ask anything…'
+                ? m('Describe the video to generate…', 'Mô tả video muốn tạo…', 'อธิบายวิดีโอที่ต้องการสร้าง…')
+                : m('Ask anything…', 'Hỏi bất cứ điều gì…', 'ถามอะไรก็ได้…')
           "
           :disabled="streaming"
           @input="onInput"
@@ -497,7 +500,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
             v-if="streaming"
             type="button"
             class="or-chat-composer-stop"
-            :aria-label="isVi ? 'Dừng' : 'Stop'"
+            :aria-label="m('Stop', 'Dừng', 'หยุด')"
             @click="emit('stop')"
           >
             <ChatIcon name="stop" />
@@ -507,7 +510,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
             type="button"
             class="or-chat-composer-send"
             :disabled="uploadingAttachments || isUploading || (!input.trim() && !hasAnyStaging)"
-            :aria-label="isVi ? 'Gửi' : 'Send'"
+            :aria-label="m('Send', 'Gửi', 'ส่ง')"
             @click="emit('send')"
           >
             <ChatIcon name="send" />
@@ -518,9 +521,11 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
 
       <p class="or-chat-composer-disclaimer">
         {{
-          isVi
-            ? 'Phản hồi do AI tạo — có thể không chính xác. Hãy kiểm tra trước khi tin.'
-            : 'Responses are AI-generated and can be inaccurate. Review outputs before relying on them.'
+          m(
+            'Responses are AI-generated and can be inaccurate. Review outputs before relying on them.',
+            'Phản hồi do AI tạo — có thể không chính xác. Hãy kiểm tra trước khi tin.',
+            'การตอบกลับสร้างโดย AI — อาจไม่ถูกต้อง โปรดตรวจสอบก่อนใช้งาน',
+          )
         }}
       </p>
     </div>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useHybridLocale } from '../composables/use-hybrid-locale';
+import { usePortalCopy } from '../composables/use-portal-copy';
 import {
   COMPARE_PRESETS,
   INPUT_MODALITIES,
@@ -25,11 +26,12 @@ import {
   type JobTypeId,
 } from '../models/catalog-api';
 
-const { isVi, prefix: localePrefix } = useHybridLocale();
-const catalogLang = computed((): CatalogLang | undefined => (isVi.value ? 'vi' : 'en'));
+const { locale, prefix: localePrefix } = useHybridLocale();
+const { m } = usePortalCopy(locale);
+const catalogLang = computed((): CatalogLang => locale.value);
 
-const homeLink = computed(() => (isVi.value ? '/vi/' : '/'));
-const catalogLink = computed(() => (isVi.value ? '/vi/models/' : '/models/'));
+const homeLink = computed(() => `${localePrefix.value}/` || '/');
+const catalogLink = computed(() => `${localePrefix.value}/models/`);
 
 const loading = ref(true);
 const error = ref('');
@@ -71,7 +73,7 @@ const modalFiltered = computed(() => {
 const modalGroups = computed(() => {
   const map = new Map<string, CatalogModel[]>();
   for (const m of modalFiltered.value) {
-    const key = monthGroupLabel(m.sortDate, isVi.value);
+    const key = monthGroupLabel(m.sortDate, locale.value);
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(m);
   }
@@ -86,7 +88,7 @@ const modalPreview = computed(() => {
 
 const compareRows = computed(() => {
   if (!slotA.value || !slotB.value) return [];
-  return buildCompareRows(slotA.value, slotB.value, isVi.value);
+  return buildCompareRows(slotA.value, slotB.value, catalogLang.value);
 });
 
 const compareSpecRows = computed(() =>
@@ -103,7 +105,7 @@ const presetCards = computed(() =>
 );
 
 function compareRowLabel(row: (typeof compareRows.value)[number]): string {
-  return isVi.value ? row.labelVi : row.labelEn;
+  return m(row.labelEn, row.labelVi, row.labelEn);
 }
 
 function syncUrl() {
@@ -195,7 +197,7 @@ watch(modalFiltered, (list) => {
   }
 });
 
-watch(isVi, () => {
+watch(locale, () => {
   void loadCatalog();
 });
 
@@ -208,25 +210,27 @@ onMounted(() => {
   <div class="or-catalog or-compare">
     <div class="or-compare-wrap">
       <nav class="or-compare-crumb" aria-label="Breadcrumb">
-        <a :href="homeLink">Home</a>
+        <a :href="homeLink">{{ m('Home', 'Trang chủ', 'หน้าแรก') }}</a>
         <span aria-hidden="true">/</span>
-        <span>{{ isVi ? 'So sánh' : 'Compare' }}</span>
+        <span>{{ m('Compare', 'So sánh', 'เปรียบเทียบ') }}</span>
       </nav>
 
       <header class="or-compare-header">
         <div class="or-compare-header-top">
           <h1 class="or-compare-title">
-            {{ isVi ? 'So sánh model AI' : 'AI Model Comparison' }}
+            {{ m('AI Model Comparison', 'So sánh model AI', 'เปรียบเทียบโมเดล AI') }}
           </h1>
           <a :href="catalogLink" class="or-compare-catalog-link">{{
-            isVi ? 'Catalog →' : 'Catalog →'
+            m('Catalog →', 'Catalog →', 'แคตตาล็อก →')
           }}</a>
         </div>
         <p class="or-compare-sub">
           {{
-            isVi
-              ? 'So sánh credits, tham số catalog và loại job — cùng nguồn GET /gateway/models.'
-              : 'Compare credits, catalog parameters, and job types — same data as GET /gateway/models.'
+            m(
+              'Compare credits, catalog parameters, and job types — same data as GET /gateway/models.',
+              'So sánh credits, tham số catalog và loại job — cùng nguồn GET /gateway/models.',
+              'เปรียบเทียบเครดิต พารามิเตอร์แคตตาล็อก และประเภทงาน — ข้อมูลเดียวกับ GET /gateway/models',
+            )
           }}
         </p>
       </header>
@@ -239,16 +243,16 @@ onMounted(() => {
           class="or-compare-preset"
           @click="onPresetClick(preset)"
         >
-          <strong>{{ isVi ? preset.titleVi : preset.titleEn }}</strong>
+          <strong>{{ m(preset.titleEn, preset.titleVi, preset.titleEn) }}</strong>
           <span class="or-compare-preset-desc">{{
-            isVi ? preset.descVi : preset.descEn
+            m(preset.descEn, preset.descVi, preset.descEn)
           }}</span>
           <span v-if="examples" class="or-compare-preset-examples">{{ examples }}</span>
         </button>
       </div>
 
       <p v-if="error" class="or-status or-status-err">{{ error }}</p>
-      <p v-else-if="loading" class="or-status">{{ isVi ? 'Đang tải…' : 'Loading…' }}</p>
+      <p v-else-if="loading" class="or-status">{{ m('Loading…', 'Đang tải…', 'กำลังโหลด…') }}</p>
 
       <div v-else-if="showSlotPicker" class="or-compare-slots">
         <div class="or-compare-slot">
@@ -259,7 +263,7 @@ onMounted(() => {
             @click="openModal('a')"
           >
             <span class="or-compare-plus">+</span>
-            {{ isVi ? 'Chọn model' : 'Select a model' }}
+            {{ m('Select a model', 'Chọn model', 'เลือกโมเดล') }}
           </button>
           <div v-else class="or-compare-slot-filled">
             <span class="or-provider-avatar">{{
@@ -270,7 +274,7 @@ onMounted(() => {
               <code>{{ slotA.slug }}</code>
             </div>
             <button type="button" class="or-link" @click="openModal('a')">
-              {{ isVi ? 'Đổi' : 'Change' }}
+              {{ m('Change', 'Đổi', 'เปลี่ยน') }}
             </button>
             <button type="button" class="or-link or-compare-clear" @click="clearSlot('a')">×</button>
           </div>
@@ -284,7 +288,7 @@ onMounted(() => {
             @click="openModal('b')"
           >
             <span class="or-compare-plus">+</span>
-            {{ isVi ? 'Chọn model' : 'Select a model' }}
+            {{ m('Select a model', 'Chọn model', 'เลือกโมเดล') }}
           </button>
           <div v-else class="or-compare-slot-filled">
             <span class="or-provider-avatar">{{
@@ -295,7 +299,7 @@ onMounted(() => {
               <code>{{ slotB.slug }}</code>
             </div>
             <button type="button" class="or-link" @click="openModal('b')">
-              {{ isVi ? 'Đổi' : 'Change' }}
+              {{ m('Change', 'Đổi', 'เปลี่ยน') }}
             </button>
             <button type="button" class="or-link or-compare-clear" @click="clearSlot('b')">×</button>
           </div>
@@ -318,7 +322,7 @@ onMounted(() => {
               <span class="or-compare-col-credits">{{ model.creditsLabel }}</span>
               <div class="or-compare-col-actions">
                 <button type="button" class="or-link" @click="openModal(idx === 0 ? 'a' : 'b')">
-                  {{ isVi ? 'Đổi' : 'Change' }}
+                  {{ m('Change', 'Đổi', 'เปลี่ยน') }}
                 </button>
                 <a
                   :href="playgroundUrl(model, localePrefix)"
@@ -326,12 +330,12 @@ onMounted(() => {
                   rel="noopener"
                   class="or-compare-play-btn"
                 >
-                  Playground
+                  {{ m('Playground', 'Playground', 'สนามทดลอง') }}
                 </a>
                 <button
                   type="button"
                   class="or-link or-compare-clear"
-                  :aria-label="isVi ? 'Xóa' : 'Clear'"
+                  :aria-label="m('Clear', 'Xóa', 'ล้าง')"
                   @click="clearSlot(idx === 0 ? 'a' : 'b')"
                 >
                   ×
@@ -381,16 +385,16 @@ onMounted(() => {
       role="presentation"
       @click.self="closeModal"
     >
-      <div class="or-compare-modal" role="dialog" aria-modal="true" :aria-label="isVi ? 'Chọn model' : 'Select model'">
+      <div class="or-compare-modal" role="dialog" aria-modal="true" :aria-label="m('Select model', 'Chọn model', 'เลือกโมเดล')">
         <header class="or-compare-modal-head">
           <input
             v-model="modalSearch"
             type="search"
             class="or-search or-compare-modal-search"
-            :placeholder="isVi ? 'Tìm model…' : 'Search models…'"
+            :placeholder="m('Search models…', 'Tìm model…', 'ค้นหาโมเดล…')"
           />
           <span class="or-compare-modal-count"
-            >{{ modalFiltered.length }} {{ isVi ? 'model' : 'models' }}</span
+            >{{ modalFiltered.length }} {{ m('models', 'model', 'โมเดล') }}</span
           >
           <button type="button" class="or-compare-modal-close" aria-label="Close" @click="closeModal">
             ×
@@ -399,15 +403,15 @@ onMounted(() => {
 
         <div class="or-compare-modal-filters">
           <select v-model="modalJobType" class="or-select">
-            <option value="all">{{ isVi ? 'Mọi loại' : 'All types' }}</option>
+            <option value="all">{{ m('All types', 'Mọi loại', 'ทุกประเภท') }}</option>
             <option v-for="t in JOB_TYPES" :key="t.id" :value="t.id">{{ t.label }}</option>
           </select>
           <select v-model="modalProvider" class="or-select">
-            <option value="">{{ isVi ? 'Mọi provider' : 'All providers' }}</option>
+            <option value="">{{ m('All providers', 'Mọi provider', 'ทุก provider') }}</option>
             <option v-for="p in providers" :key="p" :value="p">{{ p }}</option>
           </select>
           <select v-model="modalModality" class="or-select">
-            <option value="all">{{ isVi ? 'Mọi input' : 'All inputs' }}</option>
+            <option value="all">{{ m('All inputs', 'Mọi input', 'ทุก input') }}</option>
             <option v-for="m in INPUT_MODALITIES" :key="m.id" :value="m.id">{{ m.label }}</option>
           </select>
         </div>
@@ -415,7 +419,7 @@ onMounted(() => {
         <div class="or-compare-modal-body">
           <div class="or-compare-modal-list">
             <p v-if="!modalFiltered.length" class="or-muted or-compare-modal-empty">
-              {{ isVi ? 'Không có model.' : 'No models found.' }}
+              {{ m('No models found.', 'Không có model.', 'ไม่พบโมเดล') }}
             </p>
             <section v-for="[month, items] in modalGroups" :key="month" class="or-compare-modal-group">
               <h3 class="or-compare-modal-month">{{ month }}</h3>
@@ -450,16 +454,16 @@ onMounted(() => {
                 <code class="or-compare-preview-slug">{{ modalPreview.slug }}</code>
               </div>
             </div>
-            <p v-if="modelDescription(modalPreview, isVi)" class="or-compare-preview-desc">
-              {{ modelDescription(modalPreview, isVi) }}
+            <p v-if="modelDescription(modalPreview, catalogLang)" class="or-compare-preview-desc">
+              {{ modelDescription(modalPreview, catalogLang) }}
             </p>
             <dl class="or-compare-preview-meta">
               <div>
-                <dt>{{ isVi ? 'Credits' : 'Credits' }}</dt>
+                <dt>{{ m('Credits', 'Credits', 'เครดิต') }}</dt>
                 <dd>{{ modalPreview.creditsLabel }}</dd>
               </div>
               <div>
-                <dt>{{ isVi ? 'Loại' : 'Type' }}</dt>
+                <dt>{{ m('Type', 'Loại', 'ประเภท') }}</dt>
                 <dd>{{ JOB_TYPES.find((t) => t.id === modalPreview!.jobType)?.label }}</dd>
               </div>
               <div v-if="modalPreview.provider">
@@ -467,15 +471,15 @@ onMounted(() => {
                 <dd>{{ modalPreview.provider }}</dd>
               </div>
               <div v-if="modalPreview.sortDate">
-                <dt>{{ isVi ? 'Thêm' : 'Added' }}</dt>
-                <dd>{{ formatRelativeTime(modalPreview.sortDate, isVi) }}</dd>
+                <dt>{{ m('Added', 'Thêm', 'เพิ่ม') }}</dt>
+                <dd>{{ formatRelativeTime(modalPreview.sortDate, locale) }}</dd>
               </div>
             </dl>
             <div class="or-row-tags">
               <span v-for="tag in modelTags(modalPreview)" :key="tag" class="or-tag">{{ tag }}</span>
             </div>
             <button type="button" class="or-compare-select-btn" @click="selectModel(modalPreview)">
-              {{ isVi ? 'Chọn model này' : 'Select this model' }}
+              {{ m('Select this model', 'Chọn model này', 'เลือกโมเดลนี้') }}
             </button>
           </aside>
         </div>

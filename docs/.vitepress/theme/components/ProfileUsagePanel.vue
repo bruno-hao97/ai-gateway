@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import { usePortalCopy } from '../composables/use-portal-copy';
+import type { PortalLocale } from '../models/portal-locale';
+import { portalUsageLogsLanguage, portalUsageStatsLanguage } from '../models/portal-gommo-lang';
 import { activityHubHref } from '../models/activity-hub-url';
 import { fetchUsageLogs, fetchUsageStats, formatCredits } from '../models/user-api';
 import { formatUsageTime } from '../models/usage-history';
@@ -34,7 +37,7 @@ import UsageJobDetailModal from './UsageJobDetailModal.vue';
 
 const props = defineProps<{
   credits: number;
-  isVi: boolean;
+  locale: PortalLocale;
   prefix: string;
   /** full = stats + chart + logs; logs = job history only */
   mode?: 'full' | 'logs';
@@ -51,6 +54,11 @@ const props = defineProps<{
   /** Pre-fill Explore search (?q=) */
   initialSearchQuery?: string;
 }>();
+
+const { m } = usePortalCopy(computed(() => props.locale));
+
+const usageStatsLanguage = computed(() => portalUsageStatsLanguage(props.locale));
+const usageLogsLanguage = computed(() => portalUsageLogsLanguage(props.locale));
 
 const emit = defineEmits<{
   periodChange: [period: UsageStatsPeriod];
@@ -88,19 +96,19 @@ let searchEmitTimer: ReturnType<typeof setTimeout> | undefined;
 let searchDeepTimer: ReturnType<typeof setTimeout> | undefined;
 
 const typeOptions = computed(() => [
-  { id: 'all' as const, label: props.isVi ? 'Tất cả' : 'All' },
-  { id: 'image' as const, label: props.isVi ? 'Ảnh' : 'Image' },
+  { id: 'all' as const, label: m('All', 'Tất cả', 'ทั้งหมด') },
+  { id: 'image' as const, label: m('Image', 'Ảnh', 'รูปภาพ') },
   { id: 'video' as const, label: 'Video' },
   { id: 'audio' as const, label: 'Audio' },
-  { id: 'music' as const, label: props.isVi ? 'Nhạc' : 'Music' },
+  { id: 'music' as const, label: m('Music', 'Nhạc', 'เพลง') },
 ]);
 
 const rangeOptions = computed(() => {
   const opts = [
-    { id: '7d' as const, label: props.isVi ? '7 ngày' : '7 days' },
-    { id: '30d' as const, label: props.isVi ? '30 ngày' : '30 days' },
-    { id: '90d' as const, label: props.isVi ? '90 ngày' : '90 days' },
-    { id: 'all' as const, label: props.isVi ? 'Tất cả' : 'All time' },
+    { id: '7d' as const, label: m('7 days', '7 ngày', '7 วัน') },
+    { id: '30d' as const, label: m('30 days', '30 ngày', '30 วัน') },
+    { id: '90d' as const, label: m('90 days', '90 ngày', '90 วัน') },
+    { id: 'all' as const, label: m('All time', 'Tất cả', 'ตลอดเวลา') },
   ];
   if (trendsOnly.value || logsOnly.value) return opts.filter((o) => o.id !== 'all');
   return opts;
@@ -182,7 +190,7 @@ const hasActiveExploreFilters = computed(
 const exploreFilterSummary = computed(() => {
   if (!logsOnly.value || !hasActiveExploreFilters.value) return '';
   const parts: string[] = [];
-  if (hasActiveTypeFilter.value) parts.push(jobTypeLabel(typeFilter.value, props.isVi));
+  if (hasActiveTypeFilter.value) parts.push(jobTypeLabel(typeFilter.value, props.locale));
   if (hasActiveModelFilter.value) parts.push(modelFilter.value.trim());
   if (hasActiveSearchFilter.value) parts.push(`"${searchQuery.value.trim()}"`);
   return parts.join(' · ');
@@ -190,15 +198,25 @@ const exploreFilterSummary = computed(() => {
 
 const exploreEmptyMessage = computed(() => {
   if (!hasActiveExploreFilters.value) {
-    return props.isVi ? 'Chưa có bản ghi trong khoảng đã chọn.' : 'No records in the selected range.';
+    return m(
+      'No records in the selected range.',
+      'Chưa có bản ghi trong khoảng đã chọn.',
+      'ไม่มีบันทึกในช่วงที่เลือก',
+    );
   }
   const summary = exploreFilterSummary.value;
-  if (props.isVi) {
-    return summary
-      ? `Không có job khớp bộ lọc: ${summary}.`
-      : 'Không có job khớp bộ lọc.';
+  if (summary) {
+    return m(
+      `No jobs match filters: ${summary}.`,
+      `Không có job khớp bộ lọc: ${summary}.`,
+      `ไม่มีงานที่ตรงกับตัวกรอง: ${summary}`,
+    );
   }
-  return summary ? `No jobs match filters: ${summary}.` : 'No jobs match the current filters.';
+  return m(
+    'No jobs match the current filters.',
+    'Không có job khớp bộ lọc.',
+    'ไม่มีงานที่ตรงกับตัวกรอง',
+  );
 });
 
 const exploreLogCount = computed(() => filteredListItems.value.length);
@@ -208,19 +226,23 @@ const exploreLogSummary = computed(() => {
   const filtered = exploreLogCount.value;
   const loaded = listItems.value.length;
   if (hasActiveExploreFilters.value && filtered !== loaded) {
-    if (props.isVi) {
-      return listHasMore.value
-        ? `${filtered} khớp · ${loaded}+ đã tải`
-        : `${filtered} khớp · ${loaded} đã tải`;
+    if (listHasMore.value) {
+      return m(
+        `${filtered} shown · ${loaded}+ loaded`,
+        `${filtered} khớp · ${loaded}+ đã tải`,
+        `${filtered} ตรง · โหลดแล้ว ${loaded}+`,
+      );
     }
-    return listHasMore.value
-      ? `${filtered} shown · ${loaded}+ loaded`
-      : `${filtered} shown · ${loaded} loaded`;
+    return m(
+      `${filtered} shown · ${loaded} loaded`,
+      `${filtered} khớp · ${loaded} đã tải`,
+      `${filtered} ตรง · โหลดแล้ว ${loaded}`,
+    );
   }
-  if (props.isVi) {
-    return listHasMore.value ? `${filtered}+ job` : `${filtered} job`;
+  if (listHasMore.value) {
+    return m(`${filtered}+ jobs`, `${filtered}+ job`, `${filtered}+ งาน`);
   }
-  return listHasMore.value ? `${filtered}+ jobs` : `${filtered} jobs`;
+  return m(`${filtered} jobs`, `${filtered} job`, `${filtered} งาน`);
 });
 
 const showTypeCols = computed(() => typeFilter.value === 'all');
@@ -247,7 +269,7 @@ async function loadList(reset = true) {
     const data = await fetchUsageLogs({
       period: period.value,
       type: typeFilter.value,
-      language: 'VI',
+      language: usageLogsLanguage.value,
       page: listPage.value,
       limit: 30,
     });
@@ -273,14 +295,16 @@ async function reloadRecords() {
       statsData.value = await fetchUsageStats({
         period: period.value,
         type: typeFilter.value,
-        language: 'vi',
+        language: usageStatsLanguage.value,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (/failed to fetch|network|load/i.test(msg)) {
-        statsError.value = props.isVi
-          ? 'Không kết nối được gateway :3001 — chạy npm run dev rồi Refresh.'
-          : 'Cannot reach gateway :3001 — run npm run dev, then Refresh.';
+        statsError.value = m(
+          'Cannot reach gateway :3001 — run npm run dev, then Refresh.',
+          'Không kết nối được gateway :3001 — chạy npm run dev rồi Refresh.',
+          'เชื่อมต่อ gateway :3001 ไม่ได้ — รัน npm run dev แล้วกดรีเฟรช',
+        );
       } else {
         statsError.value = msg;
       }
@@ -342,7 +366,7 @@ async function exportExploreCsv() {
       const data = await fetchUsageLogs({
         period: period.value,
         type: typeFilter.value,
-        language: 'VI',
+        language: usageLogsLanguage.value,
         page,
         limit: 100,
       });
@@ -383,9 +407,9 @@ function segFlex(value: number): number {
 }
 
 function statusLabel(status: ReturnType<typeof listItemStatus>): string {
-  if (status === 'success') return props.isVi ? 'Thành công' : 'Success';
-  if (status === 'failed') return props.isVi ? 'Thất bại' : 'Failed';
-  return props.isVi ? 'Đang xử lý' : 'Pending';
+  if (status === 'success') return m('Success', 'Thành công', 'สำเร็จ');
+  if (status === 'failed') return m('Failed', 'Thất bại', 'ล้มเหลว');
+  return m('Pending', 'Đang xử lý', 'รอดำเนินการ');
 }
 
 function promptPreview(prompt?: string): string {
@@ -603,24 +627,28 @@ onMounted(() => {
   >
     <div v-if="showStatsBlocks && !trendsOnly" class="or-usage-banner" role="status">
       {{
-        isVi
-          ? 'Thống kê từ Gommo usage-history (cùng nguồn 79ai). Cần đăng nhập đúng tài khoản Gommo.'
-          : 'Stats from Gommo usage-history (same source as 79ai). Sign in with your Gommo account.'
+        m(
+          'Stats from Gommo usage-history (same source as 79ai). Sign in with your Gommo account.',
+          'Thống kê từ Gommo usage-history (cùng nguồn 79ai). Cần đăng nhập đúng tài khoản Gommo.',
+          'สถิติจาก Gommo usage-history (แหล่งเดียวกับ 79ai) — ต้องลงชื่อเข้าใช้บัญชี Gommo ที่ถูกต้อง',
+        )
       }}
     </div>
 
     <p v-if="showStatsBlocks && !trendsOnly && showZeroHint" class="or-app-muted or-usage-note">
       {{
-        isVi
-          ? 'Chưa có lượt dùng trong khoảng đã chọn — thử All time hoặc chạy job qua Playground.'
-          : 'No usage in the selected range — try All time or run a job in Playground.'
+        m(
+          'No usage in the selected range — try All time or run a job in Playground.',
+          'Chưa có lượt dùng trong khoảng đã chọn — thử All time hoặc chạy job qua Playground.',
+          'ยังไม่มีการใช้งานในช่วงที่เลือก — ลองตลอดเวลาหรือรันงานใน Playground',
+        )
       }}
     </p>
 
     <div v-if="showStatsBlocks && trendsOnly" class="or-activity-overview-kpi-row or-usage-trends-kpi">
       <div class="or-activity-hub-kpi or-activity-hub-kpi--spark">
         <div class="or-activity-hub-kpi-main">
-          <span class="or-activity-hub-kpi-label">{{ isVi ? 'Jobs' : 'Jobs' }}</span>
+          <span class="or-activity-hub-kpi-label">{{ m('Jobs', 'Jobs', 'งาน') }}</span>
           <strong class="or-activity-hub-kpi-value">
             <template v-if="loading"><span class="or-activity-skeleton or-activity-skeleton--text" /></template>
             <template v-else>{{ (summary?.total ?? 0).toLocaleString() }}</template>
@@ -633,7 +661,7 @@ onMounted(() => {
       </div>
       <div class="or-activity-hub-kpi or-activity-hub-kpi--spark">
         <div class="or-activity-hub-kpi-main">
-          <span class="or-activity-hub-kpi-label">{{ isVi ? 'Credit thực' : 'Net credits' }}</span>
+          <span class="or-activity-hub-kpi-label">{{ m('Net credits', 'Credit thực', 'เครดิตสุทธิ') }}</span>
           <strong class="or-activity-hub-kpi-value">
             <template v-if="loading"><span class="or-activity-skeleton or-activity-skeleton--text" /></template>
             <template v-else>{{ formatCredits(summary?.credit_net ?? 0) }}</template>
@@ -646,7 +674,7 @@ onMounted(() => {
       </div>
       <div class="or-activity-hub-kpi or-activity-hub-kpi--spark">
         <div class="or-activity-hub-kpi-main">
-          <span class="or-activity-hub-kpi-label">{{ isVi ? 'Thành công' : 'Success rate' }}</span>
+          <span class="or-activity-hub-kpi-label">{{ m('Success rate', 'Thành công', 'อัตราสำเร็จ') }}</span>
           <strong class="or-activity-hub-kpi-value">
             <template v-if="loading"><span class="or-activity-skeleton or-activity-skeleton--text" /></template>
             <template v-else>{{ successRate }}%</template>
@@ -660,21 +688,21 @@ onMounted(() => {
         </svg>
       </div>
       <div class="or-activity-hub-kpi">
-        <span class="or-activity-hub-kpi-label">{{ isVi ? 'Số dư' : 'Balance' }}</span>
+        <span class="or-activity-hub-kpi-label">{{ m('Balance', 'Số dư', 'ยอดคงเหลือ') }}</span>
         <strong class="or-activity-hub-kpi-value">{{ formatCredits(credits) }}</strong>
-        <span class="or-activity-hub-kpi-sub">{{ isVi ? 'Hiện tại' : 'Current' }}</span>
+        <span class="or-activity-hub-kpi-sub">{{ m('Current', 'Hiện tại', 'ปัจจุบัน') }}</span>
       </div>
     </div>
 
     <div v-else-if="showStatsBlocks" class="or-usage-stats or-usage-stats--wide">
       <div class="or-usage-stat-card">
         <p class="or-usage-stat-value">{{ (summary?.total ?? 0).toLocaleString() }}</p>
-        <p class="or-usage-stat-label">{{ isVi ? 'Tổng lượt' : 'Total calls' }}</p>
+        <p class="or-usage-stat-label">{{ m('Total calls', 'Tổng lượt', 'จำนวนครั้งทั้งหมด') }}</p>
       </div>
       <div class="or-usage-stat-card">
         <p class="or-usage-stat-value">{{ (summary?.success ?? 0).toLocaleString() }}</p>
         <p class="or-usage-stat-label">
-          {{ isVi ? 'Thành công' : 'Success' }}
+          {{ m('Success', 'Thành công', 'สำเร็จ') }}
           <span v-if="summary?.credit_success" class="or-usage-stat-sub">
             ({{ formatCredits(summary.credit_success) }})
           </span>
@@ -683,7 +711,7 @@ onMounted(() => {
       <div class="or-usage-stat-card">
         <p class="or-usage-stat-value">{{ (summary?.error ?? 0).toLocaleString() }}</p>
         <p class="or-usage-stat-label">
-          {{ isVi ? 'Thất bại' : 'Failed' }}
+          {{ m('Failed', 'Thất bại', 'ล้มเหลว') }}
           <span v-if="summary?.credit_error" class="or-usage-stat-sub">
             ({{ formatCredits(summary.credit_error) }})
           </span>
@@ -691,31 +719,31 @@ onMounted(() => {
       </div>
       <div class="or-usage-stat-card">
         <p class="or-usage-stat-value">{{ formatCredits(summary?.credit ?? 0) }}</p>
-        <p class="or-usage-stat-label">{{ isVi ? 'Credit trừ' : 'Credits charged' }}</p>
+        <p class="or-usage-stat-label">{{ m('Credits charged', 'Credit trừ', 'เครดิตที่ใช้') }}</p>
       </div>
       <div class="or-usage-stat-card">
         <p class="or-usage-stat-value">{{ formatCredits(summary?.refund ?? 0) }}</p>
-        <p class="or-usage-stat-label">{{ isVi ? 'Hoàn' : 'Refunded' }}</p>
+        <p class="or-usage-stat-label">{{ m('Refunded', 'Hoàn', 'คืนเครดิต') }}</p>
       </div>
       <div class="or-usage-stat-card">
         <p class="or-usage-stat-value">{{ formatCredits(summary?.credit_net ?? 0) }}</p>
-        <p class="or-usage-stat-label">{{ isVi ? 'Credit thực' : 'Net credits' }}</p>
+        <p class="or-usage-stat-label">{{ m('Net credits', 'Credit thực', 'เครดิตสุทธิ') }}</p>
       </div>
       <div class="or-usage-stat-card">
         <p class="or-usage-stat-value">{{ formatCredits(credits) }}</p>
-        <p class="or-usage-stat-label">{{ isVi ? 'Credits khả dụng' : 'Available credits' }}</p>
+        <p class="or-usage-stat-label">{{ m('Available credits', 'Credits khả dụng', 'เครดิตคงเหลือ') }}</p>
       </div>
       <div class="or-usage-stat-card">
         <p class="or-usage-stat-value">{{ successRate }}%</p>
-        <p class="or-usage-stat-label">{{ isVi ? 'Tỷ lệ thành công' : 'Success rate' }}</p>
+        <p class="or-usage-stat-label">{{ m('Success rate', 'Tỷ lệ thành công', 'อัตราสำเร็จ') }}</p>
       </div>
     </div>
 
     <div v-if="showStatsBlocks && !trendsOnly && typeBreakdown.length > 0" class="or-usage-type-breakdown">
-      <h3 class="or-app-panel-title">{{ isVi ? 'Phân bổ theo loại' : 'Breakdown by type' }}</h3>
+      <h3 class="or-app-panel-title">{{ m('Breakdown by type', 'Phân bổ theo loại', 'การใช้งานตามประเภท') }}</h3>
       <div class="or-usage-type-bars">
         <div v-for="row in typeBreakdown" :key="row.jobType" class="or-usage-type-row">
-          <span class="or-usage-type-label">{{ jobTypeLabel(row.jobType, isVi) }}</span>
+          <span class="or-usage-type-label">{{ jobTypeLabel(row.jobType, locale) }}</span>
           <div class="or-usage-type-track" role="presentation">
             <div class="or-usage-type-fill" :style="{ width: `${row.percent}%` }" />
           </div>
@@ -729,33 +757,33 @@ onMounted(() => {
 
     <div v-if="logsOnly && hasActiveExploreFilters" class="or-usage-explore-filter-chips">
       <div v-if="hasActiveModelFilter" class="or-usage-explore-filter-chip">
-        <span class="or-usage-explore-filter-label">{{ isVi ? 'Model' : 'Model' }}</span>
+        <span class="or-usage-explore-filter-label">{{ m('Model', 'Model', 'โมเดล') }}</span>
         <code class="or-usage-model">{{ modelFilter }}</code>
         <button type="button" class="or-usage-explore-filter-clear" @click="clearModelFilter">
-          {{ isVi ? 'Xóa lọc' : 'Clear filter' }}
+          {{ m('Clear filter', 'Xóa lọc', 'ล้างตัวกรอง') }}
         </button>
       </div>
       <div v-if="hasActiveTypeFilter" class="or-usage-explore-filter-chip">
-        <span class="or-usage-explore-filter-label">{{ isVi ? 'Loại' : 'Type' }}</span>
+        <span class="or-usage-explore-filter-label">{{ m('Type', 'Loại', 'ประเภท') }}</span>
         <span class="or-usage-type-chip" :class="`or-usage-type-chip--${typeFilter}`">
-          {{ jobTypeLabel(typeFilter, isVi) }}
+          {{ jobTypeLabel(typeFilter, locale) }}
         </span>
         <button type="button" class="or-usage-explore-filter-clear" @click="clearTypeFilter">
-          {{ isVi ? 'Xóa lọc' : 'Clear filter' }}
+          {{ m('Clear filter', 'Xóa lọc', 'ล้างตัวกรอง') }}
         </button>
       </div>
       <div v-if="hasActiveSearchFilter" class="or-usage-explore-filter-chip">
-        <span class="or-usage-explore-filter-label">{{ isVi ? 'Tìm' : 'Search' }}</span>
+        <span class="or-usage-explore-filter-label">{{ m('Search', 'Tìm', 'ค้นหา') }}</span>
         <code class="or-usage-model">{{ searchQuery.trim() }}</code>
         <button type="button" class="or-usage-explore-filter-clear" @click="clearSearchFilter">
-          {{ isVi ? 'Xóa lọc' : 'Clear filter' }}
+          {{ m('Clear filter', 'Xóa lọc', 'ล้างตัวกรอง') }}
         </button>
       </div>
     </div>
 
     <div class="or-usage-toolbar" :class="{ 'or-usage-toolbar--sticky': logsOnly }">
       <div class="or-usage-filters">
-        <div class="or-usage-filter-group" role="group" :aria-label="isVi ? 'Khoảng thời gian' : 'Time range'">
+        <div class="or-usage-filter-group" role="group" :aria-label="m('Time range', 'Khoảng thời gian', 'ช่วงเวลา')">
           <button
             v-for="opt in rangeOptions"
             :key="opt.id"
@@ -767,7 +795,7 @@ onMounted(() => {
             {{ opt.label }}
           </button>
         </div>
-        <div class="or-usage-filter-group" role="group" :aria-label="isVi ? 'Loại job' : 'Job type'">
+        <div class="or-usage-filter-group" role="group" :aria-label="m('Job type', 'Loại job', 'ประเภทงาน')">
           <button
             v-for="opt in typeOptions"
             :key="opt.id"
@@ -786,10 +814,10 @@ onMounted(() => {
           v-model="searchQuery"
           type="search"
           class="or-usage-search"
-          :placeholder="isVi ? 'Tìm model hoặc prompt…' : 'Search model or prompt…'"
+          :placeholder="m('Search model or prompt…', 'Tìm model hoặc prompt…', 'ค้นหา model หรือ prompt…')"
         />
         <button type="button" class="or-app-btn or-app-btn-ghost or-app-btn-sm" :disabled="loading" @click="reloadRecords">
-          {{ loading ? (isVi ? 'Đang tải…' : 'Loading…') : isVi ? 'Làm mới' : 'Refresh' }}
+          {{ loading ? m('Loading…', 'Đang tải…', 'กำลังโหลด…') : m('Refresh', 'Làm mới', 'รีเฟรช') }}
         </button>
         <button
           type="button"
@@ -799,57 +827,53 @@ onMounted(() => {
         >
           {{
             exploreExporting
-              ? isVi
-                ? 'Đang xuất…'
-                : 'Exporting…'
-              : isVi
-                ? 'Xuất CSV'
-                : 'Export CSV'
+              ? m('Exporting…', 'Đang xuất…', 'กำลังส่งออก…')
+              : m('Export CSV', 'Xuất CSV', 'ส่งออก CSV')
           }}
         </button>
       </div>
     </div>
 
     <p v-if="statsError && showStatsBlocks" class="or-app-error or-usage-note">
-      {{ isVi ? 'Stats:' : 'Stats:' }} {{ statsError }}
+      {{ m('Stats:', 'Stats:', 'สถิติ:') }} {{ statsError }}
     </p>
     <p v-if="listError" class="or-app-error or-usage-note">
-      {{ isVi ? 'Job logs:' : 'Job logs:' }} {{ listError }}
+      {{ m('Job logs:', 'Job logs:', 'บันทึกงาน:') }} {{ listError }}
     </p>
 
     <ActivityUsageCharts
       v-if="showStatsBlocks && trendsOnly"
       :chart="statsData?.chart"
       :chart-days="chartDays"
-      :is-vi="isVi"
+      :locale="locale"
       :loading="loading"
     />
 
     <div v-if="showStatsBlocks" class="or-app-panel or-usage-chart-panel">
       <div class="or-usage-chart-head">
-        <h3 class="or-app-panel-title">{{ isVi ? 'Biểu đồ theo thời gian' : 'Activity over time' }}</h3>
+        <h3 class="or-app-panel-title">{{ m('Activity over time', 'Biểu đồ theo thời gian', 'กิจกรรมตามเวลา') }}</h3>
         <select
           v-if="!trendsOnly"
           v-model.number="chartDays"
           class="or-usage-chart-select"
           aria-label="Chart range"
         >
-          <option :value="7">{{ isVi ? '7 ngày' : '7 days' }}</option>
-          <option :value="14">{{ isVi ? '14 ngày' : '14 days' }}</option>
-          <option :value="30">{{ isVi ? '30 ngày' : '30 days' }}</option>
+          <option :value="7">{{ m('7 days', '7 ngày', '7 วัน') }}</option>
+          <option :value="14">{{ m('14 days', '14 ngày', '14 วัน') }}</option>
+          <option :value="30">{{ m('30 days', '30 ngày', '30 วัน') }}</option>
         </select>
       </div>
       <div class="or-usage-chart-legend">
-        <span class="or-usage-legend-item or-usage-legend-item--image">{{ isVi ? 'Ảnh' : 'Image' }}</span>
+        <span class="or-usage-legend-item or-usage-legend-item--image">{{ m('Image', 'Ảnh', 'รูปภาพ') }}</span>
         <span class="or-usage-legend-item or-usage-legend-item--video">Video</span>
         <span class="or-usage-legend-item or-usage-legend-item--audio">Audio</span>
-        <span class="or-usage-legend-item or-usage-legend-item--music">{{ isVi ? 'Nhạc' : 'Music' }}</span>
+        <span class="or-usage-legend-item or-usage-legend-item--music">{{ m('Music', 'Nhạc', 'เพลง') }}</span>
       </div>
       <div v-if="loading" class="or-activity-skeleton or-activity-skeleton--chart" aria-hidden="true" />
       <div v-else-if="chartSeries.every((p) => p.total === 0)" class="or-usage-chart-empty or-app-muted">
-        {{ isVi ? 'Chưa có dữ liệu trong khoảng đã chọn.' : 'No data in the selected range.' }}
+        {{ m('No data in the selected range.', 'Chưa có dữ liệu trong khoảng đã chọn.', 'ไม่มีข้อมูลในช่วงที่เลือก') }}
       </div>
-      <div v-else class="or-usage-chart" role="img" :aria-label="isVi ? 'Biểu đồ lượt gen' : 'Generation chart'">
+      <div v-else class="or-usage-chart" role="img" :aria-label="m('Generation chart', 'Biểu đồ lượt gen', 'กราฟการสร้าง')">
         <div v-for="(point, idx) in chartSeries" :key="`${point.label}-${idx}`" class="or-usage-chart-col">
           <div class="or-usage-chart-bar-track">
             <div class="or-usage-chart-stack" :style="{ height: `${colHeight(point.total)}%` }" :title="`${point.total} · ${formatCredits(point.credit)}`">
@@ -883,11 +907,11 @@ onMounted(() => {
     <div v-if="showJobList" class="or-usage-table-wrap" :class="{ 'or-usage-explore-wrap': logsOnly }">
       <div class="or-usage-explore-head">
         <div>
-          <h3 class="or-app-panel-title">{{ isVi ? 'Job logs' : 'Job logs' }}</h3>
+          <h3 class="or-app-panel-title">{{ m('Job logs', 'Job logs', 'บันทึกงาน') }}</h3>
           <p v-if="logsOnly && (exploreLogSummary || searchDeepening)" class="or-usage-explore-meta or-app-muted">
             <template v-if="exploreLogSummary">{{ exploreLogSummary }}</template>
             <span v-if="hasActiveExploreFilters && exploreFilterSummary"> · {{ exploreFilterSummary }}</span>
-            <span v-if="searchDeepening"> · {{ isVi ? 'Đang quét thêm trang…' : 'Scanning more pages…' }}</span>
+            <span v-if="searchDeepening"> · {{ m('Scanning more pages…', 'Đang quét thêm trang…', 'กำลังสแกนหน้าถัดไป…') }}</span>
           </p>
         </div>
         <a
@@ -895,7 +919,7 @@ onMounted(() => {
           :href="exploreTrendsHref"
           class="or-profile-section-link or-profile-section-link--sm"
         >
-          {{ isVi ? 'Trends' : 'Trends' }} →
+          {{ m('Trends', 'Trends', 'แนวโน้ม') }} →
         </a>
       </div>
 
@@ -908,7 +932,7 @@ onMounted(() => {
           class="or-app-btn or-app-btn-ghost or-app-btn-sm"
           @click="clearAllExploreFilters"
         >
-          {{ isVi ? 'Xóa tất cả bộ lọc' : 'Clear all filters' }}
+          {{ m('Clear all filters', 'Xóa tất cả bộ lọc', 'ล้างตัวกรองทั้งหมด') }}
         </button>
       </div>
       <div v-else class="or-app-panel or-usage-explore-panel">
@@ -916,12 +940,12 @@ onMounted(() => {
           <table class="or-usage-table or-usage-table--explore">
             <thead>
               <tr>
-                <th>{{ isVi ? 'Thời gian' : 'Time' }}</th>
-                <th>{{ isVi ? 'Loại' : 'Type' }}</th>
+                <th>{{ m('Time', 'Thời gian', 'เวลา') }}</th>
+                <th>{{ m('Type', 'Loại', 'ประเภท') }}</th>
                 <th>Model</th>
                 <th>Prompt</th>
-                <th>{{ isVi ? 'Credit' : 'Credit' }}</th>
-                <th>{{ isVi ? 'Trạng thái' : 'Status' }}</th>
+                <th>{{ m('Credit', 'Credit', 'เครดิต') }}</th>
+                <th>{{ m('Status', 'Trạng thái', 'สถานะ') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -935,11 +959,11 @@ onMounted(() => {
                 @keydown.enter="openJobDetail(row)"
               >
                 <td class="or-usage-td-time">
-                  {{ formatUsageTime(listItemCreatedAt(row) || '', isVi) }}
+                  {{ formatUsageTime(listItemCreatedAt(row) || '', locale) }}
                 </td>
                 <td>
                   <span class="or-usage-type-chip" :class="`or-usage-type-chip--${row.type || 'image'}`">
-                    {{ jobTypeLabel((row.type as UsageStatsType) || 'image', isVi) }}
+                    {{ jobTypeLabel((row.type as UsageStatsType) || 'image', locale) }}
                   </span>
                 </td>
                 <td><code class="or-usage-model">{{ row.model || '—' }}</code></td>
@@ -962,9 +986,11 @@ onMounted(() => {
       <div v-if="logsOnly && listHasMore && filteredListItems.length > 0" class="or-usage-load-more">
         <p class="or-usage-load-more-meta or-app-muted">
           {{
-            isVi
-              ? `Đã tải ${listItems.length} job${listHasMore ? ' — còn thêm từ Gommo' : ''}`
-              : `${listItems.length} jobs loaded${listHasMore ? ' — more available' : ''}`
+            m(
+              `${listItems.length} jobs loaded${listHasMore ? ' — more available' : ''}`,
+              `Đã tải ${listItems.length} job${listHasMore ? ' — còn thêm từ Gommo' : ''}`,
+              `โหลดแล้ว ${listItems.length} งาน${listHasMore ? ' — ยังมีจาก Gommo' : ''}`,
+            )
           }}
         </p>
         <button
@@ -973,29 +999,29 @@ onMounted(() => {
           :disabled="listLoading || searchDeepening"
           @click="loadMoreList"
         >
-          {{ listLoading ? (isVi ? 'Đang tải…' : 'Loading…') : isVi ? 'Tải thêm' : 'Load more' }}
+          {{ listLoading ? m('Loading…', 'Đang tải…', 'กำลังโหลด…') : m('Load more', 'Tải thêm', 'โหลดเพิ่ม') }}
         </button>
       </div>
     </div>
 
     <div v-if="showStatsBlocks && (tableRows.length > 0 || (trendsOnly && loading))" class="or-usage-table-wrap">
-      <h3 class="or-app-panel-title">{{ isVi ? 'Tổng hợp theo ngày' : 'Daily summary' }}</h3>
+      <h3 class="or-app-panel-title">{{ m('Daily summary', 'Tổng hợp theo ngày', 'สรุปรายวัน') }}</h3>
       <div v-if="loading && tableRows.length === 0" class="or-activity-skeleton or-activity-skeleton--table" aria-hidden="true" />
       <div v-else class="or-usage-table-scroll">
         <table class="or-usage-table or-usage-table--stats">
           <thead>
             <tr>
-              <th>{{ isVi ? 'Ngày' : 'Date' }}</th>
-              <th v-if="showTypeCols">{{ isVi ? 'Ảnh' : 'Image' }}</th>
+              <th>{{ m('Date', 'Ngày', 'วันที่') }}</th>
+              <th v-if="showTypeCols">{{ m('Image', 'Ảnh', 'รูปภาพ') }}</th>
               <th v-if="showTypeCols">Video</th>
               <th v-if="showTypeCols">Audio</th>
-              <th v-if="showTypeCols">{{ isVi ? 'Nhạc' : 'Music' }}</th>
-              <th>{{ isVi ? 'Tổng' : 'Total' }}</th>
-              <th>{{ isVi ? 'OK' : 'OK' }}</th>
-              <th>{{ isVi ? 'Lỗi' : 'Err' }}</th>
-              <th>{{ isVi ? 'Credit' : 'Credit' }}</th>
-              <th>{{ isVi ? 'Hoàn' : 'Refund' }}</th>
-              <th>{{ isVi ? 'Thực' : 'Net' }}</th>
+              <th v-if="showTypeCols">{{ m('Music', 'Nhạc', 'เพลง') }}</th>
+              <th>{{ m('Total', 'Tổng', 'รวม') }}</th>
+              <th>{{ m('OK', 'OK', 'OK') }}</th>
+              <th>{{ m('Err', 'Lỗi', 'ผิดพลาด') }}</th>
+              <th>{{ m('Credit', 'Credit', 'เครดิต') }}</th>
+              <th>{{ m('Refund', 'Hoàn', 'คืนเครดิต') }}</th>
+              <th>{{ m('Net', 'Thực', 'สุทธิ') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -1020,7 +1046,7 @@ onMounted(() => {
     <UsageJobDetailModal
       :open="jobDetailOpen"
       :item="selectedJob"
-      :is-vi="isVi"
+      :locale="locale"
       :share-href="exploreJobShareHref"
       @close="closeJobDetail"
     />

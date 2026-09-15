@@ -10,6 +10,7 @@ import { clearAuth, getStoredToken } from './models/auth-api';
 import {
   PLAYGROUND_LOCALE_EVENT,
   playgroundLocaleFromPath,
+  LOCALE_MENU_LABEL_SET,
   playgroundLocaleMenuItems,
   syncPlaygroundStorageFromUrl,
   tryHybridLocaleSwitch,
@@ -31,6 +32,13 @@ import {
 
 } from './models/docs-nav';
 
+import {
+  localeFromVitepressLang,
+  localePrefix,
+  pickMsg,
+  type PortalLocale,
+} from './models/portal-locale';
+
 import SiteFooter from './components/SiteFooter.vue';
 
 
@@ -51,13 +59,18 @@ const subNavEl = ref<HTMLElement | null>(null);
 
 const playgroundImmersive = computed(() => isPlaygroundImmersivePath(route.path));
 
-const isVi = computed(() => lang.value === 'vi-VN');
+const hybridNavLocale = ref<PortalLocale | null>(null);
 
-const hybridNavVi = ref<boolean | null>(null);
+const navLocale = computed((): PortalLocale => {
+  if (hybridNavLocale.value) return hybridNavLocale.value;
+  return localeFromVitepressLang(lang.value);
+});
 
-const navIsVi = computed(() => hybridNavVi.value ?? isVi.value);
+const prefix = computed(() => localePrefix(navLocale.value));
 
-const prefix = computed(() => (navIsVi.value ? '/vi' : ''));
+function navMsg(en: string, vi: string, th?: string): string {
+  return pickMsg(navLocale.value, en, vi, th);
+}
 
 
 
@@ -78,15 +91,26 @@ const docsSubNav = computed(() => {
   const zone = getDocsZone(route.path);
 
   return [
-
-    { id: 'guide' as const, label: 'Docs', href: `${p}/quickstart` },
-
-    { id: 'reference' as const, label: 'API Reference', href: `${p}/reference/openapi` },
-
-    { id: 'sdk' as const, label: 'Client SDKs', href: `${p}/sdk/` },
-
-    { id: 'cookbook' as const, label: 'Cookbook', href: `${p}/cookbook/` },
-
+    {
+      id: 'guide' as const,
+      label: navMsg('Docs', 'Docs', 'เอกสาร'),
+      href: `${p}/quickstart`,
+    },
+    {
+      id: 'reference' as const,
+      label: navMsg('API Reference', 'API Reference', 'อ้างอิง API'),
+      href: `${p}/reference/openapi`,
+    },
+    {
+      id: 'sdk' as const,
+      label: navMsg('Client SDKs', 'Client SDKs', 'SDK ไคลเอนต์'),
+      href: `${p}/sdk/`,
+    },
+    {
+      id: 'cookbook' as const,
+      label: navMsg('Cookbook', 'Cookbook', 'คู่มือปฏิบัติ'),
+      href: `${p}/cookbook/`,
+    },
   ].map((item) => ({ ...item, active: zone === item.id }));
 
 });
@@ -102,18 +126,23 @@ function refreshSignedIn() {
 
 
 const HYBRID_VP_NAV = [
-  { en: 'Home', vi: 'Trang chủ', hrefEn: '/app/', hrefVi: '/vi/app/' },
-  { en: 'Models', vi: 'Models', hrefEn: '/models/', hrefVi: '/vi/models/' },
-  { en: 'Playground', vi: 'Playground', hrefEn: '/app/playground/', hrefVi: '/vi/app/playground/' },
-  { en: 'Chat', vi: 'Chat', hrefEn: '/app/chat/', hrefVi: '/vi/app/chat/' },
-  { en: 'Docs', vi: 'Docs', hrefEn: '/quickstart', hrefVi: '/vi/quickstart' },
+  { en: 'Home', vi: 'Trang chủ', th: 'หน้าแรก', hrefEn: '/app/', hrefVi: '/vi/app/', hrefTh: '/th/app/' },
+  { en: 'Models', vi: 'Models', th: 'โมเดล', hrefEn: '/models/', hrefVi: '/vi/models/', hrefTh: '/th/models/' },
+  { en: 'Playground', vi: 'Playground', th: 'สนามทดลอง', hrefEn: '/app/playground/', hrefVi: '/vi/app/playground/', hrefTh: '/th/app/playground/' },
+  { en: 'Chat', vi: 'Chat', th: 'แชท', hrefEn: '/app/chat/', hrefVi: '/vi/app/chat/', hrefTh: '/th/app/chat/' },
+  { en: 'Docs', vi: 'Docs', th: 'เอกสาร', hrefEn: '/quickstart', hrefVi: '/vi/quickstart', hrefTh: '/th/quickstart' },
 ];
+
+function hybridNavHref(item: (typeof HYBRID_VP_NAV)[number]): string {
+  const loc = navLocale.value;
+  if (loc === 'vi') return item.hrefVi;
+  if (loc === 'th') return item.hrefTh;
+  return item.hrefEn;
+}
 
 function patchHybridVpNavMenu() {
 
   if (typeof document === 'undefined' || !appShell.value) return;
-
-  const vi = navIsVi.value;
 
   const origin = window.location.origin;
 
@@ -127,11 +156,11 @@ function patchHybridVpNavMenu() {
 
     for (const item of HYBRID_VP_NAV) {
 
-      if (label !== item.en && label !== item.vi) continue;
+      if (label !== item.en && label !== item.vi && label !== item.th) continue;
 
-      link.textContent = vi ? item.vi : item.en;
+      link.textContent = navMsg(item.en, item.vi, item.th);
 
-      link.href = `${origin}${vi ? item.hrefVi : item.hrefEn}`;
+      link.href = `${origin}${hybridNavHref(item)}`;
 
       break;
 
@@ -161,7 +190,7 @@ function patchNavHomeLink() {
 
   if (typeof document === 'undefined') return;
 
-  const homeLabels = navIsVi.value ? ['Trang chủ'] : ['Home'];
+  const homeLabels = [navMsg('Home', 'Trang chủ', 'หน้าแรก')];
 
   for (const link of document.querySelectorAll('.VPNavBarMenu a')) {
 
@@ -191,9 +220,17 @@ function patchDocsNavActive() {
 
   const inDocs = showSubNav.value;
 
+  const docsLabels = new Set([
+    'Docs',
+    'Tài liệu',
+    navMsg('Docs', 'Docs', 'เอกสาร'),
+  ]);
+
   for (const link of document.querySelectorAll('.VPNavBarMenu a')) {
 
-    if (link.textContent?.trim() === 'Docs') {
+    const label = link.textContent?.trim();
+
+    if (label && docsLabels.has(label)) {
 
       link.classList.toggle('active', inDocs);
 
@@ -283,7 +320,7 @@ function localeMenuLinks(root: Element): HTMLAnchorElement[] {
 
     const label = link.textContent?.trim();
 
-    return label === 'English' || label === 'Tiếng Việt';
+    return Boolean(label && LOCALE_MENU_LABEL_SET.has(label));
 
   });
 
@@ -327,35 +364,19 @@ function createHybridLocaleMenuLink(host: Element, item: PlaygroundLocaleMenuIte
 
 function syncPlaygroundLocaleLinksInRoot(root: Element, items: PlaygroundLocaleMenuItem[]) {
 
-  const existing = localeMenuLinks(root);
-
   const host = localeMenuLinkHost(root);
 
-  for (let i = 0; i < items.length; i++) {
+  cleanupHybridLocaleMenuLinks(root);
 
-    const item = items[i]!;
+  for (const link of localeMenuLinks(root)) {
 
-    const link = existing[i];
-
-    if (link) {
-
-      link.dataset.gwHybridLocale = item.locale;
-
-      link.closest('li.VPMenuLink')?.setAttribute('data-gw-hybrid-locale', item.locale);
-
-      applyPlaygroundLocaleMenuItem(link, item);
-
-      continue;
-
-    }
-
-    createHybridLocaleMenuLink(host, item);
+    removeLocaleMenuLink(link);
 
   }
 
-  for (let i = items.length; i < existing.length; i++) {
+  for (const item of items) {
 
-    removeLocaleMenuLink(existing[i]!);
+    createHybridLocaleMenuLink(host, item);
 
   }
 
@@ -463,7 +484,8 @@ function syncLayoutChrome() {
 
   if (typeof document !== 'undefined') {
 
-    document.documentElement.lang = navIsVi.value ? 'vi' : 'en';
+    document.documentElement.lang =
+      navLocale.value === 'vi' ? 'vi' : navLocale.value === 'th' ? 'th' : 'en';
 
   }
 
@@ -475,7 +497,7 @@ function syncHybridNavFromUrl() {
 
   if (!appShell.value) {
 
-    hybridNavVi.value = null;
+    hybridNavLocale.value = null;
 
     return;
 
@@ -483,7 +505,7 @@ function syncHybridNavFromUrl() {
 
   if (typeof window === 'undefined') {
 
-    hybridNavVi.value = isVi.value;
+    hybridNavLocale.value = localeFromVitepressLang(lang.value);
 
     return;
 
@@ -491,7 +513,7 @@ function syncHybridNavFromUrl() {
 
   const locale = playgroundLocaleFromPath(window.location.pathname);
 
-  hybridNavVi.value = locale === 'vi';
+  hybridNavLocale.value = locale;
 
   syncPlaygroundStorageFromUrl(window.location.pathname);
 
@@ -505,7 +527,7 @@ function onPlaygroundLocaleEvent(event: Event) {
 
   if (!detail?.locale) return;
 
-  hybridNavVi.value = detail.locale === 'vi';
+  hybridNavLocale.value = detail.locale;
 
   nextTick(syncLayoutChrome);
 
@@ -615,7 +637,7 @@ function signOut() {
 
         class="gw-docs-subnav"
 
-        aria-label="Documentation"
+        :aria-label="navMsg('Documentation', 'Tài liệu', 'เอกสาร')"
 
       >
 
@@ -663,7 +685,7 @@ function signOut() {
 
           <button type="button" class="gw-nav-btn gw-nav-btn-ghost" @click="signOut">
 
-            {{ navIsVi ? 'Đăng xuất' : 'Sign out' }}
+            {{ navMsg('Sign out', 'Đăng xuất', 'ออกจากระบบ') }}
 
           </button>
 
@@ -672,11 +694,11 @@ function signOut() {
         <template v-else>
 
           <a :href="`${prefix}/login/`" class="gw-nav-link">
-            {{ navIsVi ? 'Đăng nhập' : 'Sign in' }}
+            {{ navMsg('Sign in', 'Đăng nhập', 'เข้าสู่ระบบ') }}
           </a>
 
           <a :href="`${prefix}/signup/`" class="gw-nav-btn gw-nav-btn-primary">
-            {{ navIsVi ? 'Đăng ký' : 'Sign Up' }}
+            {{ navMsg('Sign Up', 'Đăng ký', 'สมัครสมาชิก') }}
           </a>
 
         </template>

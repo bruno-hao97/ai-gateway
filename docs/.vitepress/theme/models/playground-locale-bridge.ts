@@ -1,20 +1,26 @@
 import { playgroundOrigin } from './gateway-base';
-import { isAppShellPath, stripLocale } from './docs-nav';
+import { isAppShellPath } from './docs-nav';
+import {
+  localizedPath,
+  localeFromPath,
+  localePrefix,
+  normalizePortalLocale,
+  stripLocaleFromPath,
+  type PortalLocale,
+} from './portal-locale';
 
-export type PlaygroundPortalLocale = 'en' | 'vi';
+export type PlaygroundPortalLocale = PortalLocale;
 
 const EMBED_STORE_KEY = '__gwApiPlaygroundEmbed';
 
 export function normalizePlaygroundPortalLocale(raw: string): PlaygroundPortalLocale {
-  const v = String(raw || '').toLowerCase();
-  if (v === 'vi' || v === 'vi-vn' || v.startsWith('vi')) return 'vi';
-  return 'en';
+  return normalizePortalLocale(raw);
 }
 
-/** Playground UI locale from browser path (/vi/ prefix). */
+/** Playground UI locale from browser path (/vi/ or /th/ prefix). */
 export function playgroundLocaleFromPath(path?: string): PlaygroundPortalLocale {
   const p = path ?? (typeof window !== 'undefined' ? window.location.pathname : '/');
-  return stripLocale(p).locale;
+  return localeFromPath(p);
 }
 
 /** Keep portal_ui_lang aligned with the playground URL (URL is source of truth). */
@@ -37,8 +43,9 @@ export function resolvePlaygroundLocaleNavTarget(
   currentPath: string,
 ): PlaygroundPortalLocale | null {
   try {
-    const target = stripLocale(new URL(linkHref, window.location.origin).pathname);
-    const current = stripLocale(currentPath);
+    const targetPath = new URL(linkHref, window.location.origin).pathname;
+    const target = stripLocaleFromPath(targetPath);
+    const current = stripLocaleFromPath(currentPath);
     if (target.path !== current.path) return null;
     return target.locale;
   } catch {
@@ -46,7 +53,7 @@ export function resolvePlaygroundLocaleNavTarget(
   }
 }
 
-/** Same logical page in the other docs locale (playground hybrid switch). */
+/** Same logical page in another docs locale (playground hybrid switch). */
 export function resolvePlaygroundLocaleSwitch(
   linkHref: string,
   currentPath: string,
@@ -59,9 +66,8 @@ export function resolvePlaygroundLocaleSwitch(
 }
 
 export function localizedPlaygroundPath(path: string, locale: PlaygroundPortalLocale): string {
-  const { path: bare } = stripLocale(path);
-  if (locale === 'vi') return bare === '/' ? '/vi' : `/vi${bare}`;
-  return bare;
+  const { path: bare } = stripLocaleFromPath(path);
+  return localizedPath(bare, locale);
 }
 
 export interface PlaygroundLocaleMenuItem {
@@ -71,17 +77,26 @@ export interface PlaygroundLocaleMenuItem {
   active: boolean;
 }
 
-/** Fixed EN/VI entries for hybrid playground locale menu (URL + query preserved). */
+export const LOCALE_MENU_LABELS: Record<PlaygroundPortalLocale, string> = {
+  en: 'English',
+  vi: 'Tiếng Việt',
+  th: 'ไทย',
+};
+
+export const LOCALE_MENU_LABEL_SET = new Set(Object.values(LOCALE_MENU_LABELS));
+
+/** Fixed locale entries for hybrid playground locale menu (URL + query preserved). */
 export function playgroundLocaleMenuItems(): PlaygroundLocaleMenuItem[] {
   const suffix =
     typeof window !== 'undefined' ? window.location.search + window.location.hash : '';
   const path =
     typeof window !== 'undefined' ? window.location.pathname : '/app/playground';
   const current = playgroundLocaleFromPath(path);
-  return (['en', 'vi'] as const).map((locale) => ({
+  const { path: bare } = stripLocaleFromPath(path);
+  return (['en', 'vi', 'th'] as const).map((locale) => ({
     locale,
-    label: locale === 'vi' ? 'Tiếng Việt' : 'English',
-    href: localizedPlaygroundPath(path, locale) + suffix,
+    label: LOCALE_MENU_LABELS[locale],
+    href: localizedPath(bare, locale) + suffix,
     active: locale === current,
   }));
 }
@@ -90,15 +105,15 @@ function normalizeNavPath(path: string): string {
   return path.split('?')[0]?.split('#')[0] ?? path;
 }
 
-/** Same app-shell page, locale prefix may differ (/app ↔ /vi/app). */
+/** Same app-shell page, locale prefix may differ (/app ↔ /vi/app ↔ /th/app). */
 export function isHybridLocaleNav(fromPath: string, toHref: string): boolean {
   try {
     const fromBare = normalizeNavPath(fromPath);
     const toBare = normalizeNavPath(toHref);
     const toPathname = new URL(toBare, window.location.origin).pathname;
     if (!isAppShellPath(fromBare) || !isAppShellPath(toPathname)) return false;
-    const target = stripLocale(toPathname);
-    const current = stripLocale(fromBare);
+    const target = stripLocaleFromPath(toPathname);
+    const current = stripLocaleFromPath(fromBare);
     return target.path === current.path;
   } catch {
     return false;
@@ -116,7 +131,8 @@ export const PLAYGROUND_LOCALE_EVENT = 'gw-playground-locale';
 export function applyPlaygroundHybridLocale(locale: PlaygroundPortalLocale) {
   postPlaygroundLocale(locale);
   try {
-    const path = localizedPlaygroundPath(window.location.pathname, locale);
+    const { path: bare } = stripLocaleFromPath(window.location.pathname);
+    const path = localizedPath(bare, locale);
     const url = new URL(path, window.location.origin);
     url.search = window.location.search;
     url.hash = window.location.hash;

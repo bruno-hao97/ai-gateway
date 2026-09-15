@@ -335,21 +335,36 @@ export async function fetchTopupOrders(username: string, limit = 20): Promise<To
   return data.data || [];
 }
 
-export function formatTopupOrderStatus(status: TopupOrderStatus, isVi: boolean): string {
-  const labels: Record<TopupOrderStatus, [string, string]> = {
-    pending: ['Pending', 'Chờ thanh toán'],
-    paid: ['Paid', 'Đã thanh toán'],
-    credited: ['Credited', 'Đã cộng credits'],
-    failed: ['Failed', 'Thất bại'],
-  };
-  const pair = labels[status] || labels.pending;
-  return isVi ? pair[1] : pair[0];
+type OrderLocale = 'en' | 'vi' | 'th';
+
+function normalizeOrderLocale(localeOrVi: OrderLocale | boolean): OrderLocale {
+  if (typeof localeOrVi === 'boolean') return localeOrVi ? 'vi' : 'en';
+  return localeOrVi;
 }
 
-export function formatOrderDate(iso: string, isVi: boolean): string {
+export function formatTopupOrderStatus(
+  status: TopupOrderStatus,
+  localeOrVi: OrderLocale | boolean,
+): string {
+  const labels: Record<TopupOrderStatus, [string, string, string]> = {
+    pending: ['Pending', 'Chờ thanh toán', 'รอดำเนินการ'],
+    paid: ['Paid', 'Đã thanh toán', 'ชำระแล้ว'],
+    credited: ['Credited', 'Đã cộng credits', 'เครดิตเข้าแล้ว'],
+    failed: ['Failed', 'Thất bại', 'ล้มเหลว'],
+  };
+  const locale = normalizeOrderLocale(localeOrVi);
+  const triple = labels[status] || labels.pending;
+  if (locale === 'vi') return triple[1];
+  if (locale === 'th') return triple[2];
+  return triple[0];
+}
+
+export function formatOrderDate(iso: string, localeOrVi: OrderLocale | boolean): string {
   const d = Date.parse(iso);
   if (!Number.isFinite(d)) return iso;
-  return new Date(d).toLocaleString(isVi ? 'vi-VN' : undefined, {
+  const locale = normalizeOrderLocale(localeOrVi);
+  const dateLocale = locale === 'vi' ? 'vi-VN' : locale === 'th' ? 'th-TH' : undefined;
+  return new Date(d).toLocaleString(dateLocale, {
     dateStyle: 'medium',
     timeStyle: 'short',
   });

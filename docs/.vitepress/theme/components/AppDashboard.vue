@@ -73,7 +73,7 @@ const props = defineProps<{
 }>();
 
 const route = useRoute();
-const { isVi, prefix, locale: uiLocale } = useHybridLocale();
+const { isVi, prefix, locale: uiLocale, t } = useHybridLocale();
 
 const ready = ref(false);
 const me = ref<MeResponse | null>(getCachedMe());
@@ -141,60 +141,72 @@ const creditsHref = computed(() => `${prefix.value}/app/credits/`);
 const overviewWorkspaceCards = computed(() => [
   {
     id: 'activity',
-    title: 'Activity',
-    desc: isVi.value
-      ? 'Usage, trends, job logs và billing — analytics đầy đủ.'
-      : 'Usage, trends, job logs, and billing — full analytics.',
+    title: t('Activity', 'Activity', 'กิจกรรม'),
+    desc: t(
+      'Usage, trends, job logs, and billing — full analytics.',
+      'Usage, trends, job logs và billing — analytics đầy đủ.',
+      'การใช้งาน แนวโน้ม บันทึกงาน และการเรียกเก็บเงิน — วิเคราะห์ครบถ้วน',
+    ),
     href: overviewActivityHref.value,
-    cta: isVi.value ? 'Mở Activity' : 'Open Activity',
+    cta: t('Open Activity', 'Mở Activity', 'เปิดกิจกรรม'),
   },
   {
     id: 'token',
-    title: isVi.value ? 'Access token' : 'Access token',
-    desc: isVi.value
-      ? 'Bearer token, snippet Gateway và kiểm tra kết nối.'
-      : 'Bearer token, Gateway snippets, and connection checks.',
+    title: t('Access token', 'Access token', 'โทเค็นเข้าถึง'),
+    desc: t(
+      'Bearer token, Gateway snippets, and connection checks.',
+      'Bearer token, snippet Gateway và kiểm tra kết nối.',
+      'Bearer token ตัวอย่าง Gateway และตรวจสอบการเชื่อมต่อ',
+    ),
     href: `${prefix.value}/app/token/`,
-    cta: isVi.value ? 'Mở token' : 'Open token',
+    cta: t('Open token', 'Mở token', 'เปิดโทเค็น'),
   },
   {
     id: 'credits',
-    title: isVi.value ? 'Credits' : 'Credits',
-    desc: isVi.value
-      ? 'Nạp VietQR, KPI số dư và lịch sử đơn — credits cộng tự động.'
-      : 'VietQR top-up, balance KPIs, and order history — credits apply automatically.',
+    title: t('Credits', 'Credits', 'เครดิต'),
+    desc: t(
+      'VietQR top-up, balance KPIs, and order history — credits apply automatically.',
+      'Nạp VietQR, KPI số dư và lịch sử đơn — credits cộng tự động.',
+      'เติมเงิน VietQR KPI ยอดคงเหลือ และประวัติคำสั่ง — เครดิตอัปเดตอัตโนมัติ',
+    ),
     href: `${prefix.value}/app/credits/`,
-    cta: isVi.value ? 'Nạp credits' : 'Top up',
+    cta: t('Top up', 'Nạp credits', 'เติมเครดิต'),
   },
   {
     id: 'byok',
-    title: 'BYOK',
+    title: t('BYOK', 'BYOK', 'BYOK'),
     badge: 'beta',
-    desc: isVi.value
-      ? 'Provider key cho chat, link Gommo cho media — hybrid BYOK.'
-      : 'Provider keys for chat, linked Gommo for media — hybrid BYOK.',
+    desc: t(
+      'Provider keys for chat, linked Gommo for media — hybrid BYOK.',
+      'Provider key cho chat, link Gommo cho media — hybrid BYOK.',
+      'คีย์ผู้ให้บริการสำหรับแชท เชื่อม Gommo สำหรับมีเดีย — BYOK แบบ hybrid',
+    ),
     href: `${prefix.value}/app/byok/`,
-    cta: isVi.value ? 'Mở BYOK' : 'Open BYOK',
+    cta: t('Open BYOK', 'Mở BYOK', 'เปิด BYOK'),
   },
   {
     id: 'files',
-    title: isVi.value ? 'Files' : 'Files',
+    title: t('Files', 'Files', 'ไฟล์'),
     badge: 'beta',
-    desc: isVi.value
-      ? 'Upload ảnh/video và album Gommo — copy URL cho jobs.'
-      : 'Upload images/videos and Gommo album — copy URLs for jobs.',
+    desc: t(
+      'Upload images/videos and Gommo album — copy URLs for jobs.',
+      'Upload ảnh/video và album Gommo — copy URL cho jobs.',
+      'อัปโหลดรูป/วิดีโอและอัลบั้ม Gommo — คัดลอก URL สำหรับงาน',
+    ),
     href: `${prefix.value}/app/files/`,
-    cta: isVi.value ? 'Mở Files' : 'Open Files',
+    cta: t('Open Files', 'Mở Files', 'เปิดไฟล์'),
   },
   {
     id: 'observability',
-    title: 'Observability',
+    title: t('Observability', 'Observability', 'การสังเกต'),
     badge: 'beta',
-    desc: isVi.value
-      ? 'Webhook job (beta), mirror local và usage Gommo.'
-      : 'Job webhooks (beta), local mirror, and Gommo usage.',
+    desc: t(
+      'Job webhooks (beta), local mirror, and Gommo usage.',
+      'Webhook job (beta), mirror local và usage Gommo.',
+      'Webhook งาน (เบต้า) mirror ในเครื่อง และการใช้งาน Gommo',
+    ),
     href: `${prefix.value}/app/observability/`,
-    cta: isVi.value ? 'Mở Observability' : 'Open Observability',
+    cta: t('Open Observability', 'Mở Observability', 'เปิด Observability'),
   },
 ]);
 
@@ -224,55 +236,74 @@ const maskedToken = computed(() => {
 });
 
 const navDeveloper = computed((): AppNavItem[] => [
-  { id: 'overview', label: isVi.value ? 'Tổng quan' : 'Overview', href: `${prefix.value}/app/`, icon: 'home' },
+  {
+    id: 'overview',
+    label: t('Overview', 'Tổng quan', 'ภาพรวม'),
+    href: `${prefix.value}/app/`,
+    icon: 'home',
+  },
   {
     id: 'token',
-    label: isVi.value ? 'Access token' : 'Access token',
+    label: t('Access token', 'Access token', 'โทเค็น'),
     href: `${prefix.value}/app/token/`,
     icon: 'key',
   },
   {
     id: 'files',
-    label: 'Files',
+    label: t('Files', 'Files', 'ไฟล์'),
     href: `${prefix.value}/app/files/`,
     icon: 'folder',
     badge: 'beta',
   },
   {
     id: 'observability',
-    label: 'Observability',
+    label: t('Observability', 'Observability', 'การสังเกต'),
     href: `${prefix.value}/app/observability/`,
     icon: 'observability',
     badge: 'beta',
   },
   {
     id: 'byok',
-    label: 'BYOK',
+    label: t('BYOK', 'BYOK', 'BYOK'),
     href: `${prefix.value}/app/byok/`,
     icon: 'key',
     badge: 'beta',
   },
-  { label: isVi.value ? 'Models' : 'Models', href: `${prefix.value}/models/`, icon: 'grid' },
-  { label: isVi.value ? 'So sánh' : 'Compare', href: `${prefix.value}/models/compare/`, icon: 'compare' },
+  { label: t('Models', 'Models', 'โมเดล'), href: `${prefix.value}/models/`, icon: 'grid' },
   {
-    label: isVi.value ? 'Tài liệu' : 'Documentation',
+    label: t('Compare', 'So sánh', 'เปรียบเทียบ'),
+    href: `${prefix.value}/models/compare/`,
+    icon: 'compare',
+  },
+  {
+    label: t('Documentation', 'Tài liệu', 'เอกสาร'),
     href: `${prefix.value}/quickstart`,
     icon: 'book',
   },
 ]);
 
 const navAccount = computed((): AppNavItem[] => [
-  { id: 'profile', label: isVi.value ? 'Hồ sơ' : 'Profile', href: `${prefix.value}/app/profile/`, icon: 'user' },
-  { id: 'credits', label: isVi.value ? 'Credits' : 'Credits', href: `${prefix.value}/app/credits/`, icon: 'wallet' },
+  {
+    id: 'profile',
+    label: t('Profile', 'Hồ sơ', 'โปรไฟล์'),
+    href: `${prefix.value}/app/profile/`,
+    icon: 'user',
+  },
+  {
+    id: 'credits',
+    label: t('Credits', 'Credits', 'เครดิต'),
+    href: `${prefix.value}/app/credits/`,
+    icon: 'wallet',
+  },
   {
     id: 'activity',
-    label: 'Activity',
+    label: t('Activity', 'Activity', 'กิจกรรม'),
     href: `${prefix.value}/app/activity/`,
     icon: 'activity',
   },
   {
     id: 'logs',
-    label: isVi.value ? 'Nhật ký' : 'Logs',
+    label: t('Logs', 'Nhật ký', 'บันทึก'),
     href: `${prefix.value}/app/activity/?tab=explore`,
     icon: 'logs',
   },
@@ -500,7 +531,7 @@ onMounted(async () => {
   if (!getStoredToken()) {
     if (!isPublicAppView()) {
       const returnPath = route.path + (typeof window !== 'undefined' ? window.location.search : '');
-      window.location.href = loginUrlWithRedirect(returnPath, prefix.value as '' | '/vi');
+      window.location.href = loginUrlWithRedirect(returnPath, prefix.value);
       return;
     }
     ready.value = true;
@@ -549,13 +580,13 @@ useVitepressUrlSync(syncDashboardFromLocation);
     <aside v-if="view !== 'chat' && view !== 'playground'" class="or-sidebar">
       <div class="or-app-workspace" aria-label="Workspace">
         <button type="button" class="or-app-workspace-btn" disabled>
-          <span>{{ isVi ? 'Workspace mặc định' : 'Default workspace' }}</span>
+          <span>{{ t('Default workspace', 'Workspace mặc định', 'พื้นที่ทำงานเริ่มต้น') }}</span>
           <AppNavIcon name="chevron" />
         </button>
       </div>
 
       <nav class="or-app-nav" aria-label="App">
-        <p class="or-app-nav-label">{{ isVi ? 'Developer' : 'Developer' }}</p>
+        <p class="or-app-nav-label">{{ t('Developer', 'Developer', 'นักพัฒนา') }}</p>
         <template v-for="item in navDeveloper" :key="item.label">
           <a
             v-if="item.href"
@@ -569,7 +600,7 @@ useVitepressUrlSync(syncDashboardFromLocation);
           </a>
         </template>
 
-        <p class="or-app-nav-label or-app-nav-label-account">{{ isVi ? 'Account' : 'Account' }}</p>
+        <p class="or-app-nav-label or-app-nav-label-account">{{ t('Account', 'Account', 'บัญชี') }}</p>
         <template v-for="item in navAccount" :key="item.id || item.label">
           <a
             v-if="item.href && !item.disabled"
@@ -594,7 +625,7 @@ useVitepressUrlSync(syncDashboardFromLocation);
 
       <div class="or-app-sidebar-foot">
         <a :href="creditsHref" class="or-app-sidebar-credits or-app-sidebar-credits-link">
-          {{ formatCredits(credits) }} credits
+          {{ formatCredits(credits) }} {{ t('credits', 'credits', 'เครดิต') }}
         </a>
         <p v-if="username" class="or-app-sidebar-user">@{{ username }}</p>
       </div>
@@ -604,96 +635,123 @@ useVitepressUrlSync(syncDashboardFromLocation);
       <header v-if="view !== 'chat' && view !== 'playground'" class="or-app-header">
         <div>
           <h1 class="or-app-title">
-            <template v-if="view === 'overview'">{{ isVi ? 'Tổng quan' : 'Overview' }}</template>
-            <template v-else-if="view === 'profile'">{{ isVi ? 'Hồ sơ' : 'Profile' }}</template>
-            <template v-else-if="view === 'playground'">Playground</template>
-            <template v-else-if="view === 'chat'">Chat</template>
-            <template v-else-if="view === 'token'">Access token</template>
+            <template v-if="view === 'overview'">{{ t('Overview', 'Tổng quan', 'ภาพรวม') }}</template>
+            <template v-else-if="view === 'profile'">{{ t('Profile', 'Hồ sơ', 'โปรไฟล์') }}</template>
+            <template v-else-if="view === 'playground'">{{ t('Playground', 'Playground', 'สนามทดลอง') }}</template>
+            <template v-else-if="view === 'chat'">{{ t('Chat', 'Chat', 'แชท') }}</template>
+            <template v-else-if="view === 'token'">{{ t('Access token', 'Access token', 'โทเค็นเข้าถึง') }}</template>
             <template v-else-if="view === 'files'">
-              Files <span class="or-app-title-badge">beta</span>
+              {{ t('Files', 'Files', 'ไฟล์') }} <span class="or-app-title-badge">beta</span>
             </template>
-            <template v-else-if="view === 'credits'">{{ isVi ? 'Credits' : 'Credits' }}</template>
+            <template v-else-if="view === 'credits'">{{ t('Credits', 'Credits', 'เครดิต') }}</template>
             <template v-else-if="view === 'byok'">
               BYOK <span class="or-app-title-badge">beta</span>
             </template>
             <template v-else-if="view === 'observability'">
-              Observability <span class="or-app-title-badge">beta</span>
+              {{ t('Observability', 'Observability', 'การสังเกต') }}
+              <span class="or-app-title-badge">beta</span>
             </template>
-            <template v-else-if="view === 'activity'">Activity</template>
+            <template v-else-if="view === 'activity'">{{ t('Activity', 'Activity', 'กิจกรรม') }}</template>
           </h1>
           <p v-if="view !== 'playground'" class="or-app-subtitle">
             <template v-if="view === 'overview'">
               {{
-                isVi
-                  ? 'Workspace gateway — credits, job và liên kết nhanh tới Playground, tài liệu.'
-                  : 'Your gateway workspace — credits, jobs, and quick links to Playground and docs.'
+                t(
+                  'Your gateway workspace — credits, jobs, and quick links to Playground and docs.',
+                  'Workspace gateway — credits, job và liên kết nhanh tới Playground, tài liệu.',
+                  'พื้นที่ทำงานเกตเวย์ — เครดิต งาน และลิงก์ด่วนไป Playground และเอกสาร',
+                )
               }}
             </template>
             <template v-else-if="view === 'profile'">
               <template v-if="profileSection === 'api'">
-                {{ isVi ? 'Bearer token và liên kết Access token.' : 'Bearer token and Access token shortcuts.' }}
+                {{
+                  t(
+                    'Bearer token and Access token shortcuts.',
+                    'Bearer token và liên kết Access token.',
+                    'Bearer token และลิงก์ Access token',
+                  )
+                }}
               </template>
               <template v-else>
                 {{
-                  isVi
-                    ? 'Xem trước usage, activity và API access — mở Activity để phân tích đầy đủ.'
-                    : 'Usage preview, activity summary, and API access — open Activity for full analytics.'
+                  t(
+                    'Usage preview, activity summary, and API access — open Activity for full analytics.',
+                    'Xem trước usage, activity và API access — mở Activity để phân tích đầy đủ.',
+                    'ตัวอย่างการใช้งาน กิจกรรม และ API — เปิดกิจกรรมเพื่อวิเคราะห์ครบ',
+                  )
                 }}
               </template>
             </template>
             <template v-else-if="view === 'token'">
               {{
-                isVi
-                  ? 'Credential console — token, trạng thái kết nối và snippet tích hợp.'
-                  : 'Credential console — token, connection status, and integration snippets.'
+                t(
+                  'Credential console — token, connection status, and integration snippets.',
+                  'Credential console — token, trạng thái kết nối và snippet tích hợp.',
+                  'คอนโซล credential — โทเค็น สถานะการเชื่อมต่อ และตัวอย่างการเชื่อมต่อ',
+                )
               }}
             </template>
             <template v-else-if="view === 'files'">
               {{
-                isVi
-                  ? 'Upload ảnh/video và duyệt album Gommo — dùng URL trong job hoặc Playground.'
-                  : 'Upload images and videos and browse your Gommo album — use URLs in jobs or Playground.'
+                t(
+                  'Upload images and videos and browse your Gommo album — use URLs in jobs or Playground.',
+                  'Upload ảnh/video và duyệt album Gommo — dùng URL trong job hoặc Playground.',
+                  'อัปโหลดรูป/วิดีโอและดูอัลบั้ม Gommo — ใช้ URL ในงานหรือ Playground',
+                )
               }}
             </template>
             <template v-else-if="view === 'credits'">
               {{
-                isVi
-                  ? 'Nạp credit qua Gommo (VietQR) — credits cộng tự động sau khi chuyển khoản.'
-                  : 'Top up via Gommo (VietQR) — credits apply automatically after bank transfer.'
+                t(
+                  'Top up via Gommo (VietQR) — credits apply automatically after bank transfer.',
+                  'Nạp credit qua Gommo (VietQR) — credits cộng tự động sau khi chuyển khoản.',
+                  'เติมเครดิตผ่าน Gommo (VietQR) — เครดิตอัปเดตอัตโนมัติหลังโอนเงิน',
+                )
               }}
             </template>
             <template v-else-if="view === 'byok'">
               {{
-                isVi
-                  ? 'Beta — mang key provider cho chat; Gommo account cho media. Map model và phí platform có thể thay đổi.'
-                  : 'Beta — bring provider keys for chat; Gommo accounts for media. Model map and platform fees may change.'
+                t(
+                  'Beta — bring provider keys for chat; Gommo accounts for media. Model map and platform fees may change.',
+                  'Beta — mang key provider cho chat; Gommo account cho media. Map model và phí platform có thể thay đổi.',
+                  'เบต้า — นำคีย์ provider สำหรับแชท; บัญชี Gommo สำหรับมีเดีย แผนที่โมเดลและค่าธรรมเนียมอาจเปลี่ยน',
+                )
               }}
             </template>
             <template v-else-if="view === 'observability'">
               {{
-                isVi
-                  ? 'Beta — usage Gommo, mirror local và webhook job (giới hạn; xem ghi chú trên trang).'
-                  : 'Beta — Gommo usage, local mirror, and job webhooks (limited scope; see on-page notes).'
+                t(
+                  'Beta — Gommo usage, local mirror, and job webhooks (limited scope; see on-page notes).',
+                  'Beta — usage Gommo, mirror local và webhook job (giới hạn; xem ghi chú trên trang).',
+                  'เบต้า — การใช้งาน Gommo mirror ในเครื่อง และ webhook งาน (จำกัด; ดูหมายเหตุในหน้า)',
+                )
               }}
             </template>
             <template v-else-if="view === 'activity'">
               {{
-                isVi
-                  ? 'Job và credit trên gateway — Overview, Trends, Explore, Billing.'
-                  : 'Jobs and credits on the gateway — Overview, Trends, Explore, Billing.'
+                t(
+                  'Jobs and credits on the gateway — Overview, Trends, Explore, Billing.',
+                  'Job và credit trên gateway — Overview, Trends, Explore, Billing.',
+                  'งานและเครดิตบนเกตเวย์ — ภาพรวม แนวโน้ม สำรวจ การเรียกเก็บเงิน',
+                )
               }}
             </template>
           </p>
           <p v-else class="or-app-subtitle">
             {{
-              isVi
-                ? 'Tạo ảnh/video — catalog từ gateway, job async wait.'
-                : 'Generate image/video — catalog from gateway, async wait jobs.'
+              t(
+                'Generate image/video — catalog from gateway, async wait jobs.',
+                'Tạo ảnh/video — catalog từ gateway, job async wait.',
+                'สร้างรูป/วิดีโอ — แคตตาล็อกจากเกตเวย์ งาน async',
+              )
             }}
           </p>
         </div>
         <div class="or-app-header-actions">
-          <a :href="creditsHref" class="or-app-credits-pill">{{ formatCredits(credits) }} credits</a>
+          <a :href="creditsHref" class="or-app-credits-pill">
+            {{ formatCredits(credits) }} {{ t('credits', 'credits', 'เครดิต') }}
+          </a>
           <button
             type="button"
             class="or-app-btn or-app-btn-ghost"
@@ -717,13 +775,13 @@ useVitepressUrlSync(syncDashboardFromLocation);
                               : refreshProfile()
             "
           >
-            {{ isVi ? 'Làm mới' : 'Refresh' }}
+            {{ t('Refresh', 'Làm mới', 'รีเฟรช') }}
           </button>
         </div>
       </header>
 
       <div v-if="!ready" class="or-app-loading">
-        {{ isVi ? 'Đang tải…' : 'Loading…' }}
+        {{ t('Loading…', 'Đang tải…', 'กำลังโหลด…') }}
       </div>
 
       <div v-else-if="loadError && view !== 'playground' && view !== 'chat'" class="or-app-alert">{{ loadError }}</div>
@@ -751,22 +809,22 @@ useVitepressUrlSync(syncDashboardFromLocation);
               />
               <div v-else class="or-app-profile-hero-avatar">{{ profileInitials }}</div>
               <div class="or-app-profile-hero-text">
-                <p class="or-app-hero-kicker">{{ isVi ? 'Xin chào' : 'Welcome back' }}</p>
+                <p class="or-app-hero-kicker">{{ t('Welcome back', 'Xin chào', 'ยินดีต้อนรับกลับ') }}</p>
                 <h2 class="or-app-profile-hero-name">{{ displayName }}</h2>
                 <p v-if="username" class="or-app-profile-hero-handle">@{{ username }}</p>
                 <p class="or-app-hero-balance">
-                  {{ isVi ? 'Số dư' : 'Balance' }}:
-                  <strong>{{ formatCredits(credits) }}</strong> credits
+                  {{ t('Balance', 'Số dư', 'ยอดคงเหลือ') }}:
+                  <strong>{{ formatCredits(credits) }}</strong> {{ t('credits', 'credits', 'เครดิต') }}
                   <span v-if="creditsApproxUsd" class="or-app-hero-balance-usd">{{ creditsApproxUsd }}</span>
                 </p>
               </div>
             </div>
             <div class="or-overview-hero-actions">
               <a :href="`${prefix}/app/playground/`" class="or-app-btn or-app-btn-primary">
-                {{ isVi ? 'Mở Playground' : 'Open Playground' }}
+                {{ t('Open Playground', 'Mở Playground', 'เปิด Playground') }}
               </a>
               <a :href="overviewActivityHref" class="or-app-btn or-app-btn-ghost">
-                {{ isVi ? 'Activity' : 'Activity' }}
+                {{ t('Activity', 'Activity', 'กิจกรรม') }}
               </a>
               <button
                 type="button"
@@ -774,7 +832,11 @@ useVitepressUrlSync(syncDashboardFromLocation);
                 :disabled="!token"
                 @click="copyToken"
               >
-                {{ copied ? (isVi ? 'Đã copy!' : 'Copied!') : isVi ? 'Copy token' : 'Copy token' }}
+                {{
+                  copied
+                    ? t('Copied!', 'Đã copy!', 'คัดลอกแล้ว!')
+                    : t('Copy token', 'Copy token', 'คัดลอกโทเค็น')
+                }}
               </button>
             </div>
           </div>
@@ -782,33 +844,37 @@ useVitepressUrlSync(syncDashboardFromLocation);
           <div v-if="showLowCreditsBanner" class="or-overview-banner or-overview-banner--warn" role="status">
             <p>
               {{
-                isVi
-                  ? `Số dư thấp (${formatCredits(credits)} credits) — nạp thêm để tránh job bị dừng giữa chừng.`
-                  : `Low balance (${formatCredits(credits)} credits) — top up to avoid interrupted jobs.`
+                t(
+                  `Low balance (${formatCredits(credits)} credits) — top up to avoid interrupted jobs.`,
+                  `Số dư thấp (${formatCredits(credits)} credits) — nạp thêm để tránh job bị dừng giữa chừng.`,
+                  `ยอดคงเหลือต่ำ (${formatCredits(credits)} เครดิต) — เติมเงินเพื่อไม่ให้งานหยุดกลางคัน`,
+                )
               }}
             </p>
             <a :href="`${prefix}/app/credits/`" class="or-overview-banner-link">
-              {{ isVi ? 'Nạp ngay' : 'Top up' }} →
+              {{ t('Top up', 'Nạp ngay', 'เติมเครดิต') }} →
             </a>
           </div>
 
           <div v-if="showNoJobsBanner" class="or-overview-banner or-overview-banner--info" role="status">
             <p>
               {{
-                isVi
-                  ? 'Chưa có job trong 7 ngày qua — chạy thử image hoặc video trong Playground.'
-                  : 'No jobs in the last 7 days — try an image or video job in Playground.'
+                t(
+                  'No jobs in the last 7 days — try an image or video job in Playground.',
+                  'Chưa có job trong 7 ngày qua — chạy thử image hoặc video trong Playground.',
+                  'ไม่มีงานใน 7 วันที่ผ่านมา — ลองสร้างรูปหรือวิดีโอใน Playground',
+                )
               }}
             </p>
             <a :href="`${prefix}/app/playground/`" class="or-overview-banner-link">
-              {{ isVi ? 'Mở Playground' : 'Open Playground' }} →
+              {{ t('Open Playground', 'Mở Playground', 'เปิด Playground') }} →
             </a>
           </div>
 
           <OverviewUsageSection
             ref="overviewUsageRef"
             :credits="credits"
-            :is-vi="isVi"
+            :locale="uiLocale"
             :prefix="prefix"
             @stats-loaded="onOverviewUsageStats"
           />
@@ -817,18 +883,18 @@ useVitepressUrlSync(syncDashboardFromLocation);
             <OverviewRecentTopups
               :orders="overviewTopupPreview"
               :loading="ordersLoading"
-              :is-vi="isVi"
+              :locale="uiLocale"
               :prefix="prefix"
             />
             <OverviewOnboardingCard
-              :is-vi="isVi"
+              :locale="uiLocale"
               :prefix="prefix"
               :token-copied="tokenCopiedEver"
               :has-jobs="hasOverviewJobs"
             />
           </div>
 
-          <h2 class="or-overview-links-title">{{ isVi ? 'Workspace' : 'Workspace' }}</h2>
+          <h2 class="or-overview-links-title">{{ t('Workspace', 'Workspace', 'พื้นที่ทำงาน') }}</h2>
           <div class="or-app-grid or-app-grid--overview or-overview-workspace">
             <a
               v-for="card in overviewWorkspaceCards"
@@ -845,39 +911,59 @@ useVitepressUrlSync(syncDashboardFromLocation);
             </a>
           </div>
 
-          <h2 class="or-overview-links-title">{{ isVi ? 'Tài liệu' : 'Resources' }}</h2>
+          <h2 class="or-overview-links-title">{{ t('Resources', 'Tài liệu', 'แหล่งข้อมูล') }}</h2>
           <div class="or-app-grid or-app-grid--overview">
             <a :href="`${prefix}/quickstart`" class="or-app-card">
-              <h3>Quickstart</h3>
-              <p>{{ isVi ? 'Tích hợp gateway REST — login, models, tạo job.' : 'Gateway REST integration — login, models, create jobs.' }}</p>
-              <span class="or-app-card-cta">{{ isVi ? 'Đọc hướng dẫn' : 'Read guide' }} →</span>
+              <h3>{{ t('Quickstart', 'Quickstart', 'เริ่มต้นใช้งาน') }}</h3>
+              <p>
+                {{
+                  t(
+                    'Gateway REST integration — login, models, create jobs.',
+                    'Tích hợp gateway REST — login, models, tạo job.',
+                    'การเชื่อมต่อ Gateway REST — เข้าสู่ระบบ โมเดล สร้างงาน',
+                  )
+                }}
+              </p>
+              <span class="or-app-card-cta">{{ t('Read guide', 'Đọc hướng dẫn', 'อ่านคู่มือ') }} →</span>
             </a>
             <a :href="`${prefix}/mcp/`" class="or-app-card">
-              <h3>{{ isVi ? 'MCP (Cursor & IDE)' : 'MCP (Cursor & IDE)' }}</h3>
+              <h3>MCP (Cursor & IDE)</h3>
               <p>
                 {{
-                  isVi
-                    ? '10 tools ảnh/video — cấu hình Cursor, Claude Desktop.'
-                    : '10 image/video tools — set up Cursor, Claude Desktop.'
+                  t(
+                    '10 image/video tools — set up Cursor, Claude Desktop.',
+                    '10 tools ảnh/video — cấu hình Cursor, Claude Desktop.',
+                    '10 เครื่องมือรูป/วิดีโอ — ตั้งค่า Cursor, Claude Desktop',
+                  )
                 }}
               </p>
-              <span class="or-app-card-cta">{{ isVi ? 'Cấu hình MCP' : 'Set up MCP' }} →</span>
+              <span class="or-app-card-cta">{{ t('Set up MCP', 'Cấu hình MCP', 'ตั้งค่า MCP') }} →</span>
             </a>
             <a :href="`${prefix}/authentication`" class="or-app-card">
-              <h3>{{ isVi ? 'Authentication' : 'Authentication' }}</h3>
-              <p>{{ isVi ? 'Bearer token, domain Gommo, và các mode tích hợp.' : 'Bearer token, Gommo domain, and integration modes.' }}</p>
-              <span class="or-app-card-cta">{{ isVi ? 'Xem auth' : 'View auth' }} →</span>
-            </a>
-            <a :href="`${prefix}/guides/portal-smoke`" class="or-app-card">
-              <h3>{{ isVi ? 'Portal smoke test' : 'Portal smoke test' }}</h3>
+              <h3>{{ t('Authentication', 'Authentication', 'การยืนยันตัวตน') }}</h3>
               <p>
                 {{
-                  isVi
-                    ? 'Checklist một lần chạy sau đổi UI portal — Activity, BYOK, Credits…'
-                    : 'One-pass checklist after portal UI changes — Activity, BYOK, Credits…'
+                  t(
+                    'Bearer token, Gommo domain, and integration modes.',
+                    'Bearer token, domain Gommo, và các mode tích hợp.',
+                    'Bearer token โดเมน Gommo และโหมดการเชื่อมต่อ',
+                  )
                 }}
               </p>
-              <span class="or-app-card-cta">{{ isVi ? 'Mở checklist' : 'Open checklist' }} →</span>
+              <span class="or-app-card-cta">{{ t('View auth', 'Xem auth', 'ดู auth') }} →</span>
+            </a>
+            <a :href="`${prefix}/guides/portal-smoke`" class="or-app-card">
+              <h3>{{ t('Portal smoke test', 'Portal smoke test', 'ทดสอบ Portal') }}</h3>
+              <p>
+                {{
+                  t(
+                    'One-pass checklist after portal UI changes — Activity, BYOK, Credits…',
+                    'Checklist một lần chạy sau đổi UI portal — Activity, BYOK, Credits…',
+                    'เช็กลิสต์ครั้งเดียวหลังเปลี่ยน UI portal — Activity, BYOK, Credits…',
+                  )
+                }}
+              </p>
+              <span class="or-app-card-cta">{{ t('Open checklist', 'Mở checklist', 'เปิดเช็กลิสต์') }} →</span>
             </a>
           </div>
         </section>
@@ -902,7 +988,7 @@ useVitepressUrlSync(syncDashboardFromLocation);
           <ProfileLandingPanel
             v-if="profileSection === 'general'"
             ref="profileLandingRef"
-            :is-vi="isVi"
+            :locale="uiLocale"
             :prefix="prefix"
             :credits="credits"
             :email="email"
@@ -918,31 +1004,33 @@ useVitepressUrlSync(syncDashboardFromLocation);
 
           <div v-else-if="profileSection === 'api'" class="or-profile-detail">
             <a :href="profileSectionHref('general')" class="or-profile-back">
-              ← {{ isVi ? 'Hồ sơ' : 'Profile' }}
+              ← {{ t('Profile', 'Hồ sơ', 'โปรไฟล์') }}
             </a>
 
           <div class="or-app-profile-panel">
             <div class="or-app-panel or-token-profile-shortcut">
-              <h3 class="or-app-panel-title">{{ isVi ? 'Gommo Bearer token' : 'Gommo Bearer token' }}</h3>
+              <h3 class="or-app-panel-title">{{ t('Gommo Bearer token', 'Gommo Bearer token', 'Gommo Bearer token') }}</h3>
               <p class="or-app-panel-desc">
                 {{
-                  isVi
-                    ? 'Một session token cho /gateway/* — snippet, health check và MCP trên trang Access token.'
-                    : 'One session token for /gateway/* — snippets, health checks, and MCP on the Access token page.'
+                  t(
+                    'One session token for /gateway/* — snippets, health checks, and MCP on the Access token page.',
+                    'Một session token cho /gateway/* — snippet, health check và MCP trên trang Access token.',
+                    'Session token เดียวสำหรับ /gateway/* — snippet health check และ MCP ในหน้า Access token',
+                  )
                 }}
               </p>
               <div class="or-app-token-row">
                 <code class="or-app-token-value">{{ maskedToken }}</code>
                 <button type="button" class="or-app-btn or-app-btn-ghost" @click="copyToken">
-                  {{ copied ? (isVi ? 'Đã copy' : 'Copied') : isVi ? 'Copy' : 'Copy' }}
+                  {{ copied ? t('Copied', 'Đã copy', 'คัดลอกแล้ว') : t('Copy', 'Copy', 'คัดลอก') }}
                 </button>
               </div>
               <div class="or-token-profile-shortcut-actions">
                 <a :href="`${prefix}/app/token/`" class="or-app-btn or-app-btn-primary">
-                  {{ isVi ? 'Mở Access token' : 'Open Access token' }} →
+                  {{ t('Open Access token', 'Mở Access token', 'เปิด Access token') }} →
                 </a>
                 <a :href="`${prefix}/authentication`" class="or-app-btn or-app-btn-ghost">
-                  {{ isVi ? 'Tài liệu auth' : 'Auth docs' }}
+                  {{ t('Auth docs', 'Tài liệu auth', 'เอกสาร auth') }}
                 </a>
               </div>
             </div>
@@ -954,7 +1042,7 @@ useVitepressUrlSync(syncDashboardFromLocation);
         <section v-else-if="view === 'token'" class="or-app-section or-app-section--token">
           <AccessTokenPanel
             ref="accessTokenRef"
-            :is-vi="isVi"
+            :locale="uiLocale"
             :prefix="prefix"
             :token="token"
             :masked-token="maskedToken"
@@ -970,7 +1058,7 @@ useVitepressUrlSync(syncDashboardFromLocation);
         <section v-else-if="view === 'byok'" class="or-app-section or-app-section--byok">
           <ByokPanel
             ref="byokPanelRef"
-            :is-vi="isVi"
+            :locale="uiLocale"
             :prefix="prefix"
             :session-domain="loginDomain"
           />
@@ -978,14 +1066,14 @@ useVitepressUrlSync(syncDashboardFromLocation);
 
         <!-- Files -->
         <section v-else-if="view === 'files'" class="or-app-section or-app-section--files">
-          <FilesPanel ref="filesPanelRef" :is-vi="isVi" :prefix="prefix" />
+          <FilesPanel ref="filesPanelRef" :locale="uiLocale" :prefix="prefix" />
         </section>
 
         <!-- Activity hub -->
         <section v-else-if="view === 'activity'" class="or-app-section or-app-section--activity">
           <ActivityHub
             ref="activityHubRef"
-            :is-vi="isVi"
+            :locale="uiLocale"
             :prefix="prefix"
             :credits="credits"
             :topup-orders="topupOrders"
@@ -998,7 +1086,7 @@ useVitepressUrlSync(syncDashboardFromLocation);
         <section v-else-if="view === 'observability'" class="or-app-section or-app-section--observability">
           <ObservabilityPanel
             ref="observabilityPanelRef"
-            :is-vi="isVi"
+            :locale="uiLocale"
             :prefix="prefix"
             :credits="credits"
           />
@@ -1008,7 +1096,7 @@ useVitepressUrlSync(syncDashboardFromLocation);
         <section v-else-if="view === 'credits'" class="or-app-section or-app-section--credits">
           <CreditsPanel
             ref="creditsPanelRef"
-            :is-vi="isVi"
+            :locale="uiLocale"
             :prefix="prefix"
             :credits="credits"
             :credits-low="creditsLow"

@@ -1,15 +1,24 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { usePortalCopy } from '../composables/use-portal-copy';
 import type { ChatMessageMeta } from '../models/chat-storage';
 import { buildMessageMetaRows } from '../models/chat-models';
+import type { PortalLocale } from '../models/portal-locale';
 
 const props = defineProps<{
   meta?: ChatMessageMeta;
+  locale?: PortalLocale;
   isVi?: boolean;
   title?: string;
 }>();
 
-const rows = computed(() => buildMessageMetaRows(props.meta, !!props.isVi));
+const { m } = usePortalCopy(
+  computed(() => props.locale ?? (props.isVi ? 'vi' : 'en')),
+);
+
+const activeLocale = computed(() => props.locale ?? (props.isVi ? 'vi' : 'en'));
+
+const rows = computed(() => buildMessageMetaRows(props.meta, activeLocale.value));
 </script>
 
 <template>
@@ -21,9 +30,11 @@ const rows = computed(() => buildMessageMetaRows(props.meta, !!props.isVi));
     </div>
     <p class="or-chat-meta-foot">
       {{
-        isVi
-          ? 'Credits lấy từ số dư ví; tokens từ upstream. Xem Usage trong Profile để đối chiếu.'
-          : 'Credits come from wallet balance; tokens from upstream. See Usage in Profile to reconcile.'
+        m(
+          'Credits come from wallet balance; tokens from upstream. See Usage in Profile to reconcile.',
+          'Credits lấy từ số dư ví; tokens từ upstream. Xem Usage trong Profile để đối chiếu.',
+          'เครดิตมาจากยอดคงเหลือ; โทเค็นจาก upstream — ดู Usage ใน Profile เพื่อตรวจสอบ',
+        )
       }}
     </p>
   </div>

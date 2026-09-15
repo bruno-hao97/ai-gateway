@@ -6,7 +6,7 @@ export function apiBase(): string {
   return 'https://api.yourdomain.com';
 }
 
-export type LocalePrefix = '' | '/vi';
+export type LocalePrefix = '' | '/vi' | '/th';
 
 export interface PlaygroundModelRef {
   slug?: string;

@@ -96,16 +96,12 @@ async function probeGommoPaymentDomain(accessToken: string, amountVnd?: number):
     throw new Error(text || `Không thể xác minh domain (HTTP ${response.status})`);
   }
 
-  const message = String(raw.message || '');
+  const message = String(raw.message || '').trim();
   if (isDomainMismatchMessage(message)) {
-    throw new PaymentIdentityError(PAYMENT_DOMAIN_ERROR_MESSAGE, 403, 'DOMAIN_MISMATCH');
+    throw new PaymentIdentityError(message || PAYMENT_DOMAIN_ERROR_MESSAGE, 403, 'DOMAIN_MISMATCH');
   }
   if (isAuthMessage(message)) {
-    throw new PaymentIdentityError(
-      'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
-      401,
-      'AUTH_REQUIRED',
-    );
+    throw new PaymentIdentityError(message || 'Authentication required', 401, 'AUTH_REQUIRED');
   }
 }
 
@@ -125,7 +121,11 @@ export async function verifyBearerUsername(input: {
     if (isAuthMessage(upstreamMessage)) {
       throw new PaymentIdentityError('Phiên đăng nhập đã hết hạn.', 401, 'AUTH_REQUIRED');
     }
-    throw new PaymentIdentityError(PAYMENT_DOMAIN_ERROR_MESSAGE, 403, 'DOMAIN_MISMATCH');
+    throw new PaymentIdentityError(
+      upstreamMessage || PAYMENT_DOMAIN_ERROR_MESSAGE,
+      403,
+      'DOMAIN_MISMATCH',
+    );
   }
 
   const username = String(user.username || '').trim();

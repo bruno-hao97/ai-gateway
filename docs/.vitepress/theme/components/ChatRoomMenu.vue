@@ -1,12 +1,19 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { usePortalCopy } from '../composables/use-portal-copy';
+import type { PortalLocale } from '../models/portal-locale';
 import ChatIcon from './ChatIcon.vue';
 
 const props = defineProps<{
   pinned?: boolean;
+  locale?: PortalLocale;
   isVi?: boolean;
   disabled?: boolean;
 }>();
+
+const { m } = usePortalCopy(
+  computed(() => props.locale ?? (props.isVi ? 'vi' : 'en')),
+);
 
 const emit = defineEmits<{
   pin: [];
@@ -131,7 +138,7 @@ onUnmounted(() => {
       :disabled="disabled"
       :aria-expanded="open"
       :aria-haspopup="true"
-      :aria-label="isVi ? 'Tùy chọn phòng' : 'Room options'"
+      :aria-label="m('Room options', 'Tùy chọn phòng', 'ตัวเลือกห้อง')"
       @click="toggleMenu"
     >
       <ChatIcon name="more" />
@@ -148,19 +155,19 @@ onUnmounted(() => {
       >
         <button type="button" class="or-chat-room-menu-item" role="menuitem" @click="run('pin')">
           <ChatIcon name="pin" />
-          <span>{{ pinned ? (isVi ? 'Bỏ ghim' : 'Unpin') : isVi ? 'Ghim' : 'Pin' }}</span>
+          <span>{{ pinned ? m('Unpin', 'Bỏ ghim', 'เลิกปักหมุด') : m('Pin', 'Ghim', 'ปักหมุด') }}</span>
         </button>
         <button type="button" class="or-chat-room-menu-item" role="menuitem" @click="run('rename')">
           <ChatIcon name="edit" />
-          <span>{{ isVi ? 'Đổi tên' : 'Rename' }}</span>
+          <span>{{ m('Rename', 'Đổi tên', 'เปลี่ยนชื่อ') }}</span>
         </button>
         <button type="button" class="or-chat-room-menu-item" role="menuitem" @click="run('duplicate')">
           <ChatIcon name="duplicate" />
-          <span>{{ isVi ? 'Nhân bản' : 'Duplicate' }}</span>
+          <span>{{ m('Duplicate', 'Nhân bản', 'ทำสำเนา') }}</span>
         </button>
         <button type="button" class="or-chat-room-menu-item is-danger" role="menuitem" @click="run('delete')">
           <ChatIcon name="trash" />
-          <span>{{ isVi ? 'Xóa' : 'Delete' }}</span>
+          <span>{{ m('Delete', 'Xóa', 'ลบ') }}</span>
         </button>
       </div>
     </Teleport>

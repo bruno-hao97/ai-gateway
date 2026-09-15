@@ -8,12 +8,40 @@ import { docRedirects } from './redirects';
 const GITHUB_REPO = 'https://github.com/bruno-hao97/ai-gateway';
 const EDIT_BRANCH = 'main';
 
+type LocaleChrome = 'en' | 'vi' | 'th';
+
+const CHROME_LABELS: Record<
+  LocaleChrome,
+  { appearance: string; menu: string; returnToTop: string; langMenu: string }
+> = {
+  en: {
+    appearance: 'Appearance',
+    menu: 'Menu',
+    returnToTop: 'Return to top',
+    langMenu: 'Change language',
+  },
+  vi: {
+    appearance: 'Giao diện',
+    menu: 'Menu',
+    returnToTop: 'Lên đầu trang',
+    langMenu: 'Ngôn ngữ',
+  },
+  th: {
+    appearance: 'ธีม',
+    menu: 'เมนู',
+    returnToTop: 'กลับด้านบน',
+    langMenu: 'เปลี่ยนภาษา',
+  },
+};
+
 function sharedThemeConfig(opts: {
   logoLink: string;
   prev: string;
   next: string;
   editText: string;
+  chrome: LocaleChrome;
 }) {
+  const labels = CHROME_LABELS[opts.chrome];
   return {
     logo: '/logo.svg',
     logoLink: opts.logoLink,
@@ -28,10 +56,10 @@ function sharedThemeConfig(opts: {
     socialLinks: [{ icon: 'github' as const, link: GITHUB_REPO }],
     outline: { level: [2, 3] as [number, number] },
     docFooter: { prev: opts.prev, next: opts.next },
-    darkModeSwitchLabel: opts.prev === 'Previous' ? 'Appearance' : 'Giao diện',
-    sidebarMenuLabel: opts.prev === 'Previous' ? 'Menu' : 'Menu',
-    returnToTopLabel: opts.prev === 'Previous' ? 'Return to top' : 'Lên đầu trang',
-    langMenuLabel: opts.prev === 'Previous' ? 'Change language' : 'Ngôn ngữ',
+    darkModeSwitchLabel: labels.appearance,
+    sidebarMenuLabel: labels.menu,
+    returnToTopLabel: labels.returnToTop,
+    langMenuLabel: labels.langMenu,
   };
 }
 
@@ -287,6 +315,149 @@ const navVi = [
   { text: 'Docs', link: '/vi/quickstart' },
 ];
 
+const navTh = [
+  { text: 'หน้าแรก', link: '/th/app/' },
+  { text: 'โมเดล', link: '/th/models/' },
+  { text: 'สนามทดลอง', link: '/th/app/playground/' },
+  { text: 'แชท', link: '/th/app/chat/' },
+  { text: 'เอกสาร', link: '/th/quickstart' },
+];
+
+type SidebarItem = {
+  text: string;
+  link: string;
+  items?: SidebarItem[];
+  collapsed?: boolean;
+};
+
+function prefixSidebar<T extends SidebarItem>(items: T[], localePrefix: string): T[] {
+  return items.map((item) => {
+    const next = { ...item } as T;
+    if (item.link) {
+      next.link =
+        item.link.startsWith(localePrefix) || item.link.startsWith('http')
+          ? item.link
+          : `${localePrefix}${item.link}`;
+    }
+    if (item.items?.length) next.items = prefixSidebar(item.items, localePrefix);
+    return next;
+  });
+}
+
+const overviewSidebarTh = [
+  { text: 'เริ่มต้นใช้งาน', link: '/th/quickstart' },
+  { text: 'บันทึกการเปลี่ยนแปลง', link: '/th/changelog' },
+  { text: 'Gommo public API', link: '/th/reference/gommo-public-api' },
+  { text: 'การยืนยันตัวตน', link: '/th/authentication' },
+  { text: 'หลักการ', link: '/th/principles' },
+  { text: 'MCP & เอเจนต์', link: '/th/mcp' },
+  { text: 'Billing & เครดิต', link: '/th/guides/billing-credits' },
+  { text: 'ฮับกิจกรรม', link: '/th/guides/activity-hub' },
+  { text: 'ทดสอบ portal', link: '/th/guides/portal-smoke' },
+  { text: 'BYOK production', link: '/th/guides/byok-production' },
+  { text: 'คำถามที่พบบ่อย', link: '/th/faq' },
+  { text: 'ส่ง feedback', link: '/th/report-feedback' },
+];
+
+const modelsRoutingInDocsTh = [
+  { text: 'คู่มือการเชื่อมต่อ', link: '/th/models/guide' },
+  { text: 'ประเภทงาน', link: '/th/models/job-types' },
+  { text: 'พารามิเตอร์', link: '/th/models/parameters' },
+  { text: 'ภาพรวม routing', link: '/th/routing/' },
+  { text: 'โฮสต์ upstream', link: '/th/routing/upstream-hosts' },
+  { text: 'โหมดการเชื่อมต่อ', link: '/th/routing/integration-modes' },
+  { text: 'แผนที่ endpoint', link: '/th/routing/endpoint-map' },
+  { text: 'เลือกโหมด', link: '/th/routing/choosing-a-mode' },
+];
+
+const featuresSidebarTh = [
+  { text: 'ภาพรวม', link: '/th/features/' },
+  { text: 'งานมีเดีย', link: '/th/features/media-jobs' },
+  { text: 'แชท', link: '/th/features/chat' },
+  { text: 'อัปโหลด', link: '/th/features/upload' },
+  { text: 'เสียง & TTS', link: '/th/features/audio' },
+];
+
+const communitySidebarTh = [{ text: 'ภาพรวม', link: '/th/community/' }];
+
+const opsSidebarTh = [
+  { text: 'ความเป็นส่วนตัว & ความปลอดภัย', link: '/th/privacy/' },
+  { text: 'แนวปฏิบัติที่ดี', link: '/th/best-practices/' },
+  { text: 'Deploy & ปฏิบัติการ', link: '/th/deploy/' },
+];
+
+const referenceSidebarTh = [
+  { text: 'Gommo public API', link: '/th/reference/gommo-public-api' },
+  { text: 'OpenAPI', link: '/th/reference/openapi' },
+  { text: 'สนามทดลอง API', link: '/th/app/playground/' },
+  { text: 'มีเดีย & งาน', link: '/th/reference/media' },
+  { text: 'อัปโหลด', link: '/th/reference/upload' },
+  { text: 'แชท', link: '/th/reference/chat' },
+  { text: 'เสียง', link: '/th/reference/audio' },
+  { text: 'การเรียกเก็บเงิน', link: '/th/reference/billing' },
+  { text: 'ประวัติการใช้งาน', link: '/th/reference/usage' },
+  { text: 'Observability (เบต้า)', link: '/th/reference/observability' },
+  { text: 'BYOK (เบต้า)', link: '/th/reference/byok' },
+  { text: 'Admin (เซิร์ฟเวอร์เท่านั้น)', link: '/th/reference/admin' },
+];
+
+const cookbookSidebarTh = [
+  { text: 'ภาพรวม', link: '/th/cookbook/' },
+  { text: 'งานรูปแรก (wait)', link: '/th/cookbook/image-job-wait' },
+  { text: 'งาน async + poll', link: '/th/cookbook/job-poll-async' },
+  { text: 'งานวิดีโอหรือเพลง', link: '/th/cookbook/video-music-job' },
+  { text: 'งาน tool (upscale, remove-bg)', link: '/th/cookbook/tool-jobs' },
+  { text: 'อัปโหลดรูป', link: '/th/cookbook/upload-image' },
+  { text: 'แชท + stream', link: '/th/cookbook/chat-stream' },
+  { text: 'เสียง TTS', link: '/th/cookbook/audio-tts' },
+  { text: 'Gommo VietQR เติมเครดิต', link: '/th/cookbook/gommo-topup' },
+  { text: 'PayOS เติมเครดิต (legacy)', link: '/th/cookbook/payos-topup' },
+  { text: 'Flow HTTP เอเจนต์', link: '/th/cookbook/agent-http-flow' },
+];
+
+const sdkSidebarTh = [
+  { text: 'ภาพรวม', link: '/th/sdk/' },
+  {
+    text: 'TypeScript SDK',
+    collapsed: false,
+    items: [
+      { text: 'ภาพรวม', link: '/th/sdk/typescript/' },
+      { text: 'การติดตั้ง', link: '/th/sdk/typescript/installation' },
+      { text: 'การยืนยันตัวตน', link: '/th/sdk/typescript/authentication' },
+      { text: 'โมเดล', link: '/th/sdk/typescript/models' },
+      { text: 'งาน', link: '/th/sdk/typescript/jobs' },
+      { text: 'แชท', link: '/th/sdk/typescript/chat' },
+      { text: 'อัปโหลด', link: '/th/sdk/typescript/upload' },
+      { text: 'เสียง', link: '/th/sdk/typescript/audio' },
+      { text: 'การเรียกเก็บเงิน', link: '/th/sdk/typescript/billing' },
+      { text: 'ข้อผิดพลาด', link: '/th/sdk/typescript/errors' },
+    ],
+  },
+];
+
+const mcpSidebarTh = [
+  { text: 'ภาพรวม', link: '/th/mcp/' },
+  { text: 'MCP host อื่น', link: '/th/mcp/other-hosts' },
+  { text: 'อ้างอิง tool (10)', link: '/th/mcp/tools' },
+  { text: 'กรณีใช้งาน & prompt', link: '/th/mcp/use-cases' },
+  { text: 'Self-hosted (ขั้นสูง)', link: '/th/mcp/self-hosted' },
+];
+
+const docsSidebarTh = [
+  { text: 'ภาพรวม', items: overviewSidebarTh },
+  { text: 'MCP', items: mcpSidebarTh },
+  { text: 'ฟีเจอร์', items: featuresSidebarTh },
+  { text: 'โมเดล & routing', items: modelsRoutingInDocsTh },
+  { text: 'ความเป็นส่วนตัว & ปฏิบัติการ', items: opsSidebarTh },
+  { text: 'ชุมชน', items: communitySidebarTh },
+];
+
+const pathSidebarTh = {
+  '/th/cookbook/': [{ text: 'คู่มือปฏิบัติ', items: cookbookSidebarTh }],
+  '/th/sdk/': [{ text: 'SDK ไคลเอนต์', items: sdkSidebarTh }],
+  '/th/reference/': [{ text: 'อ้างอิง API', items: referenceSidebarTh }],
+};
+
 const pathSidebarEn = {
   '/cookbook/': [{ text: 'Cookbook', items: cookbookSidebarEn }],
   '/sdk/': [{ text: 'Client SDKs', items: sdkSidebarEn }],
@@ -344,6 +515,11 @@ const docsGuideSidebarVi = {
   '/vi/routing/': docsSidebarVi,
 };
 
+const docsGuideSidebarTh: Record<string, typeof docsSidebarTh> = {};
+for (const key of Object.keys(docsGuideSidebarEn)) {
+  docsGuideSidebarTh[`/th${key}`] = docsSidebarTh;
+}
+
 export default defineConfig({
   title: 'AI Gateway',
   description: 'Developer docs — Gommo proxy + REST gateway (OpenRouter-style API platform)',
@@ -386,6 +562,7 @@ export default defineConfig({
           prev: 'Previous',
           next: 'Next',
           editText: 'Edit this page on GitHub',
+          chrome: 'en',
         }),
         nav: navEn,
         sidebar: {
@@ -406,11 +583,33 @@ export default defineConfig({
           prev: 'Trước',
           next: 'Tiếp',
           editText: 'Sửa trang trên GitHub',
+          chrome: 'vi',
         }),
         nav: navVi,
         sidebar: {
           ...pathSidebarVi,
           ...docsGuideSidebarVi,
+        },
+      },
+    },
+    th: {
+      label: 'ไทย',
+      lang: 'th-TH',
+      link: '/th/',
+      title: 'AI Gateway',
+      description: 'เอกสารนักพัฒนา — Gommo proxy + REST gateway',
+      themeConfig: {
+        ...sharedThemeConfig({
+          logoLink: '/th/',
+          prev: 'ก่อนหน้า',
+          next: 'ถัดไป',
+          editText: 'แก้ไขบน GitHub',
+          chrome: 'th',
+        }),
+        nav: navTh,
+        sidebar: {
+          ...pathSidebarTh,
+          ...docsGuideSidebarTh,
         },
       },
     },

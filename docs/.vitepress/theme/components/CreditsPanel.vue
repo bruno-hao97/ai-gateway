@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { usePortalCopy } from '../composables/use-portal-copy';
 import { activityHubHref } from '../models/activity-hub-url';
 import { formatApproxUsd, formatPayTotalLine } from '../models/invoice-buyer';
+import type { PortalLocale } from '../models/portal-locale';
 import {
   fetchBillingPackages,
   fetchBillingStatus,
@@ -16,7 +18,7 @@ import {
 import CreditsCheckoutModal from './CreditsCheckoutModal.vue';
 
 const props = defineProps<{
-  isVi: boolean;
+  locale: PortalLocale;
   prefix: string;
   credits: number;
   creditsLow: boolean;
@@ -28,6 +30,12 @@ const props = defineProps<{
 const emit = defineEmits<{
   paid: [];
 }>();
+
+const { isVi, m } = usePortalCopy(computed(() => props.locale));
+
+const numberLocale = computed(() =>
+  props.locale === 'vi' ? 'vi-VN' : props.locale === 'th' ? 'th-TH' : 'en-US',
+);
 
 const PENDING_STALE_MS = 24 * 60 * 60 * 1000;
 
@@ -77,7 +85,7 @@ const billingStats = computed(() => {
     orderCount: topupOrders.value.length,
     pendingCount: pending.length,
     creditedCount: credited.length,
-    lastOrderLabel: lastOrder ? formatOrderDate(lastOrder.createdAt, props.isVi) : '—',
+    lastOrderLabel: lastOrder ? formatOrderDate(lastOrder.createdAt, props.locale) : '—',
   };
 });
 
@@ -120,7 +128,11 @@ async function reload() {
 
 function onTopup(packageId: string) {
   if (!props.username) {
-    packagesError.value = props.isVi ? 'Thiếu username — đăng nhập lại' : 'Missing username — sign in again';
+    packagesError.value = m(
+      'Missing username — sign in again',
+      'Thiếu username — đăng nhập lại',
+      'ไม่มี username — กรุณาเข้าสู่ระบบอีกครั้ง',
+    );
     return;
   }
   const pkg = packages.value.find((item) => item.id === packageId);
@@ -160,79 +172,83 @@ defineExpose({ reload });
     <div v-if="creditsLow" class="or-overview-banner or-overview-banner--warn or-credits-banner" role="status">
       <p>
         {{
-          isVi
-            ? `Số dư thấp (${formatCredits(credits)} credits) — nạp thêm để tránh job bị dừng giữa chừng.`
-            : `Low balance (${formatCredits(credits)} credits) — top up to avoid interrupted jobs.`
+          m(
+            `Low balance (${formatCredits(credits)} credits) — top up to avoid interrupted jobs.`,
+            `Số dư thấp (${formatCredits(credits)} credits) — nạp thêm để tránh job bị dừng giữa chừng.`,
+            `ยอดคงเหลือต่ำ (${formatCredits(credits)} credits) — เติมเงินเพื่อไม่ให้งานถูกขัดจังหวะ`,
+          )
         }}
       </p>
     </div>
 
     <div class="or-activity-overview-kpi-row or-credits-kpi">
       <div class="or-activity-hub-kpi">
-        <span class="or-activity-hub-kpi-label">{{ isVi ? 'Số dư' : 'Balance' }}</span>
+        <span class="or-activity-hub-kpi-label">{{ m('Balance', 'Số dư', 'ยอดคงเหลือ') }}</span>
         <strong class="or-activity-hub-kpi-value">{{ formatCredits(credits) }}</strong>
         <span v-if="creditsApproxUsd" class="or-activity-hub-kpi-sub">{{ creditsApproxUsd }}</span>
-        <span v-else class="or-activity-hub-kpi-sub">{{ isVi ? 'Gommo credits' : 'Gommo credits' }}</span>
+        <span v-else class="or-activity-hub-kpi-sub">{{ m('Gommo credits', 'Gommo credits', 'Gommo credits') }}</span>
       </div>
       <div class="or-activity-hub-kpi">
-        <span class="or-activity-hub-kpi-label">{{ isVi ? 'Đã nạp' : 'Total topped up' }}</span>
+        <span class="or-activity-hub-kpi-label">{{ m('Total topped up', 'Đã nạp', 'เติมเงินรวม') }}</span>
         <strong class="or-activity-hub-kpi-value">
           <span v-if="ordersLoading && topupOrders.length === 0" class="or-activity-skeleton or-activity-skeleton--text" />
           <template v-else>{{ formatCredits(billingStats.totalCredited) }}</template>
         </strong>
-        <span class="or-activity-hub-kpi-sub">{{ billingStats.creditedCount }} {{ isVi ? 'đơn' : 'orders' }}</span>
+        <span class="or-activity-hub-kpi-sub">{{ billingStats.creditedCount }} {{ m('orders', 'đơn', 'รายการ') }}</span>
       </div>
       <div class="or-activity-hub-kpi">
-        <span class="or-activity-hub-kpi-label">{{ isVi ? 'Đơn nạp' : 'Top-up orders' }}</span>
+        <span class="or-activity-hub-kpi-label">{{ m('Top-up orders', 'Đơn nạp', 'คำสั่งเติมเงิน') }}</span>
         <strong class="or-activity-hub-kpi-value">
           <span v-if="ordersLoading && topupOrders.length === 0" class="or-activity-skeleton or-activity-skeleton--text" />
           <template v-else>{{ billingStats.orderCount }}</template>
         </strong>
         <span class="or-activity-hub-kpi-sub">
           <template v-if="billingStats.pendingCount > 0">
-            {{ billingStats.pendingCount }} {{ isVi ? 'đang chờ' : 'pending' }}
+            {{ billingStats.pendingCount }} {{ m('pending', 'đang chờ', 'รอดำเนินการ') }}
           </template>
           <template v-else>VietQR</template>
         </span>
       </div>
       <div class="or-activity-hub-kpi">
-        <span class="or-activity-hub-kpi-label">{{ isVi ? 'Đơn gần nhất' : 'Last order' }}</span>
+        <span class="or-activity-hub-kpi-label">{{ m('Last order', 'Đơn gần nhất', 'คำสั่งล่าสุด') }}</span>
         <strong class="or-activity-hub-kpi-value or-activity-billing-kpi-date">
           <span v-if="ordersLoading && topupOrders.length === 0" class="or-activity-skeleton or-activity-skeleton--text" />
           <template v-else>{{ billingStats.lastOrderLabel }}</template>
         </strong>
-        <span class="or-activity-hub-kpi-sub">{{ isVi ? 'Gateway này' : 'This gateway' }}</span>
+        <span class="or-activity-hub-kpi-sub">{{ m('This gateway', 'Gateway này', 'เกตเวย์นี้') }}</span>
       </div>
     </div>
 
     <div class="or-credits-quicklinks">
       <a :href="activityBillingHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
-        {{ isVi ? 'Activity Billing' : 'Activity Billing' }} →
+        {{ m('Activity Billing', 'Activity Billing', 'Activity Billing') }} →
       </a>
       <a :href="activityExploreHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
-        {{ isVi ? 'Job logs' : 'Job logs' }} →
+        {{ m('Job logs', 'Job logs', 'Job logs') }} →
       </a>
       <a :href="overviewHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
-        {{ isVi ? 'Overview' : 'Overview' }} →
+        {{ m('Overview', 'Overview', 'ภาพรวม') }} →
       </a>
       <a :href="billingDocsHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
-        {{ isVi ? 'Billing docs' : 'Billing docs' }} →
+        {{ m('Billing docs', 'Billing docs', 'เอกสาร billing') }} →
       </a>
     </div>
 
     <p v-if="!billingReady" class="or-app-alert or-app-alert-warn">
       {{
-        isVi
-          ? 'Billing Gommo chưa sẵn sàng — xem GET /billing/status.'
-          : 'Gommo billing not ready — see GET /billing/status.'
+        m(
+          'Gommo billing not ready — see GET /billing/status.',
+          'Billing Gommo chưa sẵn sàng — xem GET /billing/status.',
+          'Billing Gommo ยังไม่พร้อม — ดู GET /billing/status',
+        )
       }}
     </p>
 
-    <h2 class="or-credits-section-title">{{ isVi ? 'Gói nạp' : 'Packages' }}</h2>
-    <p v-if="packagesLoading" class="or-app-muted">{{ isVi ? 'Đang tải gói…' : 'Loading packages…' }}</p>
+    <h2 class="or-credits-section-title">{{ m('Packages', 'Gói nạp', 'แพ็กเกจ') }}</h2>
+    <p v-if="packagesLoading" class="or-app-muted">{{ m('Loading packages…', 'Đang tải gói…', 'กำลังโหลดแพ็กเกจ…') }}</p>
     <p v-else-if="packagesError" class="or-app-alert">{{ packagesError }}</p>
     <div v-else-if="packages.length === 0" class="or-app-panel or-app-empty">
-      {{ isVi ? 'Chưa có gói credit.' : 'No credit packages available.' }}
+      {{ m('No credit packages available.', 'Chưa có gói credit.', 'ยังไม่มีแพ็กเกจ credit') }}
     </div>
     <div v-else class="or-app-pkg-grid">
       <article
@@ -242,27 +258,27 @@ defineExpose({ reload });
         :class="{ featured: pkg.featured }"
       >
         <span v-if="pkg.featured" class="or-app-pkg-ribbon">
-          {{ isVi ? 'BEST' : 'BEST' }}
+          {{ m('BEST', 'BEST', 'BEST') }}
         </span>
         <div class="or-app-pkg-head">
           <h3>{{ pkg.name }}</h3>
           <span v-if="pkg.bonusPercent > 0" class="or-app-pkg-badge">
-            +{{ pkg.bonusPercent }}% {{ isVi ? 'Thưởng' : 'Bonus' }}
+            +{{ pkg.bonusPercent }}% {{ m('Bonus', 'Thưởng', 'โบนัส') }}
           </span>
         </div>
         <p class="or-app-pkg-price">
-          {{ pkg.amountVnd.toLocaleString(isVi ? 'vi-VN' : 'en-US') }} ₫
+          {{ pkg.amountVnd.toLocaleString(numberLocale) }} ₫
           <template v-if="!isVi"> · {{ formatApproxUsd(pkg.amountVnd) }}</template>
         </p>
         <p class="or-app-pkg-credits">{{ formatCredits(pkg.credits) }} credits</p>
-        <p class="or-app-pkg-vat">{{ formatPayTotalLine(pkg.amountVnd, isVi) }}</p>
+        <p class="or-app-pkg-vat">{{ formatPayTotalLine(pkg.amountVnd, props.locale) }}</p>
         <button
           type="button"
           class="or-app-btn or-app-btn-sm"
           :class="pkg.featured ? 'or-app-btn-accent' : 'or-app-btn-primary'"
           @click="onTopup(pkg.id)"
         >
-          {{ isVi ? 'Nạp ngay' : 'Top up' }}
+          {{ m('Top up', 'Nạp ngay', 'เติมเงิน') }}
         </button>
       </article>
     </div>
@@ -272,7 +288,7 @@ defineExpose({ reload });
       :pkg="checkoutPackage"
       :username="username"
       :default-email="email"
-      :is-vi="isVi"
+      :locale="locale"
       @close="closeCheckout"
       @paid="onCheckoutPaid"
       @toast="onCheckoutToast"
@@ -283,7 +299,7 @@ defineExpose({ reload });
     <div class="or-app-panel or-app-orders or-credits-orders">
       <div class="or-app-orders-head">
         <h2 class="or-app-panel-title or-credits-section-title or-credits-section-title--inline">
-          {{ isVi ? 'Lịch sử nạp' : 'Top-up history' }}
+          {{ m('Top-up history', 'Lịch sử nạp', 'ประวัติเติมเงิน') }}
         </h2>
         <button
           type="button"
@@ -291,20 +307,26 @@ defineExpose({ reload });
           :disabled="ordersLoading"
           @click="loadTopupOrders"
         >
-          {{ ordersLoading ? (isVi ? 'Đang tải…' : 'Loading…') : isVi ? 'Làm mới' : 'Refresh' }}
+          {{
+            ordersLoading
+              ? m('Loading…', 'Đang tải…', 'กำลังโหลด…')
+              : m('Refresh', 'Làm mới', 'รีเฟรช')
+          }}
         </button>
       </div>
 
       <p v-if="ordersError" class="or-app-alert" role="alert">{{ ordersError }}</p>
 
       <p v-if="ordersLoading && topupOrders.length === 0" class="or-app-muted">
-        {{ isVi ? 'Đang tải lịch sử…' : 'Loading history…' }}
+        {{ m('Loading history…', 'Đang tải lịch sử…', 'กำลังโหลดประวัติ…') }}
       </p>
       <p v-else-if="!ordersError && visibleTopupOrders.length === 0" class="or-app-muted or-app-orders-empty">
         {{
-          isVi
-            ? 'Chưa có đơn nạp. Chọn gói VietQR ở trên để bắt đầu.'
-            : 'No top-ups yet. Pick a VietQR package above to get started.'
+          m(
+            'No top-ups yet. Pick a VietQR package above to get started.',
+            'Chưa có đơn nạp. Chọn gói VietQR ở trên để bắt đầu.',
+            'ยังไม่มีการเติมเงิน เลือกแพ็กเกจ VietQR ด้านบนเพื่อเริ่มต้น',
+          )
         }}
       </p>
 
@@ -312,24 +334,24 @@ defineExpose({ reload });
         <table class="or-app-orders-table">
           <thead>
             <tr>
-              <th>{{ isVi ? 'Mã đơn' : 'Order' }}</th>
-              <th>{{ isVi ? 'Credits' : 'Credits' }}</th>
-              <th>{{ isVi ? 'Số tiền' : 'Amount' }}</th>
-              <th>{{ isVi ? 'Trạng thái' : 'Status' }}</th>
-              <th>{{ isVi ? 'Thời gian' : 'Date' }}</th>
+              <th>{{ m('Order', 'Mã đơn', 'คำสั่ง') }}</th>
+              <th>{{ m('Credits', 'Credits', 'Credits') }}</th>
+              <th>{{ m('Amount', 'Số tiền', 'จำนวนเงิน') }}</th>
+              <th>{{ m('Status', 'Trạng thái', 'สถานะ') }}</th>
+              <th>{{ m('Date', 'Thời gian', 'วันที่') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="order in visibleTopupOrders" :key="order.orderCode">
               <td><code>#{{ order.orderCode }}</code></td>
               <td>{{ formatCredits(order.credits) }}</td>
-              <td>{{ order.amountVnd.toLocaleString(isVi ? 'vi-VN' : 'en-US') }} ₫</td>
+              <td>{{ order.amountVnd.toLocaleString(numberLocale) }} ₫</td>
               <td>
                 <span class="or-app-order-status" :class="orderStatusClass(order.status)">
-                  {{ formatTopupOrderStatus(order.status, isVi) }}
+                  {{ formatTopupOrderStatus(order.status, locale) }}
                 </span>
               </td>
-              <td class="or-app-orders-date">{{ formatOrderDate(order.createdAt, isVi) }}</td>
+              <td class="or-app-orders-date">{{ formatOrderDate(order.createdAt, locale) }}</td>
             </tr>
           </tbody>
         </table>
@@ -342,23 +364,25 @@ defineExpose({ reload });
       >
         {{
           showStalePending
-            ? isVi
-              ? 'Ẩn đơn chờ cũ'
-              : 'Hide stale pending'
-            : isVi
-              ? `Hiện thêm ${hiddenPendingCount} đơn chờ cũ`
-              : `Show ${hiddenPendingCount} stale pending`
+            ? m('Hide stale pending', 'Ẩn đơn chờ cũ', 'ซ่อนคำสั่งรอเก่า')
+            : m(
+                `Show ${hiddenPendingCount} stale pending`,
+                `Hiện thêm ${hiddenPendingCount} đơn chờ cũ`,
+                `แสดงคำสั่งรอเก่า ${hiddenPendingCount} รายการ`,
+              )
         }}
       </button>
     </div>
 
     <p class="or-app-muted or-credits-footnote">
       {{
-        isVi
-          ? 'Credits cộng tự động sau chuyển khoản VietQR (Gommo).'
-          : 'Credits apply automatically after VietQR bank transfer (Gommo).'
+        m(
+          'Credits apply automatically after VietQR bank transfer (Gommo).',
+          'Credits cộng tự động sau chuyển khoản VietQR (Gommo).',
+          'Credits จะเข้าอัตโนมัติหลังโอน VietQR (Gommo)',
+        )
       }}
-      <a :href="billingDocsHref">{{ isVi ? 'Tài liệu billing' : 'Billing docs' }}</a>
+      <a :href="billingDocsHref">{{ m('Billing docs', 'Tài liệu billing', 'เอกสาร billing') }}</a>
     </p>
   </div>
 </template>

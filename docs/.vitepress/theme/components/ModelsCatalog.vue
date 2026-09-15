@@ -30,7 +30,22 @@ import {
   type ViewMode,
 } from '../models/catalog-api';
 
-const { isVi, prefix: localePrefix } = useHybridLocale();
+const { locale, prefix: localePrefix, t } = useHybridLocale();
+
+const tabLabel = (id: CatalogTabId): string => {
+  const labels: Record<CatalogTabId, [string, string, string]> = {
+    all: ['All', 'Tất cả', 'ทั้งหมด'],
+    image: ['Image', 'Image', 'รูปภาพ'],
+    video: ['Video', 'Video', 'วิดีโอ'],
+    music: ['Music', 'Music', 'เพลง'],
+    tts: ['TTS', 'TTS', 'TTS'],
+    'avatar-lipsync': ['Avatar', 'Avatar', 'อวตาร'],
+    tools: ['Tools', 'Tools', 'เครื่องมือ'],
+  };
+  const [en, vi, th] = labels[id];
+  return t(en, vi, th);
+};
+const catalogLang = computed((): CatalogLang => locale.value);
 
 const LIST_LIMIT = 6;
 
@@ -148,7 +163,7 @@ const filtered = computed(() => {
   const q = search.value.trim().toLowerCase();
   if (q) {
     list = list.filter((m) => {
-      const desc = modelDescription(m, isVi.value);
+      const desc = modelDescription(m, catalogLang.value);
       return (
         m.name.toLowerCase().includes(q) ||
         m.slug.toLowerCase().includes(q) ||
@@ -163,9 +178,8 @@ const filtered = computed(() => {
   return sortModels(list, sort.value);
 });
 
-const guideLink = computed(() => (isVi.value ? '/vi/models/guide' : '/models/guide'));
-const compareLink = computed(() => (isVi.value ? '/vi/models/compare/' : '/models/compare/'));
-const catalogLang = computed((): CatalogLang | undefined => (isVi.value ? 'vi' : 'en'));
+const guideLink = computed(() => `${localePrefix.value}/models/guide`);
+const compareLink = computed(() => `${localePrefix.value}/models/compare/`);
 
 watch(creditRange, (r) => {
   if (r) filterCreditsMax.value = r.max;
@@ -220,11 +234,11 @@ function clearFilters() {
 }
 
 function relativeTime(m: CatalogModel): string {
-  return formatRelativeTime(m.sortDate, isVi.value);
+  return formatRelativeTime(m.sortDate, locale.value);
 }
 
 function displayDescription(m: CatalogModel): string {
-  return modelDescription(m, isVi.value);
+  return modelDescription(m, catalogLang.value);
 }
 
 function formatCredits(n: number): string {
@@ -235,7 +249,7 @@ onMounted(() => {
   void loadCatalog();
 });
 
-watch(isVi, () => {
+watch(locale, () => {
   void loadCatalog();
 });
 
@@ -258,7 +272,7 @@ watch(activeTab, (tab) => {
       aria-label="Filters"
     >
       <div class="or-sidebar-head">
-        <span>{{ isVi ? 'Bộ lọc' : 'Filters' }}</span>
+        <span>{{ t('Filters', 'Bộ lọc', 'ตัวกรอง') }}</span>
         <button type="button" class="or-sidebar-close" @click="mobileFilters = false">×</button>
       </div>
 
@@ -266,7 +280,7 @@ watch(activeTab, (tab) => {
         <summary>
           <span class="or-section-label">
             <SidebarIcon name="modalities" />
-            {{ isVi ? 'Input modalities' : 'Input modalities' }}
+            {{ t('Input modalities', 'Input modalities', 'ประเภทอินพุต') }}
           </span>
         </summary>
         <div class="or-filter-body or-filter-body--indent">
@@ -289,14 +303,18 @@ watch(activeTab, (tab) => {
         <summary>
           <span class="or-section-label">
             <SidebarIcon name="categories" />
-            {{ isVi ? 'Categories' : 'Categories' }}
+            {{ t('Categories', 'Categories', 'หมวดหมู่') }}
           </span>
         </summary>
         <div class="or-filter-body or-filter-body--indent">
           <label v-for="g in ['all', 'media', 'tools'] as const" :key="g" class="or-check or-check--plain">
             <input v-model="filterGroup" type="radio" name="or-group" :value="g" />
             <span>{{
-              g === 'all' ? (isVi ? 'Tất cả' : 'All') : g === 'media' ? 'Media' : 'Tools'
+              g === 'all'
+                ? t('All', 'Tất cả', 'ทั้งหมด')
+                : g === 'media'
+                  ? t('Media', 'Media', 'มีเดีย')
+                  : t('Tools', 'Tools', 'เครื่องมือ')
             }}</span>
           </label>
         </div>
@@ -306,7 +324,7 @@ watch(activeTab, (tab) => {
         <summary>
           <span class="or-section-label">
             <SidebarIcon name="params" />
-            {{ isVi ? 'Supported parameters' : 'Supported parameters' }}
+            {{ t('Supported parameters', 'Supported parameters', 'พารามิเตอร์ที่รองรับ') }}
           </span>
         </summary>
         <div class="or-filter-body or-param-groups">
@@ -333,12 +351,12 @@ watch(activeTab, (tab) => {
         <summary>
           <span class="or-section-label">
             <SidebarIcon name="pricing" />
-            {{ isVi ? 'Credits pricing' : 'Credits pricing' }}
+            {{ t('Credits pricing', 'Credits pricing', 'ราคาเครดิต') }}
           </span>
         </summary>
         <div class="or-filter-body or-credits-filter">
           <div class="or-credits-labels">
-            <span>{{ isVi ? 'Free' : 'Free' }}</span>
+            <span>{{ t('Free', 'Free', 'ฟรี') }}</span>
             <span>{{ formatCredits(creditsSliderValue) }}</span>
           </div>
           <input
@@ -356,7 +374,7 @@ watch(activeTab, (tab) => {
         <summary>
           <span class="or-section-label">
             <SidebarIcon name="providers" />
-            Providers
+            {{ t('Providers', 'Providers', 'ผู้ให้บริการ') }}
           </span>
         </summary>
         <div class="or-filter-body or-filter-body--indent">
@@ -369,7 +387,7 @@ watch(activeTab, (tab) => {
       </details>
 
       <button v-if="hasActiveFilters" type="button" class="or-clear-filters" @click="clearFilters">
-        {{ isVi ? 'Xóa bộ lọc' : 'Clear filters' }}
+        {{ t('Clear filters', 'Xóa bộ lọc', 'ล้างตัวกรอง') }}
       </button>
     </aside>
 
@@ -377,10 +395,10 @@ watch(activeTab, (tab) => {
 
     <div class="or-main">
       <header class="or-page-header">
-        <h1 class="or-title">Models</h1>
+        <h1 class="or-title">{{ t('Models', 'Models', 'โมเดล') }}</h1>
         <div class="or-page-header-links">
-          <a :href="compareLink" class="or-docs-link">{{ isVi ? 'So sánh' : 'Compare' }}</a>
-          <a :href="guideLink" class="or-docs-link">Docs</a>
+          <a :href="compareLink" class="or-docs-link">{{ t('Compare', 'So sánh', 'เปรียบเทียบ') }}</a>
+          <a :href="guideLink" class="or-docs-link">{{ t('Docs', 'Docs', 'เอกสาร') }}</a>
         </div>
       </header>
 
@@ -402,16 +420,16 @@ watch(activeTab, (tab) => {
               v-model="search"
               type="search"
               class="or-search"
-              placeholder="Search models…"
+              :placeholder="t('Search models…', 'Tìm model…', 'ค้นหาโมเดล…')"
             />
           </div>
-          <select v-model="sort" class="or-select" aria-label="Sort">
-            <option value="newest">Newest</option>
-            <option value="oldest">Oldest</option>
-            <option value="name-asc">Name A→Z</option>
-            <option value="name-desc">Name Z→A</option>
-            <option value="credits-asc">Credits ↑</option>
-            <option value="credits-desc">Credits ↓</option>
+          <select v-model="sort" class="or-select" :aria-label="t('Sort', 'Sắp xếp', 'เรียงลำดับ')">
+            <option value="newest">{{ t('Newest', 'Mới nhất', 'ใหม่ล่าสุด') }}</option>
+            <option value="oldest">{{ t('Oldest', 'Cũ nhất', 'เก่าสุด') }}</option>
+            <option value="name-asc">{{ t('Name A→Z', 'Tên A→Z', 'ชื่อ A→Z') }}</option>
+            <option value="name-desc">{{ t('Name Z→A', 'Tên Z→A', 'ชื่อ Z→A') }}</option>
+            <option value="credits-asc">{{ t('Credits ↑', 'Credits ↑', 'เครดิต ↑') }}</option>
+            <option value="credits-desc">{{ t('Credits ↓', 'Credits ↓', 'เครดิต ↓') }}</option>
           </select>
           <div class="or-view-toggle" role="group">
             <button
@@ -444,14 +462,14 @@ watch(activeTab, (tab) => {
             :aria-selected="activeTab === tab.id"
             @click="setTab(tab.id)"
           >
-            {{ tab.label }}
+            {{ tabLabel(tab.id) }}
             <span class="or-tab-count">{{ tabCounts[tab.id] ?? 0 }}</span>
           </button>
         </nav>
       </div>
 
       <p v-if="error" class="or-status or-status-err">{{ error }}</p>
-      <p v-else-if="loading && !filtered.length" class="or-status">Loading…</p>
+      <p v-else-if="loading && !filtered.length" class="or-status">{{ t('Loading…', 'Đang tải…', 'กำลังโหลด…') }}</p>
 
       <div v-if="viewMode === 'list' && filtered.length" class="or-list">
         <article v-for="m in filtered" :key="m.slug" class="or-row">
@@ -466,7 +484,7 @@ watch(activeTab, (tab) => {
               </div>
               <p v-if="displayDescription(m)" class="or-row-desc">{{ displayDescription(m) }}</p>
               <p v-else class="or-row-desc or-muted">
-                {{ isVi ? 'Không có mô tả trong catalog.' : 'No description in catalog.' }}
+                {{ t('No description in catalog.', 'Không có mô tả trong catalog.', 'ไม่มีคำอธิบายในแคตตาล็อก') }}
               </p>
               <div class="or-row-tags">
                 <span v-for="tag in modelTags(m)" :key="tag" class="or-tag">{{ tag }}</span>
@@ -482,7 +500,7 @@ watch(activeTab, (tab) => {
                     rel="noopener"
                     class="or-link"
                     @click.stop
-                  >Playground</a>
+                  >{{ t('Playground', 'Playground', 'สนามทดลอง') }}</a>
                 </span>
               </div>
             </div>
@@ -494,11 +512,11 @@ watch(activeTab, (tab) => {
         <table class="or-table">
           <thead>
             <tr>
-              <th>Model</th>
-              <th>Type</th>
-              <th>Provider</th>
-              <th>Credits</th>
-              <th>Playground</th>
+              <th>{{ t('Model', 'Model', 'โมเดล') }}</th>
+              <th>{{ t('Type', 'Loại', 'ประเภท') }}</th>
+              <th>{{ t('Provider', 'Provider', 'ผู้ให้บริการ') }}</th>
+              <th>{{ t('Credits', 'Credits', 'เครดิต') }}</th>
+              <th>{{ t('Playground', 'Playground', 'สนามทดลอง') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -523,7 +541,7 @@ watch(activeTab, (tab) => {
                   target="_blank"
                   rel="noopener"
                   class="or-link"
-                >Open</a>
+                >{{ t('Open', 'Mở', 'เปิด') }}</a>
               </td>
             </tr>
           </tbody>
@@ -531,10 +549,10 @@ watch(activeTab, (tab) => {
       </div>
 
       <div v-else-if="!loading && !filtered.length" class="or-empty">
-        <p>No models found.</p>
+        <p>{{ t('No models found.', 'Không có model.', 'ไม่พบโมเดล') }}</p>
         <p class="or-muted"><code>npm run dev</code> → gateway <code>:3001</code></p>
         <button v-if="hasActiveFilters" type="button" class="or-link" @click="clearFilters">
-          Clear filters
+          {{ t('Clear filters', 'Xóa bộ lọc', 'ล้างตัวกรอง') }}
         </button>
       </div>
     </div>

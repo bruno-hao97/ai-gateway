@@ -6,19 +6,30 @@ import {
   SUPPORT_EMAIL,
   type LegalPageType,
 } from '../models/legal-content';
+import { localeFromVitepressLang, localePrefix, pickMsg } from '../models/portal-locale';
 
 const props = defineProps<{
   type: LegalPageType;
 }>();
 
 const { lang } = useData();
-const isVi = computed(() => lang.value === 'vi-VN');
-const prefix = computed(() => (isVi.value ? '/vi' : ''));
+const locale = computed(() => localeFromVitepressLang(lang.value));
+const prefix = computed(() => localePrefix(locale.value));
+
+function m(en: string, vi: string, th?: string): string {
+  return pickMsg(locale.value, en, vi, th);
+}
+
 const year = new Date().getFullYear();
 
-const content = computed(() => getLegalContent(props.type, isVi.value));
+const content = computed(() => getLegalContent(props.type, locale.value));
+
 const homeLink = computed(() => `${prefix.value}/`);
-const crossNavHref = computed(() => content.value.crossNav.href);
+
+const crossNavHref = computed(() => {
+  const href = content.value.crossNav.href.replace(/^\/vi/, '');
+  return `${prefix.value}${href.startsWith('/') ? href : `/${href}`}`;
+});
 const isPrivacy = computed(() => props.type === 'privacy');
 </script>
 
@@ -30,8 +41,8 @@ const isPrivacy = computed(() => props.type === 'privacy');
           <span class="gw-legal-brand-mark" aria-hidden="true">⬡</span>
           <span>AI Gateway</span>
         </a>
-        <nav class="gw-legal-topnav" :aria-label="isVi ? 'Pháp lý' : 'Legal'">
-          <a :href="homeLink">{{ isVi ? 'Trang chủ' : 'Home' }}</a>
+        <nav class="gw-legal-topnav" :aria-label="m('Legal', 'Pháp lý', 'กฎหมาย')">
+          <a :href="homeLink">{{ m('Home', 'Trang chủ', 'หน้าแรก') }}</a>
           <a :href="crossNavHref">{{ content.crossNav.label }}</a>
         </nav>
       </header>

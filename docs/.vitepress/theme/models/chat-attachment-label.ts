@@ -1,16 +1,18 @@
 import type { ChatAttachment } from './chat-storage';
+import { pickMsg, resolveLabelLocale, type PortalLocale } from './portal-locale';
 
-export function attachmentBadgeLabel(att: ChatAttachment, isVi: boolean): string {
+export function attachmentBadgeLabel(
+  att: ChatAttachment,
+  localeOrVi: PortalLocale | boolean,
+): string {
+  const locale = resolveLabelLocale(localeOrVi);
   if (att.purpose === 'job') {
     const kind =
       att.jobTarget === 'video'
-        ? isVi
-          ? 'Video'
-          : 'Video'
-        : isVi
-          ? 'Ảnh'
-          : 'Image';
-    return isVi ? `Job · ${kind}` : `Job · ${kind}`;
+        ? pickMsg(locale, 'Video', 'Video', 'วิดีโอ')
+        : pickMsg(locale, 'Image', 'Ảnh', 'ภาพ');
+    const job = pickMsg(locale, 'Job', 'Job', 'งาน');
+    return `${job} · ${kind}`;
   }
-  return isVi ? 'Chat' : 'Chat';
+  return pickMsg(locale, 'Chat', 'Chat', 'แชท');
 }

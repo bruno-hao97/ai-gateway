@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { usePortalCopy } from '../composables/use-portal-copy';
 import { activityHubHref } from '../models/activity-hub-url';
 import { getStoredDomain } from '../models/auth-api';
+import type { PortalLocale } from '../models/portal-locale';
 import {
   createByokProviderCredential,
   deleteByokCredential,
@@ -24,10 +26,12 @@ function formatCredits(value: number): string {
 }
 
 const props = defineProps<{
-  isVi: boolean;
+  locale: PortalLocale;
   prefix: string;
   sessionDomain: string;
 }>();
+
+const { m } = usePortalCopy(computed(() => props.locale));
 
 type TabId = 'providers' | 'gommo' | 'usage';
 
@@ -54,23 +58,33 @@ const providers = computed(() => status.value?.providers ?? []);
 
 const showBeta = computed(() => status.value?.beta !== false);
 
-const betaLimitations = computed(() =>
-  props.isVi
-    ? [
-        'BYOK đang beta — hành vi billing, fallback và provider có thể thay đổi.',
-        'Chat BYOK: cần map model trong config/byok-model-map.json; không phải mọi model catalog đều hỗ trợ.',
-        'Media/upload/audio: dùng Gommo primary account đã link — không dùng key OpenAI/Anthropic trực tiếp.',
-        'Phí platform (% token) đang theo dõi thử nghiệm; chưa tương đương OpenRouter billing.',
-        'Lưu key trên gateway (file local dev); production cần BYOK_ENCRYPTION_KEY và backup.',
-      ]
-    : [
-        'BYOK is in beta — billing, fallback, and provider behavior may change.',
-        'Chat BYOK requires a model map entry in config/byok-model-map.json; not every catalog model is supported.',
-        'Media/upload/audio use your linked Gommo primary account — not direct OpenAI/Anthropic keys.',
-        'Platform fee (% of tokens) is experimental tracking; not equivalent to OpenRouter billing yet.',
-        'Keys are stored on the gateway host (file in dev); production needs BYOK_ENCRYPTION_KEY and backup.',
-      ],
-);
+const betaLimitations = computed(() => [
+  m(
+    'BYOK is in beta — billing, fallback, and provider behavior may change.',
+    'BYOK đang beta — hành vi billing, fallback và provider có thể thay đổi.',
+    'BYOK อยู่ในช่วงเบต้า — การเรียกเก็บเงิน fallback และพฤติกรรมของ provider อาจเปลี่ยนแปลง',
+  ),
+  m(
+    'Chat BYOK requires a model map entry in config/byok-model-map.json; not every catalog model is supported.',
+    'Chat BYOK: cần map model trong config/byok-model-map.json; không phải mọi model catalog đều hỗ trợ.',
+    'Chat BYOK ต้องมีรายการ map model ใน config/byok-model-map.json; ไม่ใช่ทุก model ในแคตตาล็อกที่รองรับ',
+  ),
+  m(
+    'Media/upload/audio use your linked Gommo primary account — not direct OpenAI/Anthropic keys.',
+    'Media/upload/audio: dùng Gommo primary account đã link — không dùng key OpenAI/Anthropic trực tiếp.',
+    'Media/upload/audio ใช้บัญชี Gommo primary ที่เชื่อมแล้ว — ไม่ใช้ key OpenAI/Anthropic โดยตรง',
+  ),
+  m(
+    'Platform fee (% of tokens) is experimental tracking; not equivalent to OpenRouter billing yet.',
+    'Phí platform (% token) đang theo dõi thử nghiệm; chưa tương đương OpenRouter billing.',
+    'ค่าธรรมเนียมแพลตฟอร์ม (% token) เป็นการติดตามทดลอง; ยังไม่เทียบเท่า OpenRouter billing',
+  ),
+  m(
+    'Keys are stored on the gateway host (file in dev); production needs BYOK_ENCRYPTION_KEY and backup.',
+    'Lưu key trên gateway (file local dev); production cần BYOK_ENCRYPTION_KEY và backup.',
+    'เก็บ key บน gateway host (ไฟล์ใน dev); production ต้องมี BYOK_ENCRYPTION_KEY และ backup',
+  ),
+]);
 
 const sdkDocsHref = computed(() => `${props.prefix}/sdk/typescript/`);
 const byokDocsHref = computed(() => `${props.prefix}/reference/byok`);
@@ -87,19 +101,31 @@ const quickStartSteps = computed(() => [
   {
     id: 'provider',
     done: hasProviderKey.value,
-    label: props.isVi ? 'Thêm provider key (OpenAI / Anthropic)' : 'Add a provider key (OpenAI / Anthropic)',
+    label: m(
+      'Add a provider key (OpenAI / Anthropic)',
+      'Thêm provider key (OpenAI / Anthropic)',
+      'เพิ่ม provider key (OpenAI / Anthropic)',
+    ),
     tab: 'providers' as TabId,
   },
   {
     id: 'gommo',
     done: Boolean(status.value?.gommoLinked),
-    label: props.isVi ? 'Link Gommo account và đặt primary' : 'Link a Gommo account and set primary',
+    label: m(
+      'Link a Gommo account and set primary',
+      'Link Gommo account và đặt primary',
+      'เชื่อมบัญชี Gommo และตั้ง primary',
+    ),
     tab: 'gommo' as TabId,
   },
   {
     id: 'chat',
     done: (usageSummary.value?.byokRequests ?? 0) > 0,
-    label: props.isVi ? 'Gọi chat với model đã map (xem danh sách bên dưới)' : 'Call chat with a mapped model (see list below)',
+    label: m(
+      'Call chat with a mapped model (see list below)',
+      'Gọi chat với model đã map (xem danh sách bên dưới)',
+      'เรียก chat ด้วย model ที่ map แล้ว (ดูรายการด้านล่าง)',
+    ),
     href: chatDocsHref.value,
   },
 ]);
@@ -107,15 +133,19 @@ const quickStartSteps = computed(() => [
 const supportedChatModels = computed(() => status.value?.supportedChatModels ?? []);
 
 const platformFeeHelp = computed(() =>
-  props.isVi
-    ? 'Phí platform (% token hoặc/request) tích lũy trên gateway. Trước mỗi request BYOK, gateway kiểm tra credit Gommo session — thiếu credit trả 402. Chưa tương đương billing OpenRouter.'
-    : 'Platform fee (% of tokens or per request) accrues on the gateway ledger. Before each BYOK request, the gateway checks your session Gommo credits — insufficient balance returns 402. Not equivalent to OpenRouter billing yet.',
+  m(
+    'Platform fee (% of tokens or per request) accrues on the gateway ledger. Before each BYOK request, the gateway checks your session Gommo credits — insufficient balance returns 402. Not equivalent to OpenRouter billing yet.',
+    'Phí platform (% token hoặc/request) tích lũy trên gateway. Trước mỗi request BYOK, gateway kiểm tra credit Gommo session — thiếu credit trả 402. Chưa tương đương billing OpenRouter.',
+    'ค่าธรรมเนียมแพลตฟอร์ม (% token หรือต่อ request) สะสมบน gateway ก่อนแต่ละ BYOK request gateway ตรวจ credit Gommo ของเซสชัน — ยอดไม่พอคืน 402 ยังไม่เทียบเท่า OpenRouter billing',
+  ),
 );
 
 const fallbackHelp = computed(() =>
-  props.isVi
-    ? 'Khi provider key lỗi: bật = thử lại bằng credit Gommo session; tắt = trả lỗi provider, không fallback.'
-    : 'When the provider key fails: on = retry with session Gommo credits; off = return the provider error with no fallback.',
+  m(
+    'When the provider key fails: on = retry with session Gommo credits; off = return the provider error with no fallback.',
+    'Khi provider key lỗi: bật = thử lại bằng credit Gommo session; tắt = trả lỗi provider, không fallback.',
+    'เมื่อ provider key ล้มเหลว: เปิด = ลองใหม่ด้วย credit Gommo ของเซสชัน; ปิด = คืนข้อผิดพลาดจาก provider โดยไม่ fallback',
+  ),
 );
 
 function formatModelId(model: { gatewayModelId: string; gommoServer?: string }): string {
@@ -150,8 +180,8 @@ function credentialLabel(cred: ByokCredential): string {
 }
 
 function eventStatusLabel(event: ByokUsageEvent): string {
-  if (event.ok) return props.isVi ? 'OK' : 'OK';
-  return event.errorCode || (props.isVi ? 'Lỗi' : 'Error');
+  if (event.ok) return 'OK';
+  return event.errorCode || m('Error', 'Lỗi', 'ข้อผิดพลาด');
 }
 
 function eventStatusTone(event: ByokUsageEvent): 'ok' | 'error' {
@@ -168,11 +198,11 @@ function eventSourceTone(event: ByokUsageEvent): 'byok' | 'platform' {
 
 function providerStatusLabel(provider: ByokProviderInfo): string {
   if (provider.configured) {
-    return props.isVi
-      ? `${provider.credentialCount} key`
-      : `${provider.credentialCount} key${provider.credentialCount === 1 ? '' : 's'}`;
+    const count = provider.credentialCount;
+    if (count === 1) return m('1 key', '1 key', '1 key');
+    return m(`${count} keys`, `${count} key`, `${count} key`);
   }
-  return props.isVi ? 'Chưa cấu hình' : 'Not configured';
+  return m('Not configured', 'Chưa cấu hình', 'ยังไม่ได้ตั้งค่า');
 }
 
 async function reload(opts?: { initial?: boolean }) {
@@ -212,7 +242,7 @@ async function onAddProviderKey() {
     providerSecret.value = '';
     providerLabel.value = '';
     await reload();
-    setActionSuccess(props.isVi ? 'Đã lưu provider key.' : 'Provider key saved.');
+    setActionSuccess(m('Provider key saved.', 'Đã lưu provider key.', 'บันทึก provider key แล้ว'));
   } catch (e) {
     setActionError(e instanceof Error ? e.message : String(e));
   }
@@ -228,7 +258,7 @@ async function onLinkGommo() {
     });
     gommoLabel.value = '';
     await reload();
-    setActionSuccess(props.isVi ? 'Đã liên kết Gommo account.' : 'Gommo account linked.');
+    setActionSuccess(m('Gommo account linked.', 'Đã liên kết Gommo account.', 'เชื่อมบัญชี Gommo แล้ว'));
   } catch (e) {
     setActionError(e instanceof Error ? e.message : String(e));
   }
@@ -236,7 +266,7 @@ async function onLinkGommo() {
 
 async function onDeleteCredential(cred: ByokCredential) {
   const label = credentialLabel(cred);
-  const prompt = props.isVi ? `Xóa credential "${label}"?` : `Delete credential "${label}"?`;
+  const prompt = m(`Delete credential "${label}"?`, `Xóa credential "${label}"?`, `ลบ credential "${label}"?`);
   if (!window.confirm(prompt)) return;
 
   credentialActionId.value = cred.id;
@@ -244,7 +274,7 @@ async function onDeleteCredential(cred: ByokCredential) {
   try {
     await deleteByokCredential(cred.id);
     await reload();
-    setActionSuccess(props.isVi ? 'Đã xóa credential.' : 'Credential deleted.');
+    setActionSuccess(m('Credential deleted.', 'Đã xóa credential.', 'ลบ credential แล้ว'));
   } catch (e) {
     setActionError(e instanceof Error ? e.message : String(e));
   } finally {
@@ -258,9 +288,9 @@ async function onTestCredential(id: string) {
   try {
     const result = await testByokCredential(id);
     if (result.ok) {
-      setActionSuccess(result.message || (props.isVi ? 'Test thành công.' : 'Test passed.'));
+      setActionSuccess(result.message || m('Test passed.', 'Test thành công.', 'ทดสอบผ่าน'));
     } else {
-      setActionError(result.message || (props.isVi ? 'Test thất bại.' : 'Test failed.'));
+      setActionError(result.message || m('Test failed.', 'Test thất bại.', 'ทดสอบล้มเหลว'));
     }
     await reload();
   } catch (e) {
@@ -275,7 +305,7 @@ async function onSetPrimary(id: string) {
   try {
     await setPrimaryGommoAccount(id);
     await reload();
-    setActionSuccess(props.isVi ? 'Đã đặt primary account.' : 'Primary account updated.');
+    setActionSuccess(m('Primary account updated.', 'Đã đặt primary account.', 'อัปเดต primary account แล้ว'));
   } catch (e) {
     setActionError(e instanceof Error ? e.message : String(e));
   }
@@ -288,12 +318,8 @@ async function onToggleFallback(cred: ByokCredential) {
     await reload();
     setActionSuccess(
       cred.sharedFallback
-        ? props.isVi
-          ? 'Đã tắt Gommo fallback.'
-          : 'Gommo fallback disabled.'
-        : props.isVi
-          ? 'Đã bật Gommo fallback.'
-          : 'Gommo fallback enabled.',
+        ? m('Gommo fallback disabled.', 'Đã tắt Gommo fallback.', 'ปิด Gommo fallback แล้ว')
+        : m('Gommo fallback enabled.', 'Đã bật Gommo fallback.', 'เปิด Gommo fallback แล้ว'),
     );
   } catch (e) {
     setActionError(e instanceof Error ? e.message : String(e));
@@ -322,7 +348,7 @@ defineExpose({
       <div class="or-obs-beta-notice-head">
         <span class="or-obs-pill or-obs-pill--beta">Beta</span>
         <strong class="or-obs-beta-notice-title">
-          {{ isVi ? 'Giới hạn hiện tại' : 'Current limitations' }}
+          {{ m('Current limitations', 'Giới hạn hiện tại', 'ข้อจำกัดปัจจุบัน') }}
         </strong>
       </div>
       <ul class="or-obs-beta-notice-list">
@@ -330,7 +356,7 @@ defineExpose({
       </ul>
       <p class="or-obs-beta-notice-foot">
         <a :href="byokDocsHref" class="or-obs-beta-notice-link">
-          {{ isVi ? 'Tài liệu BYOK đầy đủ →' : 'Full BYOK reference →' }}
+          {{ m('Full BYOK reference →', 'Tài liệu BYOK đầy đủ →', 'เอกสาร BYOK ฉบับเต็ม →') }}
         </a>
         ·
         <a :href="sdkDocsHref" class="or-obs-beta-notice-link">
@@ -346,13 +372,15 @@ defineExpose({
       aria-labelledby="or-byok-quickstart-title"
     >
       <h2 id="or-byok-quickstart-title" class="or-overview-onboarding-title">
-        {{ isVi ? 'Bắt đầu' : 'Get started' }}
+        {{ m('Get started', 'Bắt đầu', 'เริ่มต้น') }}
       </h2>
       <p class="or-overview-onboarding-sub">
         {{
-          isVi
-            ? 'Ba bước hybrid BYOK — key cho chat, Gommo cho media.'
-            : 'Three hybrid BYOK steps — keys for chat, Gommo for media.'
+          m(
+            'Three hybrid BYOK steps — keys for chat, Gommo for media.',
+            'Ba bước hybrid BYOK — key cho chat, Gommo cho media.',
+            'สามขั้นตอน hybrid BYOK — key สำหรับ chat, Gommo สำหรับ media',
+          )
         }}
       </p>
       <ol class="or-overview-onboarding-list">
@@ -385,7 +413,7 @@ defineExpose({
         :class="{ active: activeTab === 'providers' }"
         @click="activeTab = 'providers'"
       >
-        {{ isVi ? 'Provider' : 'Providers' }}
+        {{ m('Providers', 'Provider', 'Providers') }}
       </button>
       <button
         type="button"
@@ -393,7 +421,7 @@ defineExpose({
         :class="{ active: activeTab === 'gommo' }"
         @click="activeTab = 'gommo'"
       >
-        {{ isVi ? 'Tài khoản Gommo' : 'Gommo accounts' }}
+        {{ m('Gommo accounts', 'Tài khoản Gommo', 'บัญชี Gommo') }}
       </button>
       <button
         type="button"
@@ -401,7 +429,7 @@ defineExpose({
         :class="{ active: activeTab === 'usage' }"
         @click="activeTab = 'usage'"
       >
-        {{ isVi ? 'Usage' : 'Usage' }}
+        Usage
       </button>
     </div>
 
@@ -412,9 +440,11 @@ defineExpose({
     >
       <p class="or-app-muted" :title="platformFeeHelp">
         {{
-          isVi
-            ? `Phí platform: ${status.platformFeePercent}% · Fallback mặc định: ${status.defaultSharedFallback ? 'bật' : 'tắt'}`
-            : `Platform fee: ${status.platformFeePercent}% · Default fallback: ${status.defaultSharedFallback ? 'on' : 'off'}`
+          m(
+            `Platform fee: ${status.platformFeePercent}% · Default fallback: ${status.defaultSharedFallback ? 'on' : 'off'}`,
+            `Phí platform: ${status.platformFeePercent}% · Fallback mặc định: ${status.defaultSharedFallback ? 'bật' : 'tắt'}`,
+            `ค่าธรรมเนียมแพลตฟอร์ม: ${status.platformFeePercent}% · Fallback เริ่มต้น: ${status.defaultSharedFallback ? 'เปิด' : 'ปิด'}`,
+          )
         }}
         <span class="or-byok-help" aria-hidden="true">?</span>
       </p>
@@ -424,19 +454,21 @@ defineExpose({
         :title="platformFeeHelp"
       >
         {{
-          isVi
-            ? `Phí tích lũy: ${formatCredits(status.platformFees?.outstandingCredits ?? 0)} · Credit platform (session): ${formatCredits(status.platformCredits ?? 0)}`
-            : `Accrued fees: ${formatCredits(status.platformFees?.outstandingCredits ?? 0)} · Platform credits (session): ${formatCredits(status.platformCredits ?? 0)}`
+          m(
+            `Accrued fees: ${formatCredits(status.platformFees?.outstandingCredits ?? 0)} · Platform credits (session): ${formatCredits(status.platformCredits ?? 0)}`,
+            `Phí tích lũy: ${formatCredits(status.platformFees?.outstandingCredits ?? 0)} · Credit platform (session): ${formatCredits(status.platformCredits ?? 0)}`,
+            `ค่าธรรมเนียมสะสม: ${formatCredits(status.platformFees?.outstandingCredits ?? 0)} · Credit แพลตฟอร์ม (เซสชัน): ${formatCredits(status.platformCredits ?? 0)}`,
+          )
         }}
       </p>
     </div>
 
-    <p v-if="loading" class="or-app-muted">{{ isVi ? 'Đang tải…' : 'Loading…' }}</p>
+    <p v-if="loading" class="or-app-muted">{{ m('Loading…', 'Đang tải…', 'กำลังโหลด…') }}</p>
     <p v-else-if="error" class="or-app-alert">{{ error }}</p>
 
     <template v-else>
       <p v-if="refreshing" class="or-byok-refresh-hint" role="status">
-        {{ isVi ? 'Đang cập nhật…' : 'Refreshing…' }}
+        {{ m('Refreshing…', 'Đang cập nhật…', 'กำลังอัปเดต…') }}
       </p>
       <p v-if="actionSuccess" class="or-byok-action-success" role="status">{{ actionSuccess }}</p>
       <p v-if="actionError" class="or-byok-action-error">{{ actionError }}</p>
@@ -448,19 +480,23 @@ defineExpose({
       >
         <p class="or-app-muted">
           {{
-            isVi
-              ? 'Chat /gateway/chat và /v1/chat/completions dùng key provider khi có map model. Media jobs vẫn qua Gommo.'
-              : 'Chat /gateway/chat and /v1/chat/completions use provider keys when a model map exists. Media jobs still use Gommo.'
+            m(
+              'Chat /gateway/chat and /v1/chat/completions use provider keys when a model map exists. Media jobs still use Gommo.',
+              'Chat /gateway/chat và /v1/chat/completions dùng key provider khi có map model. Media jobs vẫn qua Gommo.',
+              'Chat /gateway/chat และ /v1/chat/completions ใช้ provider key เมื่อมี model map งาน media ยังผ่าน Gommo',
+            )
           }}
         </p>
 
         <div v-if="supportedChatModels.length" class="or-app-panel or-byok-models">
-          <h3>{{ isVi ? 'Model chat BYOK (gateway map)' : 'BYOK chat models (gateway map)' }}</h3>
+          <h3>{{ m('BYOK chat models (gateway map)', 'Model chat BYOK (gateway map)', 'Model chat BYOK (gateway map)') }}</h3>
           <p class="or-app-muted">
             {{
-              isVi
-                ? 'Chỉ các model sau dùng key provider. Operator thêm model mới trong config/byok-model-map.json.'
-                : 'Only these models use your provider key. Operators add new models in config/byok-model-map.json.'
+              m(
+                'Only these models use your provider key. Operators add new models in config/byok-model-map.json.',
+                'Chỉ các model sau dùng key provider. Operator thêm model mới trong config/byok-model-map.json.',
+                'เฉพาะ model เหล่านี้ใช้ provider key ของคุณ ผู้ดูแลเพิ่ม model ใหม่ใน config/byok-model-map.json',
+              )
             }}
           </p>
           <ul class="or-byok-model-list">
@@ -477,12 +513,12 @@ defineExpose({
               <strong>{{ provider.name }}</strong>
               <span class="or-app-muted"> · {{ providerStatusLabel(provider) }}</span>
             </div>
-            <span v-if="!provider.chatSupported" class="or-app-title-badge" :title="isVi ? 'Chat chưa hỗ trợ provider này' : 'Chat not supported for this provider yet'">beta</span>
+            <span v-if="!provider.chatSupported" class="or-app-title-badge" :title="m('Chat not supported for this provider yet', 'Chat chưa hỗ trợ provider này', 'ยังไม่รองรับ chat สำหรับ provider นี้')">beta</span>
           </li>
         </ul>
 
         <div class="or-app-panel or-byok-form">
-          <h3>{{ isVi ? 'Thêm provider key' : 'Add provider key' }}</h3>
+          <h3>{{ m('Add provider key', 'Thêm provider key', 'เพิ่ม provider key') }}</h3>
           <label class="or-byok-field">
             <span>Provider</span>
             <select v-model="selectedProvider">
@@ -491,11 +527,11 @@ defineExpose({
             </select>
           </label>
           <label class="or-byok-field">
-            <span>{{ isVi ? 'API key' : 'API key' }}</span>
+            <span>API key</span>
             <input v-model="providerSecret" type="password" autocomplete="off" />
           </label>
           <label class="or-byok-field">
-            <span>{{ isVi ? 'Nhãn (tuỳ chọn)' : 'Label (optional)' }}</span>
+            <span>{{ m('Label (optional)', 'Nhãn (tuỳ chọn)', 'ชื่อ (ไม่บังคับ)') }}</span>
             <input v-model="providerLabel" type="text" />
           </label>
           <button
@@ -504,12 +540,12 @@ defineExpose({
             :disabled="refreshing || !providerSecret.trim()"
             @click="onAddProviderKey"
           >
-            {{ isVi ? 'Lưu key' : 'Save key' }}
+            {{ m('Save key', 'Lưu key', 'บันทึก key') }}
           </button>
         </div>
 
         <div v-if="providerCreds.length" class="or-app-panel">
-          <h3>{{ isVi ? 'Keys đã lưu' : 'Saved keys' }}</h3>
+          <h3>{{ m('Saved keys', 'Keys đã lưu', 'Key ที่บันทึกแล้ว') }}</h3>
           <article v-for="cred in providerCreds" :key="cred.id" class="or-byok-cred">
             <div>
               <strong>{{ cred.providerSlug }}</strong>
@@ -532,7 +568,7 @@ defineExpose({
                 :disabled="refreshing || credentialActionId === cred.id"
                 @click="onToggleFallback(cred)"
               >
-                {{ cred.sharedFallback ? (isVi ? 'Fallback: bật' : 'Fallback: on') : (isVi ? 'Fallback: tắt' : 'Fallback: off') }}
+                {{ cred.sharedFallback ? m('Fallback: on', 'Fallback: bật', 'Fallback: เปิด') : m('Fallback: off', 'Fallback: tắt', 'Fallback: ปิด') }}
               </button>
               <button
                 type="button"
@@ -540,7 +576,7 @@ defineExpose({
                 :disabled="refreshing || credentialActionId === cred.id"
                 @click="onDeleteCredential(cred)"
               >
-                {{ isVi ? 'Xóa' : 'Delete' }}
+                {{ m('Delete', 'Xóa', 'ลบ') }}
               </button>
             </div>
           </article>
@@ -554,27 +590,31 @@ defineExpose({
       >
         <p v-if="status?.primaryGommo?.primary" class="or-app-panel or-byok-meta">
           {{
-            isVi
-              ? `Media jobs dùng primary: ${status.primaryGommo.primary.domain} (@${status.primaryGommo.primary.username || '—'})`
-              : `Media jobs use primary: ${status.primaryGommo.primary.domain} (@${status.primaryGommo.primary.username || '—'})`
+            m(
+              `Media jobs use primary: ${status.primaryGommo.primary.domain} (@${status.primaryGommo.primary.username || '—'})`,
+              `Media jobs dùng primary: ${status.primaryGommo.primary.domain} (@${status.primaryGommo.primary.username || '—'})`,
+              `งาน media ใช้ primary: ${status.primaryGommo.primary.domain} (@${status.primaryGommo.primary.username || '—'})`,
+            )
           }}
         </p>
         <p class="or-app-muted">
           {{
-            isVi
-              ? 'Liên kết domain Gommo bằng session đang đăng nhập — media/upload/audio trừ credit trên account primary.'
-              : 'Link a Gommo domain with your current login session — media/upload/audio bill against the primary account.'
+            m(
+              'Link a Gommo domain with your current login session — media/upload/audio bill against the primary account.',
+              'Liên kết domain Gommo bằng session đang đăng nhập — media/upload/audio trừ credit trên account primary.',
+              'เชื่อมโดเมน Gommo ด้วยเซสชันที่ล็อกอินอยู่ — media/upload/audio หัก credit จากบัญชี primary',
+            )
           }}
         </p>
 
         <div class="or-app-panel or-byok-form">
-          <h3>{{ isVi ? 'Liên kết account' : 'Link account' }}</h3>
+          <h3>{{ m('Link account', 'Liên kết account', 'เชื่อมบัญชี') }}</h3>
           <label class="or-byok-field">
             <span>Domain</span>
             <input v-model="gommoDomain" type="text" placeholder="79ai.net" />
           </label>
           <label class="or-byok-field">
-            <span>{{ isVi ? 'Nhãn (tuỳ chọn)' : 'Label (optional)' }}</span>
+            <span>{{ m('Label (optional)', 'Nhãn (tuỳ chọn)', 'ชื่อ (ไม่บังคับ)') }}</span>
             <input v-model="gommoLabel" type="text" />
           </label>
           <button
@@ -583,12 +623,12 @@ defineExpose({
             :disabled="refreshing || !gommoDomain.trim()"
             @click="onLinkGommo"
           >
-            {{ isVi ? 'Liên kết session hiện tại' : 'Link current session' }}
+            {{ m('Link current session', 'Liên kết session hiện tại', 'เชื่อมเซสชันปัจจุบัน') }}
           </button>
         </div>
 
         <div v-if="gommoCreds.length" class="or-app-panel">
-          <h3>{{ isVi ? 'Accounts' : 'Accounts' }}</h3>
+          <h3>Accounts</h3>
           <article v-for="cred in gommoCreds" :key="cred.id" class="or-byok-cred">
             <div>
               <strong>{{ cred.gommoDomain || cred.label }}</strong>
@@ -605,7 +645,7 @@ defineExpose({
                 :disabled="refreshing || credentialActionId === cred.id"
                 @click="onSetPrimary(cred.id)"
               >
-                {{ isVi ? 'Đặt primary' : 'Set primary' }}
+                {{ m('Set primary', 'Đặt primary', 'ตั้ง primary') }}
               </button>
               <button
                 type="button"
@@ -621,7 +661,7 @@ defineExpose({
                 :disabled="refreshing || credentialActionId === cred.id"
                 @click="onDeleteCredential(cred)"
               >
-                {{ isVi ? 'Xóa' : 'Delete' }}
+                {{ m('Delete', 'Xóa', 'ลบ') }}
               </button>
             </div>
           </article>
@@ -632,13 +672,15 @@ defineExpose({
         <div class="or-byok-usage-head">
           <p class="or-app-muted or-byok-usage-intro">
             {{
-              isVi
-                ? 'Thống kê 7 ngày — request BYOK vs platform (Gommo fallback). Media usage xem Activity.'
-                : 'Last 7 days — BYOK vs platform (Gommo fallback) requests. Media usage is on Activity.'
+              m(
+                'Last 7 days — BYOK vs platform (Gommo fallback) requests. Media usage is on Activity.',
+                'Thống kê 7 ngày — request BYOK vs platform (Gommo fallback). Media usage xem Activity.',
+                '7 วันล่าสุด — request BYOK vs platform (Gommo fallback) การใช้ media ดูที่ Activity',
+              )
             }}
           </p>
           <a :href="activityHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
-            {{ isVi ? 'Activity' : 'Activity' }} →
+            Activity →
           </a>
         </div>
 
@@ -646,26 +688,26 @@ defineExpose({
           <article class="or-app-panel or-byok-usage-card">
             <h3>BYOK</h3>
             <p class="or-byok-usage-value">{{ usageSummary.byokRequests }}</p>
-            <p class="or-app-muted">{{ isVi ? 'request' : 'requests' }}</p>
+            <p class="or-app-muted">{{ m('requests', 'request', 'request') }}</p>
           </article>
           <article class="or-app-panel or-byok-usage-card">
             <h3>Platform</h3>
             <p class="or-byok-usage-value">{{ usageSummary.platformRequests }}</p>
-            <p class="or-app-muted">{{ isVi ? 'request Gommo' : 'Gommo requests' }}</p>
+            <p class="or-app-muted">{{ m('Gommo requests', 'request Gommo', 'request Gommo') }}</p>
           </article>
           <article class="or-app-panel or-byok-usage-card">
-            <h3>{{ isVi ? 'Lỗi BYOK' : 'BYOK errors' }}</h3>
+            <h3>{{ m('BYOK errors', 'Lỗi BYOK', 'ข้อผิดพลาด BYOK') }}</h3>
             <p class="or-byok-usage-value">{{ usageSummary.byokErrors }}</p>
           </article>
           <article class="or-app-panel or-byok-usage-card">
-            <h3>{{ isVi ? 'Phí BYOK' : 'BYOK fees' }}</h3>
+            <h3>{{ m('BYOK fees', 'Phí BYOK', 'ค่าธรรมเนียม BYOK') }}</h3>
             <p class="or-byok-usage-value">{{ formatCredits(usageSummary.totalPlatformFeeCredits) }}</p>
-            <p class="or-app-muted">{{ isVi ? 'credit (7 ngày)' : 'credits (7d)' }}</p>
+            <p class="or-app-muted">{{ m('credits (7d)', 'credit (7 ngày)', 'credit (7 วัน)') }}</p>
           </article>
         </div>
 
         <div v-if="usageEvents.length" class="or-app-panel">
-          <h3>{{ isVi ? 'Gần đây' : 'Recent' }}</h3>
+          <h3>{{ m('Recent', 'Gần đây', 'ล่าสุด') }}</h3>
           <article v-for="event in usageEvents" :key="event.id" class="or-byok-usage-row">
             <div class="or-byok-usage-row-title">
               <span
@@ -687,21 +729,21 @@ defineExpose({
             </div>
           </article>
         </div>
-        <p v-else class="or-app-muted">{{ isVi ? 'Chưa có usage.' : 'No usage yet.' }}</p>
+        <p v-else class="or-app-muted">{{ m('No usage yet.', 'Chưa có usage.', 'ยังไม่มี usage') }}</p>
       </div>
 
       <div class="or-byok-quicklinks">
         <a :href="chatAppHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
-          {{ isVi ? 'Chat' : 'Chat' }} →
+          Chat →
         </a>
         <a :href="chatDocsHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
-          {{ isVi ? 'Chat API' : 'Chat API' }} →
+          Chat API →
         </a>
         <a :href="tokenHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
-          {{ isVi ? 'Access token' : 'Access token' }} →
+          {{ m('Access token', 'Access token', 'Access token') }} →
         </a>
         <a :href="activityHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
-          {{ isVi ? 'Activity' : 'Activity' }} →
+          Activity →
         </a>
       </div>
     </template>

@@ -1,16 +1,23 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { usePortalCopy } from '../composables/use-portal-copy';
 import type { ChatModelOption } from '../models/chat-models';
 import { modelPickerLabel } from '../models/chat-models';
+import type { PortalLocale } from '../models/portal-locale';
 
 const props = defineProps<{
   modelId: string;
   models: ChatModelOption[];
   disabled?: boolean;
+  locale?: PortalLocale;
   isVi?: boolean;
   /** Gateway BYOK map — show badge on mapped chat models */
   byokModelIds?: string[];
 }>();
+
+const { locale: activeLocale, m } = usePortalCopy(
+  computed(() => props.locale ?? (props.isVi ? 'vi' : 'en')),
+);
 
 const byokIdSet = computed(() => new Set(props.byokModelIds ?? []));
 
@@ -71,11 +78,11 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
       :disabled="disabled"
       @click.stop="toggle"
     >
-      <span class="or-chat-model-trigger-label">{{ modelPickerLabel(activeModel, !!isVi) }}</span>
+      <span class="or-chat-model-trigger-label">{{ modelPickerLabel(activeModel, activeLocale) }}</span>
       <span
         v-if="isByokModel(modelId)"
         class="or-chat-model-badge or-chat-model-badge--byok"
-        :title="isVi ? 'Model chat BYOK — dùng provider key' : 'BYOK chat model — uses your provider key'"
+        :title="m('BYOK chat model — uses your provider key', 'Model chat BYOK — dùng provider key', 'โมเดลแชท BYOK — ใช้ provider key ของคุณ')"
       >
         BYOK
       </span>
@@ -89,7 +96,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
           v-model="search"
           type="search"
           class="or-chat-model-search"
-          :placeholder="isVi ? 'Tìm model…' : 'Search models…'"
+          :placeholder="m('Search models…', 'Tìm model…', 'ค้นหาโมเดล…')"
           @keydown.esc.prevent="open = false"
         />
       </div>
@@ -108,7 +115,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
               <span v-if="isByokModel(model.id)" class="or-chat-model-badges">
                 <span
                   class="or-chat-model-badge or-chat-model-badge--byok"
-                  :title="isVi ? 'Chat BYOK' : 'Chat BYOK'"
+                  :title="m('Chat BYOK', 'Chat BYOK', 'Chat BYOK')"
                 >
                   BYOK
                 </span>
@@ -117,7 +124,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
           </button>
         </li>
         <li v-if="filtered.length === 0" class="or-chat-model-empty">
-          {{ isVi ? 'Không có model' : 'No models' }}
+          {{ m('No models', 'Không có model', 'ไม่มีโมเดล') }}
         </li>
       </ul>
     </div>

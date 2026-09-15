@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { usePortalCopy } from '../composables/use-portal-copy';
+import type { PortalLocale } from '../models/portal-locale';
 import { formatCredits } from '../models/user-api';
 import { formatUsageTime } from '../models/usage-history';
 import {
@@ -15,7 +17,7 @@ import {
 const props = defineProps<{
   open: boolean;
   item: UsageListItem | null;
-  isVi: boolean;
+  locale: PortalLocale;
   /** Full URL to reopen this job in Explore */
   shareHref?: string;
 }>();
@@ -23,6 +25,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: [];
 }>();
+
+const { m } = usePortalCopy(computed(() => props.locale));
 
 const copied = ref(false);
 const linkCopied = ref(false);
@@ -32,9 +36,9 @@ const status = computed(() => (props.item ? listItemStatus(props.item) : 'pendin
 const jobId = computed(() => usageJobId(props.item));
 
 const statusLabel = computed(() => {
-  if (status.value === 'success') return props.isVi ? 'Thành công' : 'Success';
-  if (status.value === 'failed') return props.isVi ? 'Thất bại' : 'Failed';
-  return props.isVi ? 'Đang xử lý' : 'Pending';
+  if (status.value === 'success') return m('Success', 'Thành công', 'สำเร็จ');
+  if (status.value === 'failed') return m('Failed', 'Thất bại', 'ล้มเหลว');
+  return m('Pending', 'Đang xử lý', 'กำลังดำเนินการ');
 });
 
 watch(
@@ -100,10 +104,10 @@ function shareUrl(): string {
       class="or-usage-job-modal"
       role="dialog"
       aria-modal="true"
-      :aria-label="isVi ? 'Chi tiết job' : 'Job details'"
+      :aria-label="m('Job details', 'Chi tiết job', 'รายละเอียดงาน')"
     >
       <div class="or-usage-job-modal-head">
-        <h3 class="or-usage-job-modal-title">{{ isVi ? 'Chi tiết job' : 'Job details' }}</h3>
+        <h3 class="or-usage-job-modal-title">{{ m('Job details', 'Chi tiết job', 'รายละเอียดงาน') }}</h3>
         <div class="or-usage-job-modal-head-actions">
           <button
             v-if="shareHref"
@@ -111,9 +115,9 @@ function shareUrl(): string {
             class="or-app-btn or-app-btn-ghost or-app-btn-sm"
             @click="copyText(shareUrl(), 'link')"
           >
-            {{ linkCopied ? (isVi ? 'Đã copy link' : 'Link copied') : isVi ? 'Copy link' : 'Copy link' }}
+            {{ linkCopied ? m('Link copied', 'Đã copy link', 'คัดลอกลิงก์แล้ว') : m('Copy link', 'Copy link', 'คัดลอกลิงก์') }}
           </button>
-          <button type="button" class="or-usage-job-modal-close" :aria-label="isVi ? 'Đóng' : 'Close'" @click="emit('close')">
+          <button type="button" class="or-usage-job-modal-close" :aria-label="m('Close', 'Đóng', 'ปิด')" @click="emit('close')">
             ×
           </button>
         </div>
@@ -122,19 +126,19 @@ function shareUrl(): string {
       <div class="or-usage-job-modal-body">
         <dl class="or-usage-job-modal-dl">
           <div class="or-usage-job-modal-row">
-            <dt>{{ isVi ? 'Thời gian' : 'Time' }}</dt>
-            <dd>{{ formatUsageTime(listItemCreatedAt(item) || '', isVi) }}</dd>
+            <dt>{{ m('Time', 'Thời gian', 'เวลา') }}</dt>
+            <dd>{{ formatUsageTime(listItemCreatedAt(item) || '', locale) }}</dd>
           </div>
           <div class="or-usage-job-modal-row">
-            <dt>{{ isVi ? 'Loại' : 'Type' }}</dt>
-            <dd>{{ jobTypeLabel((item.type as UsageStatsType) || 'image', isVi) }}</dd>
+            <dt>{{ m('Type', 'Loại', 'ประเภท') }}</dt>
+            <dd>{{ jobTypeLabel((item.type as UsageStatsType) || 'image', locale) }}</dd>
           </div>
           <div class="or-usage-job-modal-row">
             <dt>Model</dt>
             <dd><code class="or-usage-model">{{ item.model || '—' }}</code></dd>
           </div>
           <div class="or-usage-job-modal-row">
-            <dt>{{ isVi ? 'Trạng thái' : 'Status' }}</dt>
+            <dt>{{ m('Status', 'Trạng thái', 'สถานะ') }}</dt>
             <dd>
               <span class="or-usage-status" :class="`or-usage-status--${status}`">
                 {{ statusLabel }}
@@ -142,11 +146,11 @@ function shareUrl(): string {
             </dd>
           </div>
           <div class="or-usage-job-modal-row">
-            <dt>{{ isVi ? 'Credit' : 'Credit' }}</dt>
+            <dt>{{ m('Credit', 'Credit', 'เครดิต') }}</dt>
             <dd>{{ listItemCredit(item) > 0 ? formatCredits(listItemCredit(item)) : '—' }}</dd>
           </div>
           <div v-if="jobId" class="or-usage-job-modal-row">
-            <dt>{{ isVi ? 'Job ID' : 'Job ID' }}</dt>
+            <dt>{{ m('Job ID', 'Job ID', 'Job ID') }}</dt>
             <dd class="or-usage-job-modal-mono">
               <code>{{ jobId }}</code>
               <button
@@ -154,7 +158,7 @@ function shareUrl(): string {
                 class="or-app-btn or-app-btn-ghost or-app-btn-sm"
                 @click="copyText(jobId)"
               >
-                {{ copied ? (isVi ? 'Đã copy' : 'Copied') : isVi ? 'Copy' : 'Copy' }}
+                {{ copied ? m('Copied', 'Đã copy', 'คัดลอกแล้ว') : m('Copy', 'Copy', 'คัดลอก') }}
               </button>
             </dd>
           </div>
@@ -169,7 +173,7 @@ function shareUrl(): string {
               class="or-app-btn or-app-btn-ghost or-app-btn-sm"
               @click="copyText(item.prompt || '')"
             >
-              {{ isVi ? 'Copy prompt' : 'Copy prompt' }}
+              {{ m('Copy prompt', 'Copy prompt', 'คัดลอก prompt') }}
             </button>
           </div>
           <pre class="or-usage-job-modal-prompt-text">{{ item.prompt || '—' }}</pre>

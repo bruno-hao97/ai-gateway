@@ -1,5 +1,6 @@
 import { config, isGommoMerchantConfigured } from '../config.js';
-import { buildChatForm, forwardChat } from './gommoChat.js';
+import { buildChatForm, forwardChat, type ChatGatewayRequest } from './gommoChat.js';
+import { extractGommoChatText } from './openaiChat.js';
 
 export function isCatalogTranslateConfigured(): boolean {
   return isGommoMerchantConfigured() || Boolean(config.catalog.translateApiKey.trim());
@@ -11,19 +12,102 @@ function translateProvider(): 'gommo' | 'openrouter' {
   throw new Error('No translate provider configured');
 }
 
-function buildTranslatePrompt(payload: Record<string, string>): string {
+export type CatalogTranslateTarget = 'en' | 'th';
+
+function buildTranslatePrompt(payload: Record<string, string>, target: CatalogTranslateTarget): string {
+  const lang = target === 'th' ? 'Thai' : 'English';
+  const langNote = target === 'th' ? 'Thai string values' : 'English string values';
   return [
-    'Translate each value from Vietnamese to concise English for an AI model catalog.',
+    `Translate each value from Vietnamese to concise ${lang} for an AI model catalog.`,
     'Keep brand names, model names, and technical tokens unchanged.',
-    'Return ONLY a JSON object with the same keys and English string values.',
+    `Return ONLY a JSON object with the same keys and ${langNote}.`,
     '',
     JSON.stringify(payload, null, 2),
   ].join('\n');
 }
 
-/** Batch translate slug → EN (Gommo chat default; OpenRouter optional fallback). */
+function buildTranslateEnToThPrompt(payload: Record<string, string>): string {
+  return [
+    'Translate each value from English to concise Thai for an AI model catalog.',
+    'Keep brand names, model names, and technical tokens unchanged.',
+    'Return ONLY a JSON object with the same keys and Thai string values.',
+    '',
+    JSON.stringify(payload, null, 2),
+  ].join('\n');
+}
+
+function buildGommoTranslateRequest(prompt: string): ChatGatewayRequest {
+  return {
+    action: 'stream',
+    query: prompt,
+    messages: [{ role: 'user', text: prompt }],
+    accessToken: config.gommo.accessToken,
+    domain: config.gommo.apiDomain,
+    server: config.gommo.chatServer,
+    model: config.gommo.chatModel,
+    customSystemPrompt:
+      'You are a translation assistant for an AI model catalog. Return only valid JSON with the requested keys.',
+  };
+}
+
+async function translateChunkEnToTh(
+  payload: Record<string, string>,
+  provider: 'gommo' | 'openrouter',
+): Promise<Record<string, string>> {
+  const prompt = buildTranslateEnToThPrompt(payload);
+  if (provider === 'gommo') {
+    return translateChunkViaGommoPrompt(prompt, Object.keys(payload));
+  }
+
+  const apiKey = config.catalog.translateApiKey;
+  const model = config.catalog.translateModel;
+  const baseUrl = config.catalog.translateBaseUrl.replace(/\/$/, '');
+  const res = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': config.appUrl,
+      'X-Title': 'ai-gateway catalog translate',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+      temperature: 0.2,
+    }),
+  });
+  const body = (await res.json().catch(() => ({}))) as {
+    error?: { message?: string };
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  if (!res.ok) {
+    throw new Error(body.error?.message || `Translate API HTTP ${res.status}`);
+  }
+  const content = body.choices?.[0]?.message?.content?.trim();
+  if (!content) return {};
+  return parseTranslateJson(content, Object.keys(payload));
+}
+
+async function translateChunkViaGommoPrompt(
+  prompt: string,
+  expectedSlugs: string[],
+): Promise<Record<string, string>> {
+  const form = buildChatForm(buildGommoTranslateRequest(prompt));
+  const res = await forwardChat(form, AbortSignal.timeout(120_000));
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`Gommo chat HTTP ${res.status}: ${text.slice(0, 300)}`);
+  }
+  const content = extractGommoChatText(text, res.headers.get('content-type') ?? '');
+  if (!content) return {};
+  return parseTranslateJson(content, expectedSlugs);
+}
+
+/** Batch translate slug → EN|TH (Gommo chat default; OpenRouter optional fallback). */
 export async function translateDescriptionsBatch(
   items: Array<{ slug: string; text: string }>,
+  target: CatalogTranslateTarget = 'en',
 ): Promise<Record<string, string>> {
   if (!items.length || !isCatalogTranslateConfigured()) return {};
 
@@ -39,69 +123,53 @@ export async function translateDescriptionsBatch(
     const payload = Object.fromEntries(chunk.map((c) => [c.slug, c.text]));
     const chunkResult =
       provider === 'gommo'
-        ? await translateChunkViaGommo(payload)
-        : await translateChunkViaOpenRouter(payload);
+        ? await translateChunkViaGommo(payload, target)
+        : await translateChunkViaOpenRouter(payload, target);
     Object.assign(out, chunkResult);
   }
 
   return out;
 }
 
-async function translateChunkViaGommo(payload: Record<string, string>): Promise<Record<string, string>> {
-  const prompt = buildTranslatePrompt(payload);
-  const form = buildChatForm({
-    action: 'chat',
-    query: prompt,
-    messages: [{ role: 'user', text: prompt }],
-    accessToken: config.gommo.accessToken,
-    domain: config.gommo.apiDomain,
-  });
+/** Bootstrap TH cache from EN cache entries (same hash, EN → TH). */
+export async function translateEnglishDescriptionsBatch(
+  items: Array<{ slug: string; text: string }>,
+): Promise<Record<string, string>> {
+  if (!items.length || !isCatalogTranslateConfigured()) return {};
 
-  const res = await forwardChat(form, AbortSignal.timeout(120_000));
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error(`Gommo chat HTTP ${res.status}: ${text.slice(0, 300)}`);
+  const provider = translateProvider();
+  const chunkSize =
+    provider === 'gommo'
+      ? Math.min(config.catalog.translateBatchSize, 8)
+      : config.catalog.translateBatchSize;
+  const out: Record<string, string> = {};
+
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
+    const payload = Object.fromEntries(chunk.map((c) => [c.slug, c.text]));
+    const chunkResult = await translateChunkEnToTh(payload, provider);
+    Object.assign(out, chunkResult);
   }
 
-  const contentType = res.headers.get('content-type') ?? '';
-  const content =
-    contentType.includes('text/event-stream') || text.includes('data: {')
-      ? parseSseChatContent(text)
-      : extractTextFromChatResponse(text);
-  if (!content) return {};
-
-  return parseTranslateJson(content, Object.keys(payload));
+  return out;
 }
 
-function parseSseChatContent(raw: string): string {
-  let out = '';
-  for (const line of raw.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith('data:')) continue;
-    const payload = trimmed.slice(5).trim();
-    if (!payload || payload === '[DONE]') continue;
-    try {
-      const json = JSON.parse(payload) as {
-        choices?: Array<{ delta?: { content?: string }; message?: { content?: string } }>;
-        text?: string;
-      };
-      const delta = json.choices?.[0]?.delta?.content;
-      if (typeof delta === 'string') out += delta;
-      const message = json.choices?.[0]?.message?.content;
-      if (typeof message === 'string') out += message;
-      if (typeof json.text === 'string') out += json.text;
-    } catch {
-      /* ignore non-JSON SSE lines */
-    }
-  }
-  return out.trim();
+async function translateChunkViaGommo(
+  payload: Record<string, string>,
+  target: CatalogTranslateTarget,
+): Promise<Record<string, string>> {
+  const prompt = buildTranslatePrompt(payload, target);
+  return translateChunkViaGommoPrompt(prompt, Object.keys(payload));
 }
 
-async function translateChunkViaOpenRouter(payload: Record<string, string>): Promise<Record<string, string>> {
+async function translateChunkViaOpenRouter(
+  payload: Record<string, string>,
+  target: CatalogTranslateTarget,
+): Promise<Record<string, string>> {
   const apiKey = config.catalog.translateApiKey;
   const model = config.catalog.translateModel;
   const baseUrl = config.catalog.translateBaseUrl.replace(/\/$/, '');
-  const prompt = buildTranslatePrompt(payload);
+  const prompt = buildTranslatePrompt(payload, target);
 
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
@@ -132,34 +200,6 @@ async function translateChunkViaOpenRouter(payload: Record<string, string>): Pro
   if (!content) return {};
 
   return parseTranslateJson(content, Object.keys(payload));
-}
-
-function extractTextFromChatResponse(raw: string): string {
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    return extractTextFromChatJson(parsed) || raw.trim();
-  } catch {
-    return raw.trim();
-  }
-}
-
-function extractTextFromChatJson(obj: Record<string, unknown>, depth = 0): string | null {
-  if (depth > 4) return null;
-
-  const directKeys = ['text', 'reply', 'content', 'message', 'answer', 'output'];
-  for (const key of directKeys) {
-    const v = obj[key];
-    if (typeof v === 'string' && v.trim()) return v.trim();
-  }
-
-  const data = obj.data;
-  if (typeof data === 'string' && data.trim()) return data.trim();
-  if (data && typeof data === 'object' && !Array.isArray(data)) {
-    const nested = extractTextFromChatJson(data as Record<string, unknown>, depth + 1);
-    if (nested) return nested;
-  }
-
-  return null;
 }
 
 function parseTranslateJson(content: string, expectedSlugs: string[]): Record<string, string> {

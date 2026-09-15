@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
+import { usePortalCopy } from '../composables/use-portal-copy';
 import {
   buildInvoiceBuyer,
   calcBillingTotals,
@@ -12,6 +13,7 @@ import {
   type InvoiceFormState,
   type InvoiceTab,
 } from '../models/invoice-buyer';
+import type { PortalLocale } from '../models/portal-locale';
 import {
   createTopup,
   formatCredits,
@@ -26,7 +28,7 @@ const props = defineProps<{
   pkg: CreditPackage | null;
   username: string;
   defaultEmail: string;
-  isVi: boolean;
+  locale: PortalLocale;
 }>();
 
 const emit = defineEmits<{
@@ -34,6 +36,8 @@ const emit = defineEmits<{
   paid: [];
   toast: [message: string];
 }>();
+
+const { isVi, m } = usePortalCopy(computed(() => props.locale));
 
 type CheckoutStep = 'summary' | 'invoice' | 'payment';
 
@@ -53,7 +57,7 @@ let paymentPollTimer: ReturnType<typeof setInterval> | null = null;
 
 const totals = computed(() => calcBillingTotals(props.pkg?.amountVnd ?? 0));
 
-const currencyDisclaimer = computed(() => billingCurrencyDisclaimer(props.isVi));
+const currencyDisclaimer = computed(() => billingCurrencyDisclaimer(props.locale));
 
 const payTotals = computed(() => {
   const p = payment.value;
@@ -108,7 +112,7 @@ const packageLineLabel = computed(() => {
 
 const invoiceNote = computed(() => {
   if (!invoiceBuyer.value || step.value !== 'payment') return '';
-  return formatInvoiceDeliveryNoteShort(invoiceBuyer.value, props.isVi);
+  return formatInvoiceDeliveryNoteShort(invoiceBuyer.value, props.locale);
 });
 
 const canConfirmSummary = computed(() => agreedTerms.value && Boolean(props.pkg));
@@ -150,7 +154,7 @@ async function pollPaymentOnce(orderCode: string) {
   }
   if (result.paid) {
     stopPaymentPoll();
-    emit('toast', props.isVi ? 'Nạp credit thành công!' : 'Top-up successful!');
+    emit('toast', m('Top-up successful!', 'Nạp credit thành công!', 'เติม credit สำเร็จ!'));
     emit('paid');
     closeModal(false);
   }
@@ -179,9 +183,11 @@ function closeModal(confirmPending = true) {
     step.value === 'payment'
   ) {
     const ok = window.confirm(
-      props.isVi
-        ? 'Đơn đang chờ thanh toán. Bạn có chắc muốn đóng?'
-        : 'Payment is pending. Close anyway?',
+      m(
+        'Payment is pending. Close anyway?',
+        'Đơn đang chờ thanh toán. Bạn có chắc muốn đóng?',
+        'การชำระเงินกำลังรอดำเนินการ ปิดเลยหรือไม่?',
+      ),
     );
     if (!ok) return;
   }
@@ -209,15 +215,17 @@ function onTabChange(tab: InvoiceTab) {
 async function submitPayment() {
   if (!props.pkg || !props.username) return;
 
-  const validationError = validateInvoiceForm(invoiceTab.value, form, props.isVi);
+  const validationError = validateInvoiceForm(invoiceTab.value, form, props.locale);
   if (validationError) {
     formError.value = validationError;
     return;
   }
   if (invoiceTab.value === 'company' && !companyConfirmed.value) {
-    formError.value = props.isVi
-      ? 'Vui lòng xác nhận thông tin hóa đơn là đúng.'
-      : 'Please confirm invoice details are correct.';
+    formError.value = m(
+      'Please confirm invoice details are correct.',
+      'Vui lòng xác nhận thông tin hóa đơn là đúng.',
+      'กรุณายืนยันว่ารายละเอียดใบแจ้งหนี้ถูกต้อง',
+    );
     return;
   }
 
@@ -280,7 +288,7 @@ watch(
         }"
         role="dialog"
         aria-modal="true"
-        :aria-label="isVi ? 'Nạp credit' : 'Top up credits'"
+        :aria-label="m('Top up credits', 'Nạp credit', 'เติม credit')"
       >
         <button type="button" class="or-checkout-close" aria-label="Close" @click="closeModal()">
           ×
@@ -289,27 +297,29 @@ watch(
         <!-- Step 1: Summary -->
         <template v-if="step === 'summary'">
           <div class="or-checkout-icon or-checkout-icon-coin" aria-hidden="true">₫</div>
-          <h2 class="or-checkout-title">{{ isVi ? 'Nạp Credit' : 'Top up credits' }}</h2>
+          <h2 class="or-checkout-title">{{ m('Top up credits', 'Nạp Credit', 'เติม Credit') }}</h2>
           <p class="or-checkout-sub">
             {{
-              isVi
-                ? 'Credit sẽ được cộng vào tài khoản ngay sau khi thanh toán.'
-                : 'Credits are added to your account right after payment.'
+              m(
+                'Credits are added to your account right after payment.',
+                'Credit sẽ được cộng vào tài khoản ngay sau khi thanh toán.',
+                'Credit จะเข้าบัญชีทันทีหลังชำระเงิน',
+              )
             }}
           </p>
 
           <div class="or-checkout-summary">
             <div class="or-checkout-summary-row">
               <span>{{ packageLineLabel }}</span>
-              <span>{{ formatVnd(totals.subtotalVnd, isVi) }}</span>
+              <span>{{ formatVnd(totals.subtotalVnd, locale) }}</span>
             </div>
             <div class="or-checkout-summary-row or-checkout-muted">
-              <span>{{ isVi ? 'VAT 5%' : 'VAT 5%' }}</span>
-              <span>{{ formatVnd(totals.vatVnd, isVi) }}</span>
+              <span>{{ m('VAT 5%', 'VAT 5%', 'VAT 5%') }}</span>
+              <span>{{ formatVnd(totals.vatVnd, locale) }}</span>
             </div>
             <div class="or-checkout-summary-row or-checkout-total">
-              <span>{{ isVi ? 'Tổng' : 'Total' }}</span>
-              <span>{{ formatVnd(totals.totalVnd, isVi) }}</span>
+              <span>{{ m('Total', 'Tổng', 'รวม') }}</span>
+              <span>{{ formatVnd(totals.totalVnd, locale) }}</span>
             </div>
           </div>
           <p v-if="currencyDisclaimer" class="or-checkout-disclaimer">{{ currencyDisclaimer }}</p>
@@ -318,13 +328,15 @@ watch(
             v-model="promoCode"
             type="text"
             class="or-checkout-input"
-            :placeholder="isVi ? 'Nhập mã tăng thêm (nếu có)' : 'Promo code (optional)'"
+            :placeholder="m('Promo code (optional)', 'Nhập mã tăng thêm (nếu có)', 'รหัสโปรโม (ถ้ามี)')"
           />
           <p class="or-checkout-hint">
             {{
-              isVi
-                ? 'Gói nạp này áp dụng cho mọi model, không áp dụng với chương trình khuyến mãi khác.'
-                : 'This package applies to all models; not combinable with other promos.'
+              m(
+                'This package applies to all models; not combinable with other promos.',
+                'Gói nạp này áp dụng cho mọi model, không áp dụng với chương trình khuyến mãi khác.',
+                'แพ็กเกจนี้ใช้ได้กับทุก model ไม่รวมกับโปรโมอื่น',
+              )
             }}
           </p>
 
@@ -332,9 +344,11 @@ watch(
             <input v-model="agreedTerms" type="checkbox" />
             <span>
               {{
-                isVi
-                  ? 'Tôi đã đọc và đồng ý: không hoàn Credit, chỉ nạp vừa đủ nhu cầu.'
-                  : 'I agree: no credit refunds; only top up what I need.'
+                m(
+                  'I agree: no credit refunds; only top up what I need.',
+                  'Tôi đã đọc và đồng ý: không hoàn Credit, chỉ nạp vừa đủ nhu cầu.',
+                  'ฉันยอมรับ: ไม่คืน Credit เติมเท่าที่ต้องการเท่านั้น',
+                )
               }}
             </span>
           </label>
@@ -346,16 +360,20 @@ watch(
             @click="goToInvoice"
           >
             {{
-              isVi
-                ? `Xác nhận và thanh toán ${formatVnd(totals.totalVnd, isVi)}`
-                : `Confirm and pay ${formatVnd(totals.totalVnd, isVi)}`
+              m(
+                `Confirm and pay ${formatVnd(totals.totalVnd, locale)}`,
+                `Xác nhận và thanh toán ${formatVnd(totals.totalVnd, locale)}`,
+                `ยืนยันและชำระ ${formatVnd(totals.totalVnd, locale)}`,
+              )
             }}
           </button>
           <p class="or-checkout-foot">
             {{
-              isVi
-                ? 'Bằng việc xác nhận, bạn đồng ý với các Điều khoản & Chính sách của chúng tôi.'
-                : 'By confirming, you agree to our Terms & Policies.'
+              m(
+                'By confirming, you agree to our Terms & Policies.',
+                'Bằng việc xác nhận, bạn đồng ý với các Điều khoản & Chính sách của chúng tôi.',
+                'เมื่อยืนยัน แสดงว่าคุณยอมรับข้อกำหนดและนโยบายของเรา',
+              )
             }}
           </p>
         </template>
@@ -363,14 +381,16 @@ watch(
         <!-- Step 2: Invoice -->
         <template v-else-if="step === 'invoice'">
           <button type="button" class="or-checkout-back" @click="goBack">
-            {{ isVi ? '← Quay lại' : '← Back' }}
+            {{ m('← Back', '← Quay lại', '← กลับ') }}
           </button>
-          <h2 class="or-checkout-title">{{ isVi ? 'Thông tin hóa đơn' : 'Invoice details' }}</h2>
+          <h2 class="or-checkout-title">{{ m('Invoice details', 'Thông tin hóa đơn', 'รายละเอียดใบแจ้งหนี้') }}</h2>
           <p class="or-checkout-sub or-checkout-invoice-sub">
             {{
-              isVi
-                ? 'Mọi đơn giá sau khi thanh toán Credit sẽ được lưu lại pháp lý tại địa chỉ, CCCD và email.'
-                : 'Invoice data is stored for legal records (address, ID, email).'
+              m(
+                'Invoice data is stored for legal records (address, ID, email).',
+                'Mọi đơn giá sau khi thanh toán Credit sẽ được lưu lại pháp lý tại địa chỉ, CCCD và email.',
+                'ข้อมูลใบแจ้งหนี้จัดเก็บตามกฎหมาย (ที่อยู่ บัตรประชาชน อีเมล)',
+              )
             }}
           </p>
 
@@ -384,7 +404,7 @@ watch(
               :aria-selected="invoiceTab === 'consumer'"
               @click="onTabChange('consumer')"
             >
-              {{ isVi ? 'Vãng lai' : 'Guest' }}
+              {{ m('Guest', 'Vãng lai', 'ลูกค้าทั่วไป') }}
             </button>
             <button
               type="button"
@@ -394,7 +414,7 @@ watch(
               :aria-selected="invoiceTab === 'personal'"
               @click="onTabChange('personal')"
             >
-              {{ isVi ? 'Cá nhân' : 'Personal' }}
+              {{ m('Personal', 'Cá nhân', 'บุคคล') }}
             </button>
             <button
               type="button"
@@ -404,75 +424,77 @@ watch(
               :aria-selected="invoiceTab === 'company'"
               @click="onTabChange('company')"
             >
-              {{ isVi ? 'Công ty' : 'Company' }}
+              {{ m('Company', 'Công ty', 'บริษัท') }}
             </button>
           </div>
 
           <div v-if="invoiceTab === 'consumer'" class="or-checkout-consumer-box">
             <p>
               {{
-                isVi
-                  ? 'Bạn không cần điền gì! Hóa đơn ghi "Bán cho người tiêu dùng" và không gửi email.'
-                  : 'Nothing to fill in. Invoice shows "Consumer" with no email.'
+                m(
+                  'Nothing to fill in. Invoice shows "Consumer" with no email.',
+                  'Bạn không cần điền gì! Hóa đơn ghi "Bán cho người tiêu dùng" và không gửi email.',
+                  'ไม่ต้องกรอกอะไร ใบแจ้งหนี้แสดง "ผู้บริโภค" โดยไม่ส่งอีเมล',
+                )
               }}
             </p>
           </div>
 
           <div v-else-if="invoiceTab === 'personal'" class="or-checkout-form">
             <label class="or-checkout-field">
-              <span>{{ isVi ? 'Họ và tên anh/chị *' : 'Full name *' }}</span>
+              <span>{{ m('Full name *', 'Họ và tên anh/chị *', 'ชื่อ-นามสกุล *') }}</span>
               <input v-model="form.name" type="text" class="or-checkout-input" />
             </label>
             <label class="or-checkout-field">
-              <span>{{ isVi ? 'Địa chỉ *' : 'Address *' }}</span>
+              <span>{{ m('Address *', 'Địa chỉ *', 'ที่อยู่ *') }}</span>
               <input v-model="form.address" type="text" class="or-checkout-input" />
             </label>
             <label class="or-checkout-field">
-              <span>{{ isVi ? 'Sđt liên hệ anh/chị *' : 'Phone *' }}</span>
+              <span>{{ m('Phone *', 'Sđt liên hệ anh/chị *', 'เบอร์โทร *') }}</span>
               <input v-model="form.phone" type="tel" class="or-checkout-input" />
             </label>
             <label class="or-checkout-field">
-              <span>{{ isVi ? 'Email nhận kết quả sau khi mua *' : 'Email *' }}</span>
+              <span>{{ m('Email *', 'Email nhận kết quả sau khi mua *', 'อีเมล *') }}</span>
               <input v-model="form.email" type="email" class="or-checkout-input" />
             </label>
             <label class="or-checkout-field">
-              <span>{{ isVi ? 'CCCD / CMND *' : 'National ID *' }}</span>
+              <span>{{ m('National ID *', 'CCCD / CMND *', 'บัตรประชาชน *') }}</span>
               <input v-model="form.nationalId" type="text" class="or-checkout-input" />
             </label>
             <label class="or-checkout-field">
-              <span>{{ isVi ? 'Mã giới thiệu' : 'Referral code' }}</span>
+              <span>{{ m('Referral code', 'Mã giới thiệu', 'รหัสแนะนำ') }}</span>
               <input v-model="form.referralCode" type="text" class="or-checkout-input" />
             </label>
           </div>
 
           <div v-else class="or-checkout-form">
             <label class="or-checkout-field">
-              <span>{{ isVi ? 'Tên công ty hoặc hộ kinh doanh *' : 'Company name *' }}</span>
+              <span>{{ m('Company name *', 'Tên công ty hoặc hộ kinh doanh *', 'ชื่อบริษัท *') }}</span>
               <input v-model="form.companyName" type="text" class="or-checkout-input" />
             </label>
             <label class="or-checkout-field">
-              <span>{{ isVi ? 'Mã số thuế *' : 'Tax code *' }}</span>
+              <span>{{ m('Tax code *', 'Mã số thuế *', 'เลขประจำตัวผู้เสียภาษี *') }}</span>
               <input v-model="form.taxCode" type="text" class="or-checkout-input" />
             </label>
             <label class="or-checkout-field">
-              <span>{{ isVi ? 'Địa chỉ công ty *' : 'Company address *' }}</span>
+              <span>{{ m('Company address *', 'Địa chỉ công ty *', 'ที่อยู่บริษัท *') }}</span>
               <input v-model="form.address" type="text" class="or-checkout-input" />
             </label>
             <label class="or-checkout-field">
-              <span>{{ isVi ? 'Họ tên người nhận hóa đơn *' : 'Invoice recipient *' }}</span>
+              <span>{{ m('Invoice recipient *', 'Họ tên người nhận hóa đơn *', 'ชื่อผู้รับใบแจ้งหนี้ *') }}</span>
               <input v-model="form.recipientName" type="text" class="or-checkout-input" />
             </label>
             <label class="or-checkout-field">
-              <span>{{ isVi ? 'Email nhận hóa đơn *' : 'Invoice email *' }}</span>
+              <span>{{ m('Invoice email *', 'Email nhận hóa đơn *', 'อีเมลรับใบแจ้งหนี้ *') }}</span>
               <input v-model="form.email" type="email" class="or-checkout-input" />
             </label>
             <label class="or-checkout-field">
-              <span>{{ isVi ? 'Số điện thoại *' : 'Phone *' }}</span>
+              <span>{{ m('Phone *', 'Số điện thoại *', 'เบอร์โทร *') }}</span>
               <input v-model="form.phone" type="tel" class="or-checkout-input" />
             </label>
             <label class="or-checkout-check or-checkout-check-inline">
               <input v-model="companyConfirmed" type="checkbox" />
-              <span>{{ isVi ? 'Xác nhận thông tin hóa đơn là đúng' : 'Invoice details are correct' }}</span>
+              <span>{{ m('Invoice details are correct', 'Xác nhận thông tin hóa đơn là đúng', 'ยืนยันว่ารายละเอียดใบแจ้งหนี้ถูกต้อง') }}</span>
             </label>
           </div>
 
@@ -488,12 +510,8 @@ watch(
           >
             {{
               creating
-                ? isVi
-                  ? 'Đang tạo đơn…'
-                  : 'Creating order…'
-                : isVi
-                  ? 'Tiếp tục thanh toán'
-                  : 'Continue to payment'
+                ? m('Creating order…', 'Đang tạo đơn…', 'กำลังสร้างคำสั่ง…')
+                : m('Continue to payment', 'Tiếp tục thanh toán', 'ดำเนินการชำระเงิน')
             }}
           </button>
           </div>
@@ -504,27 +522,27 @@ watch(
           <div class="or-checkout-pay-badge" aria-hidden="true">
             {{ String(payment.orderCode || 'SP').slice(0, 2) }}
           </div>
-          <h2 class="or-checkout-title">{{ isVi ? 'Thanh toán' : 'Payment' }}</h2>
+          <h2 class="or-checkout-title">{{ m('Payment', 'Thanh toán', 'ชำระเงิน') }}</h2>
           <p class="or-checkout-sub">
-            {{ isVi ? 'Quét mã bằng app ngân hàng để hoàn tất' : 'Scan with your banking app to complete' }}
+            {{ m('Scan with your banking app to complete', 'Quét mã bằng app ngân hàng để hoàn tất', 'สแกนด้วยแอปธนาคารเพื่อชำระเงิน') }}
           </p>
 
           <div class="or-checkout-summary or-checkout-pay-summary">
             <div class="or-checkout-summary-row or-checkout-muted">
-              <span>{{ isVi ? 'GÓI' : 'Plan' }}</span>
+              <span>{{ m('Plan', 'GÓI', 'แพ็กเกจ') }}</span>
               <span>{{ pkg.name }}</span>
             </div>
             <div class="or-checkout-summary-row">
-              <span>{{ isVi ? 'Tạm tính' : 'Subtotal' }}</span>
-              <span>{{ formatVnd(payTotals.subtotalVnd, isVi) }}</span>
+              <span>{{ m('Subtotal', 'Tạm tính', 'ยอดก่อนภาษี') }}</span>
+              <span>{{ formatVnd(payTotals.subtotalVnd, locale) }}</span>
             </div>
             <div class="or-checkout-summary-row or-checkout-muted">
-              <span>{{ isVi ? `Thuế ${payTotals.vatPercent ?? 5}%` : `Tax ${payTotals.vatPercent ?? 5}%` }}</span>
-              <span>+{{ formatVnd(payTotals.vatVnd, isVi) }}</span>
+              <span>{{ m(`Tax ${payTotals.vatPercent ?? 5}%`, `Thuế ${payTotals.vatPercent ?? 5}%`, `ภาษี ${payTotals.vatPercent ?? 5}%`) }}</span>
+              <span>+{{ formatVnd(payTotals.vatVnd, locale) }}</span>
             </div>
             <div class="or-checkout-summary-row or-checkout-total">
-              <span>{{ isVi ? 'Tổng' : 'Total' }}</span>
-              <span>{{ formatVnd(payTotals.totalVnd, isVi) }}</span>
+              <span>{{ m('Total', 'Tổng', 'รวม') }}</span>
+              <span>{{ formatVnd(payTotals.totalVnd, locale) }}</span>
             </div>
           </div>
           <p v-if="currencyDisclaimer" class="or-checkout-disclaimer">{{ currencyDisclaimer }}</p>
@@ -548,25 +566,27 @@ watch(
             />
             <p class="or-checkout-qr-hint">
               {{
-                isVi
-                  ? 'Mở app ngân hàng → Quét mã → Xác nhận'
-                  : 'Open banking app → Scan → Confirm'
+                m(
+                  'Open banking app → Scan → Confirm',
+                  'Mở app ngân hàng → Quét mã → Xác nhận',
+                  'เปิดแอปธนาคาร → สแกน → ยืนยัน',
+                )
               }}
             </p>
 
             <dl v-if="hasBankDetails" class="or-checkout-bank">
               <div v-if="payment.holder" class="or-checkout-bank-row">
-                <dt>{{ isVi ? 'Chủ tài khoản' : 'Account holder' }}</dt>
+                <dt>{{ m('Account holder', 'Chủ tài khoản', 'เจ้าของบัญชี') }}</dt>
                 <dd><span>{{ payment.holder }}</span></dd>
               </div>
               <div v-if="payment.acc" class="or-checkout-bank-row">
-                <dt>{{ isVi ? 'Số tài khoản' : 'Account number' }}</dt>
+                <dt>{{ m('Account number', 'Số tài khoản', 'เลขบัญชี') }}</dt>
                 <dd>
                   <span>{{ accountNumberLabel }}</span>
                   <button
                     type="button"
                     class="or-checkout-copy"
-                    :title="isVi ? 'Sao chép' : 'Copy'"
+                    :title="m('Copy', 'Sao chép', 'คัดลอก')"
                     aria-label="Copy account number"
                     @click="copyField('acc', payment.acc!)"
                   >
@@ -580,17 +600,17 @@ watch(
                 </dd>
               </div>
               <div v-if="payment.bank" class="or-checkout-bank-row">
-                <dt>{{ isVi ? 'Ngân hàng' : 'Bank' }}</dt>
+                <dt>{{ m('Bank', 'Ngân hàng', 'ธนาคาร') }}</dt>
                 <dd><span>{{ payment.bank }}</span></dd>
               </div>
               <div v-if="transferMemo" class="or-checkout-bank-row">
-                <dt>{{ isVi ? 'Nội dung chuyển khoản' : 'Transfer memo' }}</dt>
+                <dt>{{ m('Transfer memo', 'Nội dung chuyển khoản', 'หมายเหตุการโอน') }}</dt>
                 <dd>
                   <span>{{ transferMemo }}</span>
                   <button
                     type="button"
                     class="or-checkout-copy"
-                    :title="isVi ? 'Sao chép' : 'Copy'"
+                    :title="m('Copy', 'Sao chép', 'คัดลอก')"
                     aria-label="Copy transfer memo"
                     @click="copyField('memo', transferMemo)"
                   >
@@ -607,18 +627,20 @@ watch(
           </div>
 
           <p v-if="paymentWaiting && !payment.paid" class="or-checkout-waiting">
-            {{ isVi ? 'Đang chờ ngân hàng xác nhận…' : 'Waiting for bank confirmation…' }}
+            {{ m('Waiting for bank confirmation…', 'Đang chờ ngân hàng xác nhận…', 'กำลังรอธนาคารยืนยัน…') }}
           </p>
           <p v-else-if="payment.paid" class="or-checkout-paid">
-            {{ isVi ? 'Đã thanh toán — credits đã được cộng.' : 'Paid — credits applied.' }}
+            {{ m('Paid — credits applied.', 'Đã thanh toán — credits đã được cộng.', 'ชำระแล้ว — credits เข้าแล้ว') }}
           </p>
           <p v-if="paymentPollError" class="or-checkout-poll-error">{{ paymentPollError }}</p>
 
           <p class="or-checkout-hint or-checkout-hint-center or-checkout-pay-foot">
             {{
-              isVi
-                ? 'Giữ nguyên nội dung chuyển khoản để credit được cộng tự động.'
-                : 'Keep the transfer memo exactly as shown for automatic credit.'
+              m(
+                'Keep the transfer memo exactly as shown for automatic credit.',
+                'Giữ nguyên nội dung chuyển khoản để credit được cộng tự động.',
+                'ใช้หมายเหตุการโอนตามที่แสดงเพื่อให้ credit เข้าอัตโนมัติ',
+              )
             }}
           </p>
         </template>

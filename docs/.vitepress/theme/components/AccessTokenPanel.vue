@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { usePortalCopy } from '../composables/use-portal-copy';
 import { clearAuth, getStoredDomain, getStoredToken, STORAGE_TOKEN } from '../models/auth-api';
 import {
   GOMMO_AUTH_HOST_LABEL,
@@ -10,6 +11,8 @@ import {
 import { activityHubHref } from '../models/activity-hub-url';
 import { apiBase } from '../models/gateway-base';
 import { formatApproxUsd } from '../models/invoice-buyer';
+import type { PortalLocale } from '../models/portal-locale';
+import { portalUsageLogsLanguage } from '../models/portal-gommo-lang';
 import { fetchMe, fetchUsageLogs, formatCredits } from '../models/user-api';
 import { formatUsageTime } from '../models/usage-history';
 import { listItemCreatedAt, normalizeUsageListItem, usageJobId } from '../models/usage-stats';
@@ -17,7 +20,7 @@ import { listItemCreatedAt, normalizeUsageListItem, usageJobId } from '../models
 const TOKEN_COPIED_STORAGE_KEY = 'gateway_token_copied';
 
 const props = defineProps<{
-  isVi: boolean;
+  locale: PortalLocale;
   prefix: string;
   token: string;
   maskedToken: string;
@@ -30,6 +33,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   tokenCopied: [];
 }>();
+
+const { isVi, m } = usePortalCopy(computed(() => props.locale));
 
 type SnippetTab = 'gateway' | 'auth' | 'curl' | 'javascript' | 'python' | 'mcp';
 type ConnectionStatus = 'idle' | 'checking' | 'connected' | 'error';
@@ -55,7 +60,7 @@ const checksRunning = computed(
   () => accountStatus.value === 'checking' || gommoV2Status.value === 'checking',
 );
 
-const creditsApproxUsd = computed(() => (props.isVi ? '' : formatApproxUsd(props.credits)));
+const creditsApproxUsd = computed(() => (isVi.value ? '' : formatApproxUsd(props.credits)));
 
 const appDomain = computed(() => props.domain.trim() || getStoredDomain());
 
@@ -70,14 +75,14 @@ const displayedToken = computed(() => (revealToken.value ? props.token : props.m
 
 const credentialName = computed(() => {
   if (props.username) return `@${props.username}`;
-  return props.isVi ? 'Phiên mặc định' : 'Default session';
+  return m('Default session', 'Phiên mặc định', 'เซสชันเริ่มต้น');
 });
 
 function statusLabel(status: ConnectionStatus, okLabel: string, errLabel: string): string {
-  if (status === 'checking') return props.isVi ? 'Đang kiểm tra…' : 'Checking…';
+  if (status === 'checking') return m('Checking…', 'Đang kiểm tra…', 'กำลังตรวจสอบ…');
   if (status === 'connected') return okLabel;
   if (status === 'error') return errLabel;
-  return props.isVi ? 'Chưa kiểm tra' : 'Not verified';
+  return m('Not verified', 'Chưa kiểm tra', 'ยังไม่ได้ตรวจสอบ');
 }
 
 function statusClass(status: ConnectionStatus): string {
@@ -88,14 +93,18 @@ function statusClass(status: ConnectionStatus): string {
 }
 
 const accountStatusLabel = computed(() =>
-  statusLabel(accountStatus.value, props.isVi ? 'Đã kết nối' : 'Connected', props.isVi ? 'Lỗi' : 'Error'),
+  statusLabel(
+    accountStatus.value,
+    m('Connected', 'Đã kết nối', 'เชื่อมต่อแล้ว'),
+    m('Error', 'Lỗi', 'ข้อผิดพลาด'),
+  ),
 );
 
 const gommoV2StatusLabel = computed(() =>
   statusLabel(
     gommoV2Status.value,
-    props.isVi ? 'Sẵn sàng' : 'Reachable',
-    props.isVi ? 'Không phản hồi' : 'Unreachable',
+    m('Reachable', 'Sẵn sàng', 'เข้าถึงได้'),
+    m('Unreachable', 'Không phản hồi', 'ไม่สามารถเข้าถึง'),
   ),
 );
 
@@ -119,63 +128,87 @@ const mediaJobsDocsHref = computed(() => `${props.prefix}/features/media-jobs`);
 const quickLinks = computed(() => [
   {
     id: 'activity',
-    title: 'Activity',
-    desc: props.isVi ? 'Usage, job logs và billing trên gateway.' : 'Usage, job logs, and billing on the gateway.',
+    title: m('Activity', 'Activity', 'กิจกรรม'),
+    desc: m(
+      'Usage, job logs, and billing on the gateway.',
+      'Usage, job logs và billing trên gateway.',
+      'การใช้งาน บันทึกงาน และการเรียกเก็บเงินบนเกตเวย์',
+    ),
     href: `${props.prefix}/app/activity/`,
-    cta: props.isVi ? 'Mở Activity' : 'Open Activity',
+    cta: m('Open Activity', 'Mở Activity', 'เปิด Activity'),
   },
   {
     id: 'observability',
-    title: 'Observability',
-    desc: props.isVi ? 'Webhook job (beta) và mirror local.' : 'Job webhooks (beta) and local mirror.',
+    title: m('Observability', 'Observability', 'การสังเกต'),
+    desc: m(
+      'Job webhooks (beta) and local mirror.',
+      'Webhook job (beta) và mirror local.',
+      'Webhook งาน (เบต้า) และ mirror ในเครื่อง',
+    ),
     href: `${props.prefix}/app/observability/`,
-    cta: props.isVi ? 'Mở Observability' : 'Open Observability',
+    cta: m('Open Observability', 'Mở Observability', 'เปิด Observability'),
   },
   {
     id: 'gommo-api',
-    title: props.isVi ? 'Gommo public API' : 'Gommo public API',
-    desc: props.isVi ? 'v2.api.gommo.net + api.gommo.net — host chính thức.' : 'v2.api.gommo.net + api.gommo.net — official hosts.',
+    title: 'Gommo public API',
+    desc: m(
+      'v2.api.gommo.net + api.gommo.net — official hosts.',
+      'v2.api.gommo.net + api.gommo.net — host chính thức.',
+      'v2.api.gommo.net + api.gommo.net — โฮสต์อย่างเป็นทางการ',
+    ),
     href: `${props.prefix}/reference/gommo-public-api`,
-    cta: props.isVi ? 'Xem API' : 'View API',
+    cta: m('View API', 'Xem API', 'ดู API'),
   },
   {
     id: 'playground',
-    title: 'Playground',
-    desc: props.isVi ? 'Tạo job ảnh/video trực tiếp trong browser.' : 'Create image/video jobs in the browser.',
+    title: m('Playground', 'Playground', 'สนามทดลอง'),
+    desc: m(
+      'Create image/video jobs in the browser.',
+      'Tạo job ảnh/video trực tiếp trong browser.',
+      'สร้างงานภาพ/วิดีโอในเบราว์เซอร์',
+    ),
     href: `${props.prefix}/app/playground/`,
-    cta: props.isVi ? 'Mở Playground' : 'Open Playground',
+    cta: m('Open Playground', 'Mở Playground', 'เปิด Playground'),
   },
   {
     id: 'chat',
-    title: 'Chat',
-    desc: props.isVi ? 'Chat streaming qua catalog Gommo.' : 'Streaming chat via the Gommo catalog.',
+    title: m('Chat', 'Chat', 'แชท'),
+    desc: m(
+      'Streaming chat via the Gommo catalog.',
+      'Chat streaming qua catalog Gommo.',
+      'แชทสตรีมผ่านแคตตาล็อก Gommo',
+    ),
     href: `${props.prefix}/app/chat/`,
-    cta: props.isVi ? 'Mở Chat' : 'Open Chat',
+    cta: m('Open Chat', 'Mở Chat', 'เปิด Chat'),
   },
   {
     id: 'mcp',
-    title: props.isVi ? 'MCP setup' : 'MCP setup',
-    desc: props.isVi ? '10 tools ảnh/video cho Cursor & IDE.' : '10 image/video tools for Cursor & IDE.',
+    title: m('MCP setup', 'Cấu hình MCP', 'ตั้งค่า MCP'),
+    desc: m(
+      '10 image/video tools for Cursor & IDE.',
+      '10 tools ảnh/video cho Cursor & IDE.',
+      '10 เครื่องมือภาพ/วิดีโอสำหรับ Cursor และ IDE',
+    ),
     href: `${props.prefix}/mcp/other-hosts`,
-    cta: props.isVi ? 'Cấu hình MCP' : 'Set up MCP',
+    cta: m('Set up MCP', 'Cấu hình MCP', 'ตั้งค่า MCP'),
   },
 ]);
 
 const lastVerifiedLabel = computed(() => {
   if (!lastVerifiedAt.value) return '—';
   const diff = Date.now() - lastVerifiedAt.value;
-  if (diff < 60_000) return props.isVi ? 'Vừa xong' : 'Just now';
+  if (diff < 60_000) return m('Just now', 'Vừa xong', 'เมื่อสักครู่');
   const min = Math.floor(diff / 60_000);
-  return props.isVi ? `${min} phút trước` : `${min}m ago`;
+  return m(`${min}m ago`, `${min} phút trước`, `${min} นาทีที่แล้ว`);
 });
 
 const snippetTabs = computed(() => [
-  { id: 'gateway' as const, label: props.isVi ? 'Gateway' : 'Gateway' },
-  { id: 'auth' as const, label: props.isVi ? 'Authorization' : 'Authorization' },
-  { id: 'curl' as const, label: props.isVi ? 'curl (Gommo)' : 'curl (Gommo)' },
+  { id: 'gateway' as const, label: 'Gateway' },
+  { id: 'auth' as const, label: 'Authorization' },
+  { id: 'curl' as const, label: 'curl (Gommo)' },
   { id: 'javascript' as const, label: 'JavaScript' },
   { id: 'python' as const, label: 'Python' },
-  { id: 'mcp' as const, label: props.isVi ? 'MCP JSON' : 'MCP JSON' },
+  { id: 'mcp' as const, label: 'MCP JSON' },
 ]);
 
 const snippets = computed(() => {
@@ -249,9 +282,11 @@ async function copyToken() {
       copied.value = false;
     }, 2000);
   } catch {
-    copyError.value = props.isVi
-      ? 'Không copy được — thử chọn token và copy thủ công.'
-      : 'Could not copy — try selecting the token and copying manually.';
+    copyError.value = m(
+      'Could not copy — try selecting the token and copying manually.',
+      'Không copy được — thử chọn token và copy thủ công.',
+      'ไม่สามารถคัดลอก — ลองเลือกโทเค็นและคัดลอกด้วยตนเอง',
+    );
   }
 }
 
@@ -272,7 +307,7 @@ async function copySnippet(tab: SnippetTab) {
 async function checkAccount(): Promise<void> {
   if (!getStoredToken()) {
     accountStatus.value = 'error';
-    accountMessage.value = props.isVi ? 'Chưa có token.' : 'No token found.';
+    accountMessage.value = m('No token found.', 'Chưa có token.', 'ไม่พบโทเค็น');
     return;
   }
   accountStatus.value = 'checking';
@@ -294,7 +329,7 @@ async function checkGommoV2(): Promise<void> {
     const res = await fetch(`${GOMMO_V2_HOST}/ai/models?type=image`, { method: 'GET' });
     if (res.status >= 500) {
       gommoV2Status.value = 'error';
-      gommoV2Message.value = props.isVi ? `HTTP ${res.status}` : `HTTP ${res.status}`;
+      gommoV2Message.value = `HTTP ${res.status}`;
       return;
     }
     gommoV2Status.value = 'connected';
@@ -314,18 +349,22 @@ async function testConnection() {
   clearConnectionFeedback();
   await Promise.all([checkAccount(), checkGommoV2()]);
   if (accountStatus.value === 'connected') {
-    connectionSuccess.value = props.isVi
-      ? 'Kết nối gateway OK — token hợp lệ.'
-      : 'Gateway connected — token is valid.';
+    connectionSuccess.value = m(
+      'Gateway connected — token is valid.',
+      'Kết nối gateway OK — token hợp lệ.',
+      'เชื่อมต่อเกตเวย์สำเร็จ — โทเค็นถูกต้อง',
+    );
     if (gommoV2Status.value !== 'connected') {
-      connectionV2Hint.value = props.isVi
-        ? 'Jobs API trực tiếp (v2) không kiểm tra được từ browser — dùng gateway hoặc curl.'
-        : 'Direct Jobs API (v2) unreachable from browser — use gateway or curl.';
+      connectionV2Hint.value = m(
+        'Direct Jobs API (v2) unreachable from browser — use gateway or curl.',
+        'Jobs API trực tiếp (v2) không kiểm tra được từ browser — dùng gateway hoặc curl.',
+        'Jobs API (v2) โดยตรงไม่สามารถตรวจสอบจากเบราว์เซอร์ — ใช้เกตเวย์หรือ curl',
+      );
     }
   } else if (accountStatus.value === 'error') {
     connectionError.value =
       accountMessage.value ||
-      (props.isVi ? 'Không kết nối được gateway.' : 'Could not connect to gateway.');
+      m('Could not connect to gateway.', 'Không kết nối được gateway.', 'ไม่สามารถเชื่อมต่อเกตเวย์');
   }
 }
 
@@ -342,14 +381,14 @@ async function loadLastActivity() {
     const data = await fetchUsageLogs({
       period: '30d',
       type: 'all',
-      language: props.isVi ? 'VI' : 'EN',
+      language: portalUsageLogsLanguage(props.locale),
       page: 1,
       limit: 1,
     });
     const row = data.items[0] ? normalizeUsageListItem(data.items[0]) : null;
     const created = row ? listItemCreatedAt(row) : '';
     lastActivityJobId.value = row ? usageJobId(row) : '';
-    lastActivityAt.value = created ? formatUsageTime(created, props.isVi) : '';
+    lastActivityAt.value = created ? formatUsageTime(created, props.locale) : '';
   } catch {
     lastActivityAt.value = '';
   } finally {
@@ -375,19 +414,25 @@ defineExpose({
       <div class="or-token-credential-head">
         <div>
           <h2 id="or-token-credential-title" class="or-token-credential-title">
-            {{ isVi ? 'Phiên truy cập' : 'Session credential' }}
+            {{ m('Session credential', 'Phiên truy cập', 'ข้อมูลรับรองเซสชัน') }}
           </h2>
           <p class="or-token-credential-sub">
             {{
-              isVi
-                ? 'Bearer token Gommo — dùng trực tiếp với api.gommo.net và v2.api.gommo.net.'
-                : 'Gommo Bearer token — use directly with api.gommo.net and v2.api.gommo.net.'
+              m(
+                'Gommo Bearer token — use directly with api.gommo.net and v2.api.gommo.net.',
+                'Bearer token Gommo — dùng trực tiếp với api.gommo.net và v2.api.gommo.net.',
+                'โทเค็น Bearer Gommo — ใช้โดยตรงกับ api.gommo.net และ v2.api.gommo.net',
+              )
             }}
           </p>
         </div>
         <div class="or-token-credential-actions">
           <button type="button" class="or-app-btn or-app-btn-ghost or-app-btn-sm" :disabled="checksRunning" @click="testConnection">
-            {{ checksRunning ? (isVi ? 'Đang kiểm tra…' : 'Testing…') : isVi ? 'Kiểm tra' : 'Test connection' }}
+            {{
+              checksRunning
+                ? m('Testing…', 'Đang kiểm tra…', 'กำลังทดสอบ…')
+                : m('Test connection', 'Kiểm tra', 'ทดสอบการเชื่อมต่อ')
+            }}
           </button>
           <button
             type="button"
@@ -395,7 +440,7 @@ defineExpose({
             :disabled="!token"
             @click="copyToken"
           >
-            {{ copied ? (isVi ? 'Đã copy!' : 'Copied!') : isVi ? 'Copy token' : 'Copy token' }}
+            {{ copied ? m('Copied!', 'Đã copy!', 'คัดลอกแล้ว!') : 'Copy token' }}
           </button>
         </div>
       </div>
@@ -406,10 +451,14 @@ defineExpose({
           type="button"
           class="or-token-field-btn"
           :disabled="!token"
-          :title="revealToken ? (isVi ? 'Ẩn token' : 'Hide token') : isVi ? 'Hiện token' : 'Reveal token'"
+          :title="
+            revealToken
+              ? m('Hide token', 'Ẩn token', 'ซ่อนโทเค็น')
+              : m('Reveal token', 'Hiện token', 'แสดงโทเค็น')
+          "
           @click="revealToken = !revealToken"
         >
-          {{ revealToken ? (isVi ? 'Ẩn' : 'Hide') : isVi ? 'Hiện' : 'Reveal' }}
+          {{ revealToken ? m('Hide', 'Ẩn', 'ซ่อน') : m('Reveal', 'Hiện', 'แสดง') }}
         </button>
       </div>
 
@@ -426,14 +475,14 @@ defineExpose({
         <table class="or-token-meta-table">
           <thead>
             <tr>
-              <th>{{ isVi ? 'Tên' : 'Name' }}</th>
-              <th>{{ isVi ? 'Prefix' : 'Prefix' }}</th>
+              <th>{{ m('Name', 'Tên', 'ชื่อ') }}</th>
+              <th>Prefix</th>
               <th>Domain</th>
-              <th>{{ isVi ? 'Auth API' : 'Auth API' }}</th>
-              <th>{{ isVi ? 'Jobs API' : 'Jobs API' }}</th>
-              <th>{{ isVi ? 'Trạng thái' : 'Status' }}</th>
-              <th>{{ isVi ? 'Hoạt động cuối' : 'Last activity' }}</th>
-              <th>{{ isVi ? 'Số dư' : 'Balance' }}</th>
+              <th>Auth API</th>
+              <th>Jobs API</th>
+              <th>{{ m('Status', 'Trạng thái', 'สถานะ') }}</th>
+              <th>{{ m('Last activity', 'Hoạt động cuối', 'กิจกรรมล่าสุด') }}</th>
+              <th>{{ m('Balance', 'Số dư', 'ยอดคงเหลือ') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -456,11 +505,11 @@ defineExpose({
                   v-else-if="lastActivityAt"
                   :href="lastActivityHref"
                   class="or-token-activity-link"
-                  :title="isVi ? 'Mở job trong Activity' : 'Open job in Activity'"
+                  :title="m('Open job in Activity', 'Mở job trong Activity', 'เปิดงานใน Activity')"
                 >
                   {{ lastActivityAt }} →
                 </a>
-                <span v-else>{{ isVi ? 'Chưa có job' : 'No jobs yet' }}</span>
+                <span v-else>{{ m('No jobs yet', 'Chưa có job', 'ยังไม่มีงาน') }}</span>
               </td>
               <td>
                 <strong>{{ formatCredits(credits) }}</strong>
@@ -473,14 +522,14 @@ defineExpose({
 
       <ul class="or-token-health" aria-label="Connection health">
         <li>
-          <span class="or-token-health-label">{{ isVi ? 'Tài khoản' : 'Account' }}</span>
+          <span class="or-token-health-label">{{ m('Account', 'Tài khoản', 'บัญชี') }}</span>
           <span class="or-token-status" :class="statusClass(accountStatus)">{{ accountStatusLabel }}</span>
           <span class="or-token-health-meta">{{ GOMMO_AUTH_HOST_LABEL }}</span>
           <span v-if="lastVerifiedAt" class="or-token-health-meta">{{ lastVerifiedLabel }}</span>
           <span v-if="accountMessage" class="or-token-health-error">{{ accountMessage }}</span>
         </li>
         <li>
-          <span class="or-token-health-label">{{ isVi ? 'Jobs API' : 'Jobs API' }}</span>
+          <span class="or-token-health-label">Jobs API</span>
           <span class="or-token-status" :class="statusClass(gommoV2Status)">{{ gommoV2StatusLabel }}</span>
           <span class="or-token-health-meta">{{ GOMMO_V2_HOST_LABEL }}</span>
           <span v-if="gommoV2Message" class="or-token-health-error">{{ gommoV2Message }}</span>
@@ -491,13 +540,15 @@ defineExpose({
     <section class="or-token-snippets" aria-labelledby="or-token-snippets-title">
       <div class="or-token-snippets-head">
         <h2 id="or-token-snippets-title" class="or-token-snippets-title">
-          {{ isVi ? 'Tích hợp' : 'Integration kit' }}
+          {{ m('Integration kit', 'Tích hợp', 'ชุดการเชื่อมต่อ') }}
         </h2>
         <p class="or-token-snippets-sub">
           {{
-            isVi
-              ? 'Snippet Gommo public API (form-urlencoded) và MCP JSON.'
-              : 'Gommo public API snippets (form-urlencoded) and MCP JSON.'
+            m(
+              'Gommo public API snippets (form-urlencoded) and MCP JSON.',
+              'Snippet Gommo public API (form-urlencoded) và MCP JSON.',
+              'ตัวอย่าง Gommo public API (form-urlencoded) และ MCP JSON',
+            )
           }}
         </p>
       </div>
@@ -521,28 +572,20 @@ defineExpose({
         <pre class="or-app-code or-token-snippet-code"><code>{{ activeSnippet }}</code></pre>
         <div class="or-token-snippet-actions">
           <button type="button" class="or-app-btn or-app-btn-ghost or-app-btn-sm" @click="copySnippet(activeTab)">
-            {{
-              copiedSnippet === activeTab
-                ? isVi
-                  ? 'Đã copy!'
-                  : 'Copied!'
-                : isVi
-                  ? 'Copy snippet'
-                  : 'Copy snippet'
-            }}
+            {{ copiedSnippet === activeTab ? m('Copied!', 'Đã copy!', 'คัดลอกแล้ว!') : 'Copy snippet' }}
           </button>
           <a v-if="activeTab === 'gateway'" :href="mediaJobsDocsHref" class="or-token-snippet-link">
-            {{ isVi ? 'Media jobs (gateway)' : 'Media jobs (gateway)' }} →
+            {{ m('Media jobs (gateway)', 'Media jobs (gateway)', 'งานมีเดีย (เกตเวย์)') }} →
           </a>
           <a
             v-else-if="activeTab === 'mcp'"
             :href="`${prefix}/mcp/other-hosts`"
             class="or-token-snippet-link"
           >
-            {{ isVi ? 'Hướng dẫn MCP đầy đủ' : 'Full MCP setup' }} →
+            {{ m('Full MCP setup', 'Hướng dẫn MCP đầy đủ', 'คู่มือตั้งค่า MCP ฉบับเต็ม') }} →
           </a>
           <a v-else :href="publicApiHref" class="or-token-snippet-link">
-            {{ isVi ? 'Gommo public API' : 'Gommo public API' }} →
+            Gommo public API →
           </a>
         </div>
       </div>
@@ -550,7 +593,7 @@ defineExpose({
 
     <section class="or-token-quicklinks" aria-labelledby="or-token-quicklinks-title">
       <h2 id="or-token-quicklinks-title" class="or-token-quicklinks-title">
-        {{ isVi ? 'Dùng token này' : 'Use this token' }}
+        {{ m('Use this token', 'Dùng token này', 'ใช้โทเค็นนี้') }}
       </h2>
       <div class="or-app-grid or-token-quicklinks-grid">
         <a v-for="link in quickLinks" :key="link.id" :href="link.href" class="or-app-card or-token-quicklink-card">
@@ -563,40 +606,46 @@ defineExpose({
 
     <section class="or-token-security" aria-labelledby="or-token-security-title">
       <h2 id="or-token-security-title" class="or-token-security-title">
-        {{ isVi ? 'Bảo mật & phạm vi' : 'Security & scope' }}
+        {{ m('Security & scope', 'Bảo mật & phạm vi', 'ความปลอดภัยและขอบเขต') }}
       </h2>
       <ul class="or-token-security-list">
         <li>
           {{
-            isVi
-              ? `Token lưu trong localStorage (\`${STORAGE_TOKEN}\`) trên trình duyệt này.`
-              : `Token is stored in this browser's localStorage (\`${STORAGE_TOKEN}\`).`
+            m(
+              `Token is stored in this browser's localStorage (\`${STORAGE_TOKEN}\`).`,
+              `Token lưu trong localStorage (\`${STORAGE_TOKEN}\`) trên trình duyệt này.`,
+              `โทเค็นถูกเก็บใน localStorage (\`${STORAGE_TOKEN}\`) ของเบราว์เซอร์นี้`,
+            )
           }}
         </li>
         <li>
           {{
-            isVi
-              ? `Gọi trực tiếp ${GOMMO_AUTH_HOST_LABEL} (auth, chat) và ${GOMMO_V2_HOST_LABEL} (models, jobs) — không phải merchant token.`
-              : `Call ${GOMMO_AUTH_HOST_LABEL} (auth, chat) and ${GOMMO_V2_HOST_LABEL} (models, jobs) directly — not a merchant token.`
+            m(
+              `Call ${GOMMO_AUTH_HOST_LABEL} (auth, chat) and ${GOMMO_V2_HOST_LABEL} (models, jobs) directly — not a merchant token.`,
+              `Gọi trực tiếp ${GOMMO_AUTH_HOST_LABEL} (auth, chat) và ${GOMMO_V2_HOST_LABEL} (models, jobs) — không phải merchant token.`,
+              `เรียก ${GOMMO_AUTH_HOST_LABEL} (auth, chat) และ ${GOMMO_V2_HOST_LABEL} (models, jobs) โดยตรง — ไม่ใช่ merchant token`,
+            )
           }}
         </li>
         <li>
           {{
-            isVi
-              ? 'Đổi token: đăng xuất hoặc paste token mới tại trang đăng nhập.'
-              : 'Rotate: sign out or paste a new token on the login page.'
+            m(
+              'Rotate: sign out or paste a new token on the login page.',
+              'Đổi token: đăng xuất hoặc paste token mới tại trang đăng nhập.',
+              'เปลี่ยนโทเค็น: ออกจากระบบหรือวางโทเค็นใหม่ที่หน้าเข้าสู่ระบบ',
+            )
           }}
         </li>
       </ul>
       <div class="or-token-security-actions">
         <a :href="publicApiHref" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
-          {{ isVi ? 'Gommo public API' : 'Gommo public API' }}
+          Gommo public API
         </a>
         <a :href="`${prefix}/login/`" class="or-app-btn or-app-btn-ghost or-app-btn-sm">
-          {{ isVi ? 'Paste token mới' : 'Paste new token' }}
+          {{ m('Paste new token', 'Paste token mới', 'วางโทเค็นใหม่') }}
         </a>
         <button type="button" class="or-app-btn or-app-btn-ghost or-app-btn-sm" @click="signOut">
-          {{ isVi ? 'Đăng xuất' : 'Sign out' }}
+          {{ m('Sign out', 'Đăng xuất', 'ออกจากระบบ') }}
         </button>
       </div>
     </section>

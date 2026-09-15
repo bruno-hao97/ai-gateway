@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { usePortalCopy } from '../composables/use-portal-copy';
+import type { PortalLocale } from '../models/portal-locale';
 import { formatCredits } from '../models/user-api';
 import {
   areaSvgPaths,
@@ -11,9 +13,11 @@ import {
 const props = defineProps<{
   chart: UsageStatsChart | undefined;
   chartDays: number;
-  isVi: boolean;
+  locale: PortalLocale;
   loading?: boolean;
 }>();
+
+const { m } = usePortalCopy(computed(() => props.locale));
 
 const creditValues = computed(() =>
   sparklineValuesFromChart(props.chart, props.chartDays, 'credits'),
@@ -47,21 +51,21 @@ function segFlex(value: number): number {
   <div class="or-activity-charts-row">
     <div class="or-app-panel or-activity-overview-widget">
       <div class="or-activity-hub-widget-head">
-        <h3 class="or-app-panel-title">{{ isVi ? 'Credit theo thời gian' : 'Credits over time' }}</h3>
+        <h3 class="or-app-panel-title">{{ m('Credits over time', 'Credit theo thời gian', 'เครดิตตามเวลา') }}</h3>
         <span v-if="!loading && creditTotal > 0" class="or-app-muted or-activity-overview-hint">
           {{ formatCredits(creditTotal) }}
         </span>
       </div>
       <div v-if="loading" class="or-activity-skeleton or-activity-skeleton--area" aria-hidden="true" />
       <p v-else-if="creditValues.every((v) => v === 0)" class="or-app-muted or-usage-chart-empty">
-        {{ isVi ? 'Chưa có credit.' : 'No credits yet.' }}
+        {{ m('No credits yet.', 'Chưa có credit.', 'ยังไม่มีเครดิต') }}
       </p>
       <svg
         v-else
         class="or-activity-area-chart"
         viewBox="0 0 280 72"
         role="img"
-        :aria-label="isVi ? 'Biểu đồ credit' : 'Credits chart'"
+        :aria-label="m('Credits chart', 'Biểu đồ credit', 'กราฟเครดิต')"
       >
         <defs>
           <linearGradient id="or-activity-credit-fill" x1="0" y1="0" x2="0" y2="1">
@@ -90,7 +94,7 @@ function segFlex(value: number): number {
 
     <div class="or-app-panel or-activity-overview-widget">
       <div class="or-activity-hub-widget-head">
-        <h3 class="or-app-panel-title">{{ isVi ? 'Thành công vs lỗi' : 'Success vs failed' }}</h3>
+        <h3 class="or-app-panel-title">{{ m('Success vs failed', 'Thành công vs lỗi', 'สำเร็จ vs ล้มเหลว') }}</h3>
         <span
           v-if="!loading && outcomeTotals.success + outcomeTotals.error > 0"
           class="or-app-muted or-activity-overview-hint"
@@ -100,21 +104,21 @@ function segFlex(value: number): number {
       </div>
       <div class="or-usage-chart-legend or-activity-overview-legend">
         <span class="or-usage-legend-item or-activity-legend-item--success">
-          {{ isVi ? 'Thành công' : 'Success' }}
+          {{ m('Success', 'Thành công', 'สำเร็จ') }}
         </span>
         <span class="or-usage-legend-item or-activity-legend-item--error">
-          {{ isVi ? 'Lỗi' : 'Failed' }}
+          {{ m('Failed', 'Lỗi', 'ล้มเหลว') }}
         </span>
       </div>
       <div v-if="loading" class="or-activity-skeleton or-activity-skeleton--chart" aria-hidden="true" />
       <p v-else-if="outcomeSeries.every((p) => p.total === 0)" class="or-app-muted or-usage-chart-empty">
-        {{ isVi ? 'Chưa có dữ liệu.' : 'No data yet.' }}
+        {{ m('No data yet.', 'Chưa có dữ liệu.', 'ยังไม่มีข้อมูล') }}
       </p>
       <div
         v-else
         class="or-usage-chart or-activity-overview-chart or-activity-outcome-chart"
         role="img"
-        :aria-label="isVi ? 'Biểu đồ kết quả' : 'Outcome chart'"
+        :aria-label="m('Outcome chart', 'Biểu đồ kết quả', 'กราฟผลลัพธ์')"
       >
         <div v-for="(point, idx) in outcomeSeries" :key="`${point.label}-${idx}`" class="or-usage-chart-col">
           <div class="or-usage-chart-bar-track">

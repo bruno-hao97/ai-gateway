@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { usePortalCopy } from '../composables/use-portal-copy';
 import { useVitepressUrlSync } from '../composables/use-vitepress-url-sync';
+import type { PortalLocale } from '../models/portal-locale';
+import { portalUsageLogsLanguage, portalUsageStatsLanguage } from '../models/portal-gommo-lang';
 import { activityHubHref } from '../models/activity-hub-url';
 import { fetchUsageLogs, fetchUsageModelAggregate, fetchUsageStats, formatCredits } from '../models/user-api';
 import { formatUsageTime } from '../models/usage-history';
@@ -37,12 +40,14 @@ const PERIOD_OPTIONS = new Set<UsageStatsPeriod>(['7d', '30d', '90d']);
 const TYPE_OPTIONS = new Set<UsageStatsType>(['image', 'video', 'audio', 'music']);
 
 const props = defineProps<{
-  isVi: boolean;
+  locale: PortalLocale;
   prefix: string;
   credits: number;
   topupOrders: TopupOrder[];
   ordersLoading: boolean;
 }>();
+
+const { m } = usePortalCopy(computed(() => props.locale));
 
 const emit = defineEmits<{
   refresh: [];
@@ -111,16 +116,16 @@ function readActivityTab(): ActivityTab {
 const activeTab = ref<ActivityTab>(readActivityTab());
 
 const tabs = computed(() => [
-  { id: 'overview' as const, label: props.isVi ? 'Tổng quan' : 'Overview' },
-  { id: 'trends' as const, label: props.isVi ? 'Xu hướng' : 'Trends' },
-  { id: 'explore' as const, label: props.isVi ? 'Khám phá' : 'Explore' },
-  { id: 'billing' as const, label: props.isVi ? 'Billing' : 'Billing' },
+  { id: 'overview' as const, label: m('Overview', 'Tổng quan', 'ภาพรวม') },
+  { id: 'trends' as const, label: m('Trends', 'Xu hướng', 'แนวโน้ม') },
+  { id: 'explore' as const, label: m('Explore', 'Khám phá', 'สำรวจ') },
+  { id: 'billing' as const, label: m('Billing', 'Billing', 'การเรียกเก็บเงิน') },
 ]);
 
 const periodOptions = computed(() => [
-  { id: '7d' as const, label: props.isVi ? '7 ngày' : '7 days' },
-  { id: '30d' as const, label: props.isVi ? '30 ngày' : '30 days' },
-  { id: '90d' as const, label: props.isVi ? '90 ngày' : '90 days' },
+  { id: '7d' as const, label: m('7 days', '7 ngày', '7 วัน') },
+  { id: '30d' as const, label: m('30 days', '30 ngày', '30 วัน') },
+  { id: '90d' as const, label: m('90 days', '90 ngày', '90 วัน') },
 ]);
 
 const summary = computed(() => statsData.value?.summary);
@@ -169,22 +174,24 @@ const periodLabel = computed(() => {
 const topModelsHint = computed(() => {
   if (topModelsScanned.value <= 0) return '';
   const scanned = topModelsScanned.value.toLocaleString();
-  const base = props.isVi
-    ? topModelsTruncated.value
-      ? `Từ ${scanned}+ job (giới hạn scan)`
-      : `Từ ${scanned} job`
-    : topModelsTruncated.value
-      ? `From ${scanned}+ jobs (scan cap)`
-      : `From ${scanned} jobs`;
+  const base = topModelsTruncated.value
+    ? m(
+        `From ${scanned}+ jobs (scan cap)`,
+        `Từ ${scanned}+ job (giới hạn scan)`,
+        `จาก ${scanned}+ งาน (จำกัดการสแกน)`,
+      )
+    : m(`From ${scanned} jobs`, `Từ ${scanned} job`, `จาก ${scanned} งาน`);
   if (!topModelsFromCache.value) return base;
-  return props.isVi ? `${base} · cache` : `${base} · cached`;
+  return m(`${base} · cached`, `${base} · cache`, `${base} · แคช`);
 });
 
 const topModelsCacheTitle = computed(() => {
   if (!topModelsFromCache.value) return '';
-  return props.isVi
-    ? 'Cache gateway ~10 phút. Bấm Làm mới để quét lại từ Gommo.'
-    : 'Gateway cache ~10 min. Click Refresh to rescan from Gommo.';
+  return m(
+    'Gateway cache ~10 min. Click Refresh to rescan from Gommo.',
+    'Cache gateway ~10 phút. Bấm Làm mới để quét lại từ Gommo.',
+    'แคชเกตเวย ~10 นาที คลิกรีเฟรชเพื่อสแกนใหม่จาก Gommo',
+  );
 });
 
 function syncQueryToUrl() {
@@ -322,7 +329,7 @@ async function exportOverviewCsv() {
       const data = await fetchUsageLogs({
         period: sharedPeriod.value,
         type: exportType,
-        language: 'VI',
+        language: portalUsageLogsLanguage(props.locale),
         page,
         limit: 100,
       });
@@ -342,9 +349,9 @@ async function exportOverviewCsv() {
 }
 
 function statusLabel(status: ReturnType<typeof listItemStatus>): string {
-  if (status === 'success') return props.isVi ? 'Thành công' : 'Success';
-  if (status === 'failed') return props.isVi ? 'Thất bại' : 'Failed';
-  return props.isVi ? 'Đang xử lý' : 'Pending';
+  if (status === 'success') return m('Success', 'Thành công', 'สำเร็จ');
+  if (status === 'failed') return m('Failed', 'Thất bại', 'ล้มเหลว');
+  return m('Pending', 'Đang xử lý', 'รอดำเนินการ');
 }
 
 function promptPreview(prompt?: string): string {
@@ -375,19 +382,19 @@ async function loadOverview(forceRefresh = false) {
       fetchUsageStats({
         period: sharedPeriod.value,
         type: 'all',
-        language: props.isVi ? 'vi' : 'en',
+        language: portalUsageStatsLanguage(props.locale),
       }),
       fetchUsageModelAggregate({
         period: sharedPeriod.value,
         type: 'all',
-        language: 'VI',
+        language: portalUsageLogsLanguage(props.locale),
         top: 5,
         refresh: forceRefresh,
       }),
       fetchUsageLogs({
         period: sharedPeriod.value,
         type: 'all',
-        language: 'VI',
+        language: portalUsageLogsLanguage(props.locale),
         page: 1,
         limit: 5,
       }),
@@ -482,13 +489,13 @@ defineExpose({ reload: reloadAll });
 
     <p class="or-activity-hub-meta or-app-muted">
       <a :href="`${prefix}/app/observability/`" class="or-activity-hub-meta-link">
-        {{ isVi ? 'Webhook export → Observability' : 'Webhook export → Observability' }}
+        {{ m('Webhook export → Observability', 'Webhook export → Observability', 'Webhook export → Observability') }}
       </a>
     </p>
 
     <div v-if="activeTab === 'overview'" class="or-activity-hub-panel or-activity-overview">
       <div class="or-activity-overview-toolbar">
-        <div class="or-usage-filter-group" role="group" :aria-label="isVi ? 'Khoảng thời gian' : 'Time range'">
+        <div class="or-usage-filter-group" role="group" :aria-label="m('Time range', 'Khoảng thời gian', 'ช่วงเวลา')">
           <button
             v-for="opt in periodOptions"
             :key="opt.id"
@@ -502,17 +509,17 @@ defineExpose({ reload: reloadAll });
         </div>
         <div class="or-activity-overview-toolbar-actions">
           <label class="or-usage-export-type-wrap">
-            <span class="or-usage-export-type-label">{{ isVi ? 'Xuất' : 'Export' }}</span>
+            <span class="or-usage-export-type-label">{{ m('Export', 'Xuất', 'ส่งออก') }}</span>
             <select
               v-model="overviewExportType"
               class="or-usage-export-type"
               :disabled="overviewLoading || overviewExporting"
             >
-              <option value="all">{{ isVi ? 'Tất cả' : 'All types' }}</option>
-              <option value="image">{{ isVi ? 'Ảnh' : 'Image' }}</option>
+              <option value="all">{{ m('All types', 'Tất cả', 'ทุกประเภท') }}</option>
+              <option value="image">{{ m('Image', 'Ảnh', 'รูปภาพ') }}</option>
               <option value="video">Video</option>
               <option value="audio">Audio</option>
-              <option value="music">{{ isVi ? 'Nhạc' : 'Music' }}</option>
+              <option value="music">{{ m('Music', 'Nhạc', 'เพลง') }}</option>
             </select>
           </label>
           <button
@@ -521,7 +528,7 @@ defineExpose({ reload: reloadAll });
             :disabled="overviewLoading || overviewExporting || (summary?.total ?? 0) === 0"
             @click="exportOverviewCsv"
           >
-            {{ overviewExporting ? (isVi ? 'Đang xuất…' : 'Exporting…') : isVi ? 'Xuất CSV' : 'Export CSV' }}
+            {{ overviewExporting ? m('Exporting…', 'Đang xuất…', 'กำลังส่งออก…') : m('Export CSV', 'Xuất CSV', 'ส่งออก CSV') }}
           </button>
           <button
             type="button"
@@ -529,7 +536,7 @@ defineExpose({ reload: reloadAll });
             :disabled="overviewLoading"
             @click="loadOverview(true)"
           >
-            {{ overviewLoading ? (isVi ? 'Đang tải…' : 'Loading…') : isVi ? 'Làm mới' : 'Refresh' }}
+            {{ overviewLoading ? m('Loading…', 'Đang tải…', 'กำลังโหลด…') : m('Refresh', 'Làm mới', 'รีเฟรช') }}
           </button>
         </div>
       </div>
@@ -539,7 +546,7 @@ defineExpose({ reload: reloadAll });
       <div class="or-activity-overview-kpi-row">
         <div class="or-activity-hub-kpi or-activity-hub-kpi--spark">
           <div class="or-activity-hub-kpi-main">
-            <span class="or-activity-hub-kpi-label">{{ isVi ? 'Jobs' : 'Jobs' }}</span>
+            <span class="or-activity-hub-kpi-label">{{ m('Jobs', 'Jobs', 'งาน') }}</span>
             <strong class="or-activity-hub-kpi-value">
               <span v-if="overviewLoading" class="or-activity-skeleton or-activity-skeleton--text" />
               <template v-else>{{ (summary?.total ?? 0).toLocaleString() }}</template>
@@ -560,7 +567,7 @@ defineExpose({ reload: reloadAll });
 
         <div class="or-activity-hub-kpi or-activity-hub-kpi--spark">
           <div class="or-activity-hub-kpi-main">
-            <span class="or-activity-hub-kpi-label">{{ isVi ? 'Credit thực' : 'Net credits' }}</span>
+            <span class="or-activity-hub-kpi-label">{{ m('Net credits', 'Credit thực', 'เครดิตสุทธิ') }}</span>
             <strong class="or-activity-hub-kpi-value">
               <span v-if="overviewLoading" class="or-activity-skeleton or-activity-skeleton--text" />
               <template v-else>{{ formatCredits(summary?.credit_net ?? 0) }}</template>
@@ -581,7 +588,7 @@ defineExpose({ reload: reloadAll });
 
         <div class="or-activity-hub-kpi or-activity-hub-kpi--spark">
           <div class="or-activity-hub-kpi-main">
-            <span class="or-activity-hub-kpi-label">{{ isVi ? 'Thành công' : 'Success rate' }}</span>
+            <span class="or-activity-hub-kpi-label">{{ m('Success rate', 'Thành công', 'อัตราสำเร็จ') }}</span>
             <strong class="or-activity-hub-kpi-value">
               <span v-if="overviewLoading" class="or-activity-skeleton or-activity-skeleton--text" />
               <template v-else>{{ successRate }}%</template>
@@ -605,49 +612,51 @@ defineExpose({ reload: reloadAll });
         </div>
 
         <div class="or-activity-hub-kpi">
-          <span class="or-activity-hub-kpi-label">{{ isVi ? 'Số dư' : 'Balance' }}</span>
+          <span class="or-activity-hub-kpi-label">{{ m('Balance', 'Số dư', 'ยอดคงเหลือ') }}</span>
           <strong class="or-activity-hub-kpi-value">{{ formatCredits(credits) }}</strong>
-          <span class="or-activity-hub-kpi-sub">{{ isVi ? 'Hiện tại' : 'Current' }}</span>
+          <span class="or-activity-hub-kpi-sub">{{ m('Current', 'Hiện tại', 'ปัจจุบัน') }}</span>
         </div>
       </div>
 
       <p v-if="showEmptyOverview" class="or-activity-overview-empty or-app-muted">
         {{
-          isVi
-            ? 'Chưa có job trong khoảng đã chọn — thử Playground hoặc mở khoảng 90 ngày.'
-            : 'No jobs in the selected range — try Playground or switch to 90 days.'
+          m(
+            'No jobs in the selected range — try Playground or switch to 90 days.',
+            'Chưa có job trong khoảng đã chọn — thử Playground hoặc mở khoảng 90 ngày.',
+            'ไม่มีงานในช่วงที่เลือก — ลอง Playground หรือเปลี่ยนเป็นช่วง 90 วัน',
+          )
         }}
         <a :href="`${prefix}/app/playground/`" class="or-profile-section-link">
-          {{ isVi ? 'Mở Playground' : 'Open Playground' }} →
+          {{ m('Open Playground', 'Mở Playground', 'เปิด Playground') }} →
         </a>
       </p>
 
       <div class="or-activity-overview-grid">
         <div class="or-app-panel or-activity-overview-widget">
           <div class="or-activity-hub-widget-head">
-            <h3 class="or-app-panel-title">{{ isVi ? 'Hoạt động theo thời gian' : 'Activity over time' }}</h3>
+            <h3 class="or-app-panel-title">{{ m('Activity over time', 'Hoạt động theo thời gian', 'กิจกรรมตามเวลา') }}</h3>
             <a :href="tabHref('trends')" class="or-profile-section-link or-profile-section-link--sm">
-              {{ isVi ? 'Trends' : 'Trends' }} →
+              {{ m('Trends', 'Trends', 'แนวโน้ม') }} →
             </a>
           </div>
           <div class="or-usage-chart-legend or-activity-overview-legend">
-            <span class="or-usage-legend-item or-usage-legend-item--image">{{ isVi ? 'Ảnh' : 'Image' }}</span>
+            <span class="or-usage-legend-item or-usage-legend-item--image">{{ m('Image', 'Ảnh', 'รูปภาพ') }}</span>
             <span class="or-usage-legend-item or-usage-legend-item--video">Video</span>
             <span class="or-usage-legend-item or-usage-legend-item--audio">Audio</span>
-            <span class="or-usage-legend-item or-usage-legend-item--music">{{ isVi ? 'Nhạc' : 'Music' }}</span>
+            <span class="or-usage-legend-item or-usage-legend-item--music">{{ m('Music', 'Nhạc', 'เพลง') }}</span>
           </div>
           <div v-if="overviewLoading" class="or-activity-skeleton or-activity-skeleton--chart" aria-hidden="true" />
           <div
             v-else-if="chartSeries.every((p) => p.total === 0)"
             class="or-usage-chart-empty or-app-muted"
           >
-            {{ isVi ? 'Chưa có dữ liệu.' : 'No data yet.' }}
+            {{ m('No data yet.', 'Chưa có dữ liệu.', 'ยังไม่มีข้อมูล') }}
           </div>
           <div
             v-else
             class="or-usage-chart or-activity-overview-chart"
             role="img"
-            :aria-label="isVi ? 'Biểu đồ job' : 'Jobs chart'"
+            :aria-label="m('Jobs chart', 'Biểu đồ job', 'กราฟงาน')"
           >
             <div v-for="(point, idx) in chartSeries" :key="`${point.label}-${idx}`" class="or-usage-chart-col">
               <div class="or-usage-chart-bar-track">
@@ -685,14 +694,14 @@ defineExpose({ reload: reloadAll });
 
         <div class="or-app-panel or-activity-overview-widget">
           <div class="or-activity-hub-widget-head">
-            <h3 class="or-app-panel-title">{{ isVi ? 'Theo loại job' : 'Usage by type' }}</h3>
+            <h3 class="or-app-panel-title">{{ m('Usage by type', 'Theo loại job', 'การใช้งานตามประเภท') }}</h3>
             <a :href="tabHref('trends')" class="or-profile-section-link or-profile-section-link--sm">
-              {{ isVi ? 'Trends' : 'Trends' }} →
+              {{ m('Trends', 'Trends', 'แนวโน้ม') }} →
             </a>
           </div>
           <div v-if="overviewLoading" class="or-activity-skeleton or-activity-skeleton--bars" aria-hidden="true" />
           <p v-else-if="typeBreakdown.length === 0" class="or-app-muted">
-            {{ isVi ? 'Chưa có dữ liệu.' : 'No data yet.' }}
+            {{ m('No data yet.', 'Chưa có dữ liệu.', 'ยังไม่มีข้อมูล') }}
           </p>
           <div v-else class="or-usage-type-bars">
             <a
@@ -700,10 +709,10 @@ defineExpose({ reload: reloadAll });
               :key="row.jobType"
               :href="exploreTypeHref(row.jobType)"
               class="or-usage-type-row or-activity-type-drill-row or-activity-top-model-link"
-              :title="isVi ? `Mở Explore — ${jobTypeLabel(row.jobType, isVi)}` : `Open Explore — ${jobTypeLabel(row.jobType, isVi)}`"
+              :title="`${m('Open Explore', 'Mở Explore', 'เปิด Explore')} — ${jobTypeLabel(row.jobType, props.locale)}`"
             >
               <span class="or-usage-type-label or-activity-type-link-label">
-                {{ jobTypeLabel(row.jobType, isVi) }} →
+                {{ jobTypeLabel(row.jobType, props.locale) }} →
               </span>
               <div class="or-usage-type-track" role="presentation">
                 <div
@@ -723,13 +732,13 @@ defineExpose({ reload: reloadAll });
         <ActivityUsageCharts
           :chart="statsData?.chart"
           :chart-days="chartDays"
-          :is-vi="isVi"
+          :locale="props.locale"
           :loading="overviewLoading"
         />
 
         <div class="or-app-panel or-activity-overview-widget">
           <div class="or-activity-hub-widget-head">
-            <h3 class="or-app-panel-title">{{ isVi ? 'Top models' : 'Top models' }}</h3>
+            <h3 class="or-app-panel-title">{{ m('Top models', 'Top models', 'โมเดลยอดนิยม') }}</h3>
             <span
               v-if="topModelsHint"
               class="or-app-muted or-activity-overview-hint"
@@ -741,7 +750,7 @@ defineExpose({ reload: reloadAll });
           </div>
           <div v-if="overviewLoading" class="or-activity-skeleton or-activity-skeleton--bars" aria-hidden="true" />
           <p v-else-if="topModels.length === 0" class="or-app-muted">
-            {{ isVi ? 'Chưa có model.' : 'No models yet.' }}
+            {{ m('No models yet.', 'Chưa có model.', 'ยังไม่มีโมเดล') }}
           </p>
           <div v-else class="or-usage-type-bars">
             <a
@@ -764,24 +773,24 @@ defineExpose({ reload: reloadAll });
 
         <div class="or-app-panel or-activity-overview-widget">
           <div class="or-activity-hub-widget-head">
-            <h3 class="or-app-panel-title">{{ isVi ? 'Job gần đây' : 'Recent jobs' }}</h3>
+            <h3 class="or-app-panel-title">{{ m('Recent jobs', 'Job gần đây', 'งานล่าสุด') }}</h3>
             <a :href="tabHref('explore')" class="or-profile-section-link or-profile-section-link--sm">
-              {{ isVi ? 'Explore' : 'Explore' }} →
+              {{ m('Explore', 'Explore', 'สำรวจ') }} →
             </a>
           </div>
           <div v-if="overviewLoading" class="or-activity-skeleton or-activity-skeleton--table" aria-hidden="true" />
           <p v-else-if="recentJobs.length === 0" class="or-app-muted">
-            {{ isVi ? 'Chưa có job.' : 'No jobs yet.' }}
+            {{ m('No jobs yet.', 'Chưa có job.', 'ยังไม่มีงาน') }}
           </p>
           <div v-else class="or-activity-recent-table-wrap">
             <table class="or-usage-table or-activity-recent-table">
               <thead>
                 <tr>
-                  <th>{{ isVi ? 'Thời gian' : 'Time' }}</th>
+                  <th>{{ m('Time', 'Thời gian', 'เวลา') }}</th>
                   <th>Model</th>
                   <th>Prompt</th>
-                  <th>{{ isVi ? 'Credit' : 'Credit' }}</th>
-                  <th>{{ isVi ? 'Trạng thái' : 'Status' }}</th>
+                  <th>{{ m('Credit', 'Credit', 'เครดิต') }}</th>
+                  <th>{{ m('Status', 'Trạng thái', 'สถานะ') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -795,7 +804,7 @@ defineExpose({ reload: reloadAll });
                   @keydown.enter="openJobDetail(row)"
                 >
                   <td class="or-usage-td-time">
-                    {{ formatUsageTime(listItemCreatedAt(row) || '', isVi) }}
+                    {{ formatUsageTime(listItemCreatedAt(row) || '', props.locale) }}
                   </td>
                   <td>
                     <a
@@ -831,7 +840,7 @@ defineExpose({ reload: reloadAll });
         activity-tab="trends"
         :initial-period="sharedPeriod"
         :credits="credits"
-        :is-vi="isVi"
+        :locale="props.locale"
         :prefix="prefix"
         @period-change="setSharedPeriod"
       />
@@ -847,7 +856,7 @@ defineExpose({ reload: reloadAll });
         :initial-type-filter="sharedType"
         :initial-search-query="sharedSearchQuery"
         :credits="credits"
-        :is-vi="isVi"
+        :locale="props.locale"
         :prefix="prefix"
         @period-change="setSharedPeriod"
         @model-filter-change="setSharedModel"
@@ -861,7 +870,7 @@ defineExpose({ reload: reloadAll });
       <ProfileActivityPanel
         billing-only
         :activity-period="sharedPeriod"
-        :is-vi="isVi"
+        :locale="props.locale"
         :prefix="prefix"
         :credits="credits"
         :topup-orders="topupOrders"
@@ -873,7 +882,7 @@ defineExpose({ reload: reloadAll });
     <UsageJobDetailModal
       :open="jobDetailOpen"
       :item="selectedJob"
-      :is-vi="isVi"
+      :locale="props.locale"
       :share-href="overviewJobShareHrefValue"
       @close="closeJobDetail"
     />

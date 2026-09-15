@@ -27,6 +27,12 @@ function pgLocale() {
   return globalThis.PortalI18n?.getLocale() || 'en';
 }
 
+function formatCreditsLabel(count) {
+  const n =
+    typeof count === 'number' ? count.toLocaleString() : String(count ?? '').trim();
+  return pgT('conn.credits', '{count} credits').replace('{count}', n);
+}
+
 function workerIconHtml(name) {
   if (typeof globalThis.workerIconSvg === 'function') return globalThis.workerIconSvg(name);
   return '';
@@ -157,7 +163,7 @@ function syncConnectionModalUi() {
       const raw = $('creditsBadge')?.textContent?.trim();
       const match = raw?.match(/([\d,]+)/);
       credits.textContent = match
-        ? `${match[1]} credits`
+        ? formatCreditsLabel(match[1].replace(/,/g, ''))
         : pgT('conn.creditsLoading', 'Loading credits…');
     }
   }
@@ -2070,6 +2076,7 @@ function handleEmbedParentMessage(event) {
       updateTokenBadge();
       renderAiGuidePanel();
       syncEmbedChromeFromState();
+      syncConnectionModalUi();
     }
     return;
   }
@@ -3667,6 +3674,7 @@ function buildAiSkillText() {
 function initPortalI18n() {
   if (!globalThis.PortalI18n) return;
   PortalI18n.applyDom();
+  syncConnectionModalUi();
   window.addEventListener('portal-locale-change', async () => {
     PortalI18n.applyDom();
     applyMediaPromptDefaults($('jobType')?.value || 'image');
@@ -5982,7 +5990,7 @@ function showCredits(credits) {
       embed.hidden = true;
     } else {
       embed.hidden = false;
-      embed.textContent = `${credits.toLocaleString()} credits`;
+      embed.textContent = formatCreditsLabel(credits);
     }
   }
   syncConnectionModalUi();

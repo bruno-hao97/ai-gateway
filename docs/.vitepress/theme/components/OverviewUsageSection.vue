@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { pickMsg, type PortalLocale } from '../models/portal-locale';
+import { portalUsageLogsLanguage, portalUsageStatsLanguage } from '../models/portal-gommo-lang';
 import { fetchUsageLogs, fetchUsageStats, formatCredits } from '../models/user-api';
 import { formatUsageTime } from '../models/usage-history';
 import { activityHubHref, PROFILE_USAGE_PREVIEW_PERIOD } from '../models/activity-hub-url';
@@ -20,11 +22,15 @@ type MetricView = 'jobs' | 'credits' | 'success';
 
 const props = defineProps<{
   credits: number;
-  isVi: boolean;
+  locale: PortalLocale;
   prefix: string;
   /** OpenRouter-style Jobs / Credits / Success toggle on profile */
   showMetricToggle?: boolean;
 }>();
+
+function m(en: string, vi: string, th?: string): string {
+  return pickMsg(props.locale, en, vi, th);
+}
 
 const metricView = ref<MetricView>('jobs');
 
@@ -67,18 +73,18 @@ const heroMetricValue = computed(() => {
 
 const heroMetricLabel = computed(() => {
   if (metricView.value === 'jobs') {
-    return props.isVi ? 'Jobs (7 ngày)' : 'Jobs (7 days)';
+    return m('Jobs (7 days)', 'Jobs (7 ngày)', 'งาน (7 วัน)');
   }
   if (metricView.value === 'credits') {
-    return props.isVi ? 'Credit thực (7 ngày)' : 'Net credits (7 days)';
+    return m('Net credits (7 days)', 'Credit thực (7 ngày)', 'เครดิตสุทธิ (7 วัน)');
   }
-  return props.isVi ? 'Tỷ lệ thành công' : 'Success rate';
+  return m('Success rate', 'Tỷ lệ thành công', 'อัตราสำเร็จ');
 });
 
 const metricOptions = computed(() => [
-  { id: 'jobs' as const, label: props.isVi ? 'Jobs' : 'Jobs' },
-  { id: 'credits' as const, label: props.isVi ? 'Credits' : 'Credits' },
-  { id: 'success' as const, label: props.isVi ? 'Thành công' : 'Success' },
+  { id: 'jobs' as const, label: m('Jobs', 'Jobs', 'งาน') },
+  { id: 'credits' as const, label: m('Credits', 'Credits', 'เครดิต') },
+  { id: 'success' as const, label: m('Success', 'Thành công', 'สำเร็จ') },
 ]);
 
 const usageHref = computed(() =>
@@ -97,9 +103,9 @@ function segFlex(value: number): number {
 }
 
 function statusLabel(status: ReturnType<typeof listItemStatus>): string {
-  if (status === 'success') return props.isVi ? 'Thành công' : 'Success';
-  if (status === 'failed') return props.isVi ? 'Thất bại' : 'Failed';
-  return props.isVi ? 'Đang xử lý' : 'Pending';
+  if (status === 'success') return m('Success', 'Thành công', 'สำเร็จ');
+  if (status === 'failed') return m('Failed', 'Thất bại', 'ล้มเหลว');
+  return m('Pending', 'Đang xử lý', 'รอดำเนินการ');
 }
 
 function promptPreview(prompt?: string): string {
@@ -127,7 +133,7 @@ async function load() {
     statsData.value = await fetchUsageStats({
       period: PROFILE_USAGE_PREVIEW_PERIOD,
       type: 'all',
-      language: props.isVi ? 'vi' : 'en',
+      language: portalUsageStatsLanguage(props.locale),
     });
   } catch (e) {
     statsData.value = null;
@@ -138,7 +144,7 @@ async function load() {
     const data = await fetchUsageLogs({
       period: PROFILE_USAGE_PREVIEW_PERIOD,
       type: 'all',
-      language: 'VI',
+      language: portalUsageLogsLanguage(props.locale),
       page: 1,
       limit: 3,
     });
@@ -167,27 +173,33 @@ defineExpose({ reload: load });
     <div class="or-overview-usage-head">
       <div>
         <h2 id="overview-usage-title" class="or-overview-usage-title">
-          {{ isVi ? '7 ngày gần đây' : 'Last 7 days' }}
+          {{ m('Last 7 days', '7 ngày gần đây', '7 วันที่ผ่านมา') }}
           <span class="or-profile-period-pill">7d</span>
         </h2>
         <p class="or-overview-usage-sub">
-          {{ isVi ? 'Từ Gommo usage-history — cùng nguồn tab Usage.' : 'From Gommo usage-history — same source as Usage tab.' }}
+          {{
+            m(
+              'From Gommo usage-history — same source as Usage tab.',
+              'Từ Gommo usage-history — cùng nguồn tab Usage.',
+              'จาก Gommo usage-history — แหล่งเดียวกับแท็บ Usage',
+            )
+          }}
         </p>
       </div>
       <a :href="usageHref" class="or-overview-usage-link">
-        {{ isVi ? 'Xem Usage' : 'View Usage' }} →
+        {{ m('View Usage', 'Xem Usage', 'ดูการใช้งาน') }} →
       </a>
     </div>
 
     <p v-if="loading" class="or-app-muted or-overview-usage-loading">
-      {{ isVi ? 'Đang tải thống kê…' : 'Loading stats…' }}
+      {{ m('Loading stats…', 'Đang tải thống kê…', 'กำลังโหลดสถิติ…') }}
     </p>
 
     <template v-else>
       <p v-if="statsError" class="or-app-error or-overview-usage-note">{{ statsError }}</p>
 
       <div v-if="showMetricToggle" class="or-usage-metric-hero">
-        <div class="or-usage-metric-toggle" role="group" :aria-label="isVi ? 'Chỉ số usage' : 'Usage metric'">
+        <div class="or-usage-metric-toggle" role="group" :aria-label="m('Usage metric', 'Chỉ số usage', 'ตัวชี้วัดการใช้งาน')">
           <button
             v-for="opt in metricOptions"
             :key="opt.id"
@@ -206,27 +218,33 @@ defineExpose({ reload: load });
       <div v-if="!showMetricToggle" class="or-overview-kpi-row">
         <div class="or-overview-kpi">
           <p class="or-overview-kpi-value">{{ (summary?.total ?? 0).toLocaleString() }}</p>
-          <p class="or-overview-kpi-label">{{ isVi ? 'Jobs' : 'Jobs' }}</p>
+          <p class="or-overview-kpi-label">{{ m('Jobs', 'Jobs', 'งาน') }}</p>
         </div>
         <div class="or-overview-kpi">
           <p class="or-overview-kpi-value">{{ formatCredits(summary?.credit_net ?? 0) }}</p>
-          <p class="or-overview-kpi-label">{{ isVi ? 'Credit trừ' : 'Credits used' }}</p>
+          <p class="or-overview-kpi-label">{{ m('Credits used', 'Credit trừ', 'เครดิตที่ใช้') }}</p>
         </div>
         <div class="or-overview-kpi">
           <p class="or-overview-kpi-value">{{ successRate }}%</p>
-          <p class="or-overview-kpi-label">{{ isVi ? 'Thành công' : 'Success rate' }}</p>
+          <p class="or-overview-kpi-label">{{ m('Success rate', 'Thành công', 'อัตราสำเร็จ') }}</p>
         </div>
       </div>
 
       <div class="or-app-panel or-overview-chart-panel">
         <div v-if="chartBarValues.every((v) => v === 0)" class="or-usage-chart-empty or-app-muted">
-          {{ isVi ? 'Chưa có job trong 7 ngày — thử Playground.' : 'No jobs in the last 7 days — try Playground.' }}
+          {{
+            m(
+              'No jobs in the last 7 days — try Playground.',
+              'Chưa có job trong 7 ngày — thử Playground.',
+              'ไม่มีงานใน 7 วัน — ลอง Playground',
+            )
+          }}
         </div>
         <div
           v-else
           class="or-usage-chart or-overview-chart"
           role="img"
-          :aria-label="isVi ? 'Biểu đồ 7 ngày' : '7-day chart'"
+          :aria-label="m('7-day chart', 'Biểu đồ 7 ngày', 'กราฟ 7 วัน')"
         >
           <div v-for="(point, idx) in chartSeries" :key="`${point.label}-${idx}`" class="or-usage-chart-col">
             <div class="or-usage-chart-bar-track or-overview-chart-track">
@@ -264,28 +282,28 @@ defineExpose({ reload: load });
 
       <div id="profile-recent-jobs" class="or-overview-recent">
         <div class="or-overview-recent-head">
-          <h3 class="or-app-panel-title">{{ isVi ? 'Job gần đây' : 'Recent jobs' }}</h3>
+          <h3 class="or-app-panel-title">{{ m('Recent jobs', 'Job gần đây', 'งานล่าสุด') }}</h3>
           <a :href="logsHref" class="or-overview-usage-link or-overview-usage-link--sm">
-            {{ isVi ? 'Xem logs' : 'View logs' }} →
+            {{ m('View logs', 'Xem logs', 'ดูบันทึก') }} →
           </a>
         </div>
         <p v-if="listError" class="or-app-error or-overview-usage-note">{{ listError }}</p>
         <p v-else-if="recentJobs.length === 0" class="or-app-muted or-overview-recent-empty">
-          {{ isVi ? 'Chưa có job gần đây.' : 'No recent jobs yet.' }}
+          {{ m('No recent jobs yet.', 'Chưa có job gần đây.', 'ยังไม่มีงานล่าสุด') }}
         </p>
         <ul v-else class="or-overview-recent-list">
           <li v-for="row in recentJobs" :key="row.id_base || `${row.created_at}-${row.model}`">
             <a :href="jobExploreHref(row)" class="or-overview-recent-row">
               <div class="or-overview-recent-main">
                 <span class="or-overview-recent-type">
-                  {{ jobTypeLabel((row.type as UsageStatsType) || 'image', isVi) }}
+                  {{ jobTypeLabel((row.type as UsageStatsType) || 'image', locale) }}
                 </span>
                 <code class="or-overview-recent-model">{{ row.model || '—' }}</code>
                 <span class="or-overview-recent-prompt" :title="row.prompt">{{ promptPreview(row.prompt) }}</span>
               </div>
               <div class="or-overview-recent-meta">
                 <span class="or-overview-recent-time">
-                  {{ formatUsageTime(listItemCreatedAt(row) || '', isVi) }}
+                  {{ formatUsageTime(listItemCreatedAt(row) || '', locale) }}
                 </span>
                 <span
                   class="or-usage-status or-overview-recent-status"

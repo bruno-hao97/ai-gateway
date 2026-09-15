@@ -1,20 +1,25 @@
 import type { CatalogModel } from './catalog-api';
 import { catalogOptionsForField, type CatalogJobField, type CatalogOption } from './catalog-api';
+import { pickMsg, resolveLabelLocale, type PortalLocale } from './portal-locale';
 
 export type { CatalogJobField, CatalogOption };
 
 export const CATALOG_JOB_FIELD_ORDER: CatalogJobField[] = ['ratio', 'mode', 'resolution', 'duration'];
 
-const CATALOG_JOB_FIELD_LABELS: Record<CatalogJobField, { en: string; vi: string }> = {
-  ratio: { en: 'Aspect ratio', vi: 'Tỉ lệ ảnh' },
-  mode: { en: 'Mode', vi: 'Chế độ' },
-  resolution: { en: 'Resolution', vi: 'Độ phân giải' },
-  duration: { en: 'Duration', vi: 'Thời lượng' },
+const CATALOG_JOB_FIELD_LABELS: Record<CatalogJobField, { en: string; vi: string; th: string }> = {
+  ratio: { en: 'Aspect ratio', vi: 'Tỉ lệ ảnh', th: 'อัตราส่วนภาพ' },
+  mode: { en: 'Mode', vi: 'Chế độ', th: 'โหมด' },
+  resolution: { en: 'Resolution', vi: 'Độ phân giải', th: 'ความละเอียด' },
+  duration: { en: 'Duration', vi: 'Thời lượng', th: 'ความยาว' },
 };
 
-export function catalogJobFieldLabel(field: CatalogJobField, isVi = false): string {
+export function catalogJobFieldLabel(
+  field: CatalogJobField,
+  localeOrVi: PortalLocale | boolean = 'en',
+): string {
+  const locale = resolveLabelLocale(localeOrVi);
   const labels = CATALOG_JOB_FIELD_LABELS[field];
-  return isVi ? labels.vi : labels.en;
+  return pickMsg(locale, labels.en, labels.vi, labels.th);
 }
 
 const STORAGE_KEY = 'gw_portal_chat_image_fields_v2';
@@ -116,20 +121,27 @@ export function resolveImageFieldValues(
 export function validateCatalogJobFields(
   model: CatalogModel,
   values: CatalogJobFieldValues,
-  isVi = false,
+  localeOrVi: PortalLocale | boolean = 'en',
 ): string | null {
+  const locale = resolveLabelLocale(localeOrVi);
   for (const def of catalogJobFieldDefs(model)) {
     const val = values[def.field]?.trim();
     if (!val) {
-      return isVi
-        ? `Chọn ${def.field} từ catalog — không đoán giá trị.`
-        : `Select ${def.field} from catalog — never guess values.`;
+      return pickMsg(
+        locale,
+        `Select ${def.field} from catalog — never guess values.`,
+        `Chọn ${def.field} từ catalog — không đoán giá trị.`,
+        `เลือก ${def.field} จากแคตตาล็อก — ห้ามเดาค่า`,
+      );
     }
     if (!def.options.some((o) => o.value === val)) {
-      const label = catalogJobFieldLabel(def.field, isVi);
-      return isVi
-        ? `${label} không hợp lệ cho model này.`
-        : `Invalid ${label.toLowerCase()} for this model.`;
+      const label = catalogJobFieldLabel(def.field, locale);
+      return pickMsg(
+        locale,
+        `Invalid ${label.toLowerCase()} for this model.`,
+        `${label} không hợp lệ cho model này.`,
+        `${label} ไม่ถูกต้องสำหรับโมเดลนี้`,
+      );
     }
   }
   return null;
@@ -148,8 +160,12 @@ export function buildImageJobFields(
   return fields;
 }
 
-export function formatImageJobFieldSummary(values: CatalogJobFieldValues, isVi = false): string {
+export function formatImageJobFieldSummary(
+  values: CatalogJobFieldValues,
+  localeOrVi: PortalLocale | boolean = 'en',
+): string {
+  const locale = resolveLabelLocale(localeOrVi);
   return CATALOG_JOB_FIELD_ORDER.filter((f) => values[f])
-    .map((f) => `${catalogJobFieldLabel(f, isVi)} ${values[f]}`)
+    .map((f) => `${catalogJobFieldLabel(f, locale)} ${values[f]}`)
     .join(' · ');
 }

@@ -16,7 +16,7 @@ const props = defineProps<{
   mode: 'login' | 'signup';
 }>();
 
-const { isVi, prefix } = useHybridLocale();
+const { prefix, t } = useHybridLocale();
 
 const homeLink = computed(() => `${prefix.value}/`);
 const loginLink = computed(() => `${prefix.value}/login/`);
@@ -56,9 +56,9 @@ async function onSubmit() {
   loading.value = true;
   try {
     if (tokenMode.value) {
-      const t = pasteToken.value.trim();
-      if (!t) throw new Error(isVi.value ? 'Nhập token' : 'Enter a token');
-      setStoredToken(t);
+      const pasted = pasteToken.value.trim();
+      if (!pasted) throw new Error(t('Enter a token', 'Nhập token', 'ใส่โทเค็น'));
+      setStoredToken(pasted);
       setStoredDomain(DEFAULT_DOMAIN);
       await prefetchProfile();
       window.location.href = afterAuthRedirect();
@@ -67,7 +67,7 @@ async function onSubmit() {
 
     if (isSignup.value) {
       if (!agreeTerms.value) {
-        throw new Error(isVi.value ? 'Đồng ý điều khoản để tiếp tục' : 'Accept terms to continue');
+        throw new Error(t('Accept terms to continue', 'Đồng ý điều khoản để tiếp tục', 'ยอมรับข้อกำหนดเพื่อดำเนินการต่อ'));
       }
       const name = [firstName.value.trim(), lastName.value.trim()].filter(Boolean).join(' ');
       await registerAccount({
@@ -98,17 +98,21 @@ async function onSubmit() {
       </a>
 
       <h1 class="gw-auth-title">
-        {{ isSignup ? (isVi ? 'Đăng ký' : 'Sign Up') : isVi ? 'Đăng nhập' : 'Sign In' }}
+        {{ isSignup ? t('Sign Up', 'Đăng ký', 'สมัครสมาชิก') : t('Sign In', 'Đăng nhập', 'เข้าสู่ระบบ') }}
       </h1>
       <p class="gw-auth-sub">
         {{
           isSignup
-            ? isVi
-              ? 'Tạo tài khoản Gommo qua gateway — email và mật khẩu.'
-              : 'Create a Gommo account via the gateway — email and password.'
-            : isVi
-              ? 'Đăng nhập bằng email và mật khẩu Gommo.'
-              : 'Sign in with your Gommo email and password.'
+            ? t(
+                'Create a Gommo account via the gateway — email and password.',
+                'Tạo tài khoản Gommo qua gateway — email và mật khẩu.',
+                'สร้างบัญชี Gommo ผ่านเกตเวย์ — อีเมลและรหัสผ่าน',
+              )
+            : t(
+                'Sign in with your Gommo email and password.',
+                'Đăng nhập bằng email và mật khẩu Gommo.',
+                'เข้าสู่ระบบด้วยอีเมลและรหัสผ่าน Gommo',
+              )
         }}
       </p>
 
@@ -139,7 +143,7 @@ async function onSubmit() {
               v-model="pasteToken"
               rows="3"
               class="gw-auth-input gw-auth-textarea"
-              :placeholder="isVi ? 'Dán access_token…' : 'Paste access_token…'"
+              :placeholder="t('Paste access_token…', 'Dán access_token…', 'วาง access_token…')"
             />
           </label>
         </template>
@@ -147,17 +151,17 @@ async function onSubmit() {
         <template v-else>
           <div v-if="isSignup" class="gw-auth-row">
             <label class="gw-auth-field">
-              <span>{{ isVi ? 'Họ' : 'First name' }} <em>optional</em></span>
+              <span>{{ t('First name', 'Họ', 'ชื่อ') }} <em>optional</em></span>
               <input v-model="firstName" type="text" autocomplete="given-name" class="gw-auth-input" />
             </label>
             <label class="gw-auth-field">
-              <span>{{ isVi ? 'Tên' : 'Last name' }} <em>optional</em></span>
+              <span>{{ t('Last name', 'Tên', 'นามสกุล') }} <em>optional</em></span>
               <input v-model="lastName" type="text" autocomplete="family-name" class="gw-auth-input" />
             </label>
           </div>
 
           <label class="gw-auth-field">
-            <span>{{ isVi ? 'Email' : 'Email address' }}</span>
+            <span>{{ t('Email address', 'Email', 'อีเมล') }}</span>
             <input
               v-model="email"
               type="email"
@@ -169,19 +173,19 @@ async function onSubmit() {
           </label>
 
           <label v-if="isSignup" class="gw-auth-field">
-            <span>{{ isVi ? 'Số điện thoại' : 'Phone' }}</span>
+            <span>{{ t('Phone', 'Số điện thoại', 'โทรศัพท์') }}</span>
             <input
               v-model="phone"
               type="tel"
               required
               autocomplete="tel"
               class="gw-auth-input"
-              :placeholder="isVi ? 'Bắt buộc trên Gommo' : 'Required by Gommo'"
+              :placeholder="t('Required by Gommo', 'Bắt buộc trên Gommo', 'จำเป็นบน Gommo')"
             />
           </label>
 
           <label class="gw-auth-field">
-            <span>{{ isVi ? 'Mật khẩu' : 'Password' }}</span>
+            <span>{{ t('Password', 'Mật khẩu', 'รหัสผ่าน') }}</span>
             <div class="gw-auth-password-wrap">
               <input
                 v-model="password"
@@ -189,7 +193,7 @@ async function onSubmit() {
                 required
                 :autocomplete="isSignup ? 'new-password' : 'current-password'"
                 class="gw-auth-input"
-                :placeholder="isSignup ? (isVi ? 'Tạo mật khẩu' : 'Create a password') : ''"
+                :placeholder="isSignup ? t('Create a password', 'Tạo mật khẩu', 'สร้างรหัสผ่าน') : ''"
               />
               <button
                 type="button"
@@ -205,20 +209,14 @@ async function onSubmit() {
           <label v-if="isSignup" class="gw-auth-check">
             <input v-model="agreeTerms" type="checkbox" required />
             <span>
-              <template v-if="isVi">
-                Tôi đồng ý
-                <a :href="termsLink" target="_blank" rel="noopener">Điều khoản dịch vụ</a>
-                và
-                <a :href="privacyPolicyLink" target="_blank" rel="noopener"
-                  >Chính sách quyền riêng tư</a
-                >.
-              </template>
-              <template v-else>
-                I agree to the
-                <a :href="termsLink" target="_blank" rel="noopener">Terms of Service</a>
-                and
-                <a :href="privacyPolicyLink" target="_blank" rel="noopener">Privacy Policy</a>.
-              </template>
+              {{ t('I agree to the', 'Tôi đồng ý', 'ฉันยอมรับ') }}
+              <a :href="termsLink" target="_blank" rel="noopener">
+                {{ t('Terms of Service', 'Điều khoản dịch vụ', 'ข้อกำหนดการใช้บริการ') }}
+              </a>
+              {{ t('and', 'và', 'และ') }}
+              <a :href="privacyPolicyLink" target="_blank" rel="noopener">
+                {{ t('Privacy Policy', 'Chính sách quyền riêng tư', 'นโยบายความเป็นส่วนตัว') }}
+              </a>.
             </span>
           </label>
         </template>
@@ -228,36 +226,28 @@ async function onSubmit() {
         <button type="submit" class="gw-auth-submit" :disabled="loading">
           {{
             loading
-              ? isVi
-                ? 'Đang xử lý…'
-                : 'Please wait…'
+              ? t('Please wait…', 'Đang xử lý…', 'กรุณารอ…')
               : tokenMode
-                ? isVi
-                  ? 'Lưu token'
-                  : 'Save token'
+                ? t('Save token', 'Lưu token', 'บันทึกโทเค็น')
                 : isSignup
-                  ? isVi
-                    ? 'Tiếp tục'
-                    : 'Continue'
-                  : isVi
-                    ? 'Đăng nhập'
-                    : 'Sign in'
+                  ? t('Continue', 'Tiếp tục', 'ดำเนินการต่อ')
+                  : t('Sign in', 'Đăng nhập', 'เข้าสู่ระบบ')
           }}
         </button>
       </form>
 
       <p class="gw-auth-switch">
         <template v-if="isSignup">
-          {{ isVi ? 'Đã có tài khoản?' : 'Already have an account?' }}
-          <a :href="loginLink">{{ isVi ? 'Đăng nhập' : 'Sign in' }}</a>
+          {{ t('Already have an account?', 'Đã có tài khoản?', 'มีบัญชีแล้ว?') }}
+          <a :href="loginLink">{{ t('Sign in', 'Đăng nhập', 'เข้าสู่ระบบ') }}</a>
         </template>
         <template v-else>
-          {{ isVi ? 'Chưa có tài khoản?' : "Don't have an account?" }}
-          <a :href="signupLink">{{ isVi ? 'Đăng ký ngay' : 'Sign up' }}</a>
+          {{ t("Don't have an account?", 'Chưa có tài khoản?', 'ยังไม่มีบัญชี?') }}
+          <a :href="signupLink">{{ t('Sign up', 'Đăng ký ngay', 'สมัครเลย') }}</a>
         </template>
       </p>
 
-      <a :href="homeLink" class="gw-auth-back">← {{ isVi ? 'Về trang chủ' : 'Back to home' }}</a>
+      <a :href="homeLink" class="gw-auth-back">← {{ t('Back to home', 'Về trang chủ', 'กลับหน้าแรก') }}</a>
     </div>
   </div>
 </template>

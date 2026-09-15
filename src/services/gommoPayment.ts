@@ -3,7 +3,8 @@ import {
   gommo79aiDeviceFields,
   type Gommo79aiDevicePayload,
 } from './gommoDevice.js';
-import { PAYMENT_DOMAIN_ERROR_MESSAGE, PaymentIdentityError } from './paymentIdentity.js';
+import { PaymentIdentityError } from './paymentIdentity.js';
+import { gommoFormLanguage, type SiteLocale } from './gommoLanguage.js';
 
 const CREATE_PAYMENT_URL = `${config.gommo.authBaseUrl.replace(/\/$/, '')}${config.gommo.authPath}/subscriptions/create_payment`;
 const PAYMENT_SYNC_URL = `${config.gommo.authBaseUrl.replace(/\/$/, '')}${config.gommo.authPath}/subscriptions/payment_sync`;
@@ -23,6 +24,7 @@ export interface InvoiceBuyer {
 
 export interface CreateGommoPaymentInput {
   accessToken: string;
+  siteLocale?: SiteLocale;
   domain?: string;
   idBase: string;
   amountVnd: number;
@@ -61,6 +63,7 @@ export interface CreateGommoPaymentResult {
 
 export interface SyncGommoPaymentInput {
   accessToken: string;
+  siteLocale?: SiteLocale;
   domain?: string;
   orderCode: string;
   device?: Gommo79aiDevicePayload;
@@ -140,13 +143,14 @@ export function parseOrderCodeFromPaymentUrl(url: string): string {
 }
 
 function throwUpstreamError(message: string): never {
-  if (isDomainMismatchMessage(message)) {
-    throw new GommoPaymentError(PAYMENT_DOMAIN_ERROR_MESSAGE, 403, 'DOMAIN_MISMATCH');
+  const text = message.trim() || 'Gommo payment failed';
+  if (isDomainMismatchMessage(text)) {
+    throw new GommoPaymentError(text, 403, 'DOMAIN_MISMATCH');
   }
-  if (isAuthMessage(message)) {
-    throw new GommoPaymentError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 401, 'AUTH_REQUIRED');
+  if (isAuthMessage(text)) {
+    throw new GommoPaymentError(text, 401, 'AUTH_REQUIRED');
   }
-  throw new GommoPaymentError(message || 'Gommo payment failed', 502, 'UPSTREAM_ERROR');
+  throw new GommoPaymentError(text, 502, 'UPSTREAM_ERROR');
 }
 
 async function parseJsonResponse(response: Response): Promise<Record<string, unknown>> {
@@ -212,7 +216,7 @@ export async function createGommoPayment(input: CreateGommoPaymentInput): Promis
     gateway: 'payos',
     amount: String(Math.max(1, Math.floor(input.amountVnd))),
     invoice_buyer: JSON.stringify(invoiceBuyer),
-    language: 'vi',
+    language: gommoFormLanguage(input.siteLocale),
     device_id: device.device_id,
     device_name: device.device_name,
     device_info: device.device_info,
@@ -291,7 +295,7 @@ export async function syncGommoPayment(input: SyncGommoPaymentInput): Promise<Sy
     access_token: input.accessToken,
     domain: (input.domain || config.gommo.apiDomain).trim(),
     order_code: orderCode,
-    language: 'vi',
+    language: gommoFormLanguage(input.siteLocale),
     device_id: device.device_id,
     device_name: device.device_name,
     device_info: device.device_info,

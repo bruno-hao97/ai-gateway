@@ -56,6 +56,9 @@ export const config = {
     descriptionCacheFile:
       process.env.CATALOG_DESCRIPTION_CACHE_FILE ||
       path.join(process.cwd(), 'cache', 'catalog-descriptions.en.json'),
+    descriptionCacheThFile:
+      process.env.CATALOG_DESCRIPTION_CACHE_TH_FILE ||
+      path.join(process.cwd(), 'cache', 'catalog-descriptions.th.json'),
     translateApiKey: (process.env.OPENROUTER_API_KEY || process.env.CATALOG_TRANSLATE_API_KEY || '').trim(),
     translateBaseUrl: (process.env.CATALOG_TRANSLATE_BASE_URL || 'https://openrouter.ai/api/v1').trim(),
     translateModel: (process.env.CATALOG_TRANSLATE_MODEL || 'google/gemini-2.0-flash-001').trim(),

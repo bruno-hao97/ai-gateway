@@ -77,7 +77,10 @@ export function sanitizeRedirectPath(path: string | null | undefined): string | 
   return p;
 }
 
-export function loginUrlWithRedirect(returnPath: string, localePrefix: '' | '/vi' = ''): string {
+export function loginUrlWithRedirect(
+  returnPath: string,
+  localePrefix: '' | '/vi' | '/th' = '',
+): string {
   const safe = sanitizeRedirectPath(returnPath);
   const base = `${localePrefix}/login/`;
   if (!safe) return base;

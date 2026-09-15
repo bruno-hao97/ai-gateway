@@ -503,8 +503,9 @@ export function exportStatsTableCsv(rows: UsageStatsTableRow[]): string {
 
 export function groupListItemsByDay(
   items: UsageListItem[],
-  isVi: boolean,
+  localeOrVi: StatsLocale | boolean,
 ): { dayKey: string; label: string; items: UsageListItem[] }[] {
+  const locale = normalizeStatsLocale(localeOrVi);
   const map = new Map<string, UsageListItem[]>();
   for (const item of items) {
     const iso = listItemCreatedAt(item);
@@ -517,16 +518,21 @@ export function groupListItemsByDay(
     .sort(([a], [b]) => b.localeCompare(a))
     .map(([dayKey, dayItems]) => ({
       dayKey,
-      label: formatDayLabel(dayKey, isVi),
+      label: formatDayLabel(dayKey, locale),
       items: dayItems,
     }));
 }
 
-function formatDayLabel(dayKey: string, isVi: boolean): string {
-  if (dayKey === 'unknown') return isVi ? 'Không rõ ngày' : 'Unknown date';
+function formatDayLabel(dayKey: string, locale: StatsLocale): string {
+  if (dayKey === 'unknown') {
+    if (locale === 'vi') return 'Không rõ ngày';
+    if (locale === 'th') return 'วันที่ไม่ทราบ';
+    return 'Unknown date';
+  }
   const d = Date.parse(`${dayKey}T12:00:00`);
   if (!Number.isFinite(d)) return dayKey;
-  return new Intl.DateTimeFormat(isVi ? 'vi-VN' : 'en-US', {
+  const dateLocale = locale === 'vi' ? 'vi-VN' : locale === 'th' ? 'th-TH' : 'en-US';
+  return new Intl.DateTimeFormat(dateLocale, {
     weekday: 'short',
     year: 'numeric',
     month: 'short',
@@ -534,14 +540,24 @@ function formatDayLabel(dayKey: string, isVi: boolean): string {
   }).format(new Date(d));
 }
 
-export function jobTypeLabel(type: UsageStatsType | 'all', isVi: boolean): string {
-  const map: Record<string, [string, string]> = {
-    all: ['All', 'Tất cả'],
-    image: ['Image', 'Ảnh'],
-    video: ['Video', 'Video'],
-    audio: ['Audio', 'Audio'],
-    music: ['Music', 'Nhạc'],
+type StatsLocale = 'en' | 'vi' | 'th';
+
+function normalizeStatsLocale(localeOrVi: StatsLocale | boolean): StatsLocale {
+  if (typeof localeOrVi === 'boolean') return localeOrVi ? 'vi' : 'en';
+  return localeOrVi;
+}
+
+export function jobTypeLabel(type: UsageStatsType | 'all', localeOrVi: StatsLocale | boolean): string {
+  const map: Record<string, [string, string, string]> = {
+    all: ['All', 'Tất cả', 'ทั้งหมด'],
+    image: ['Image', 'Ảnh', 'รูป'],
+    video: ['Video', 'Video', 'วิดีโอ'],
+    audio: ['Audio', 'Audio', 'เสียง'],
+    music: ['Music', 'Nhạc', 'เพลง'],
   };
-  const pair = map[type] || map.all;
-  return isVi ? pair[1] : pair[0];
+  const locale = normalizeStatsLocale(localeOrVi);
+  const triple = map[type] || map.all;
+  if (locale === 'vi') return triple[1];
+  if (locale === 'th') return triple[2];
+  return triple[0];
 }

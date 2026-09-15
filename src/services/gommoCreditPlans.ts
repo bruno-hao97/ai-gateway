@@ -70,7 +70,7 @@ async function fetchGommoCreditPlans(accessToken: string): Promise<CreditPackage
   const body = new URLSearchParams({
     access_token: accessToken,
     domain: config.gommo.apiDomain,
-    language: 'vi',
+    language: 'en',
     ...gommoServerDeviceFields(),
   });
 

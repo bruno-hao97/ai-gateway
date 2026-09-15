@@ -14,6 +14,7 @@ import { extractPollSnapshot } from '../services/mediaGenerationStatus.js';
 import { byokMediaAuthMiddleware } from '../middleware/byokMediaAuth.js';
 import { fetchModelsCatalog } from '../services/gommoClient.js';
 import { enrichModelsCatalogLanguage } from '../services/catalogLang.js';
+import { normalizeCatalogLang } from '../services/gommoLanguage.js';
 import { loginGommoUser, GommoAuthError } from '../services/gommoAuth.js';
 import { GommoRegisterError, registerGommoUser } from '../services/merchantRegister.js';
 import { createJobAndPoll } from '../services/polling.js';
@@ -103,7 +104,7 @@ router.post('/auth/register', async (req, res) => {
   }
 });
 
-/** GET /gateway/models?type=image&lang=en — Bearer optional; lang=en merges EN descriptions from cache */
+/** GET /gateway/models?type=image&lang=en|th — Bearer optional; lang merges cached locale descriptions */
 router.get('/models', gatewayAuthOptional, async (req, res) => {
   try {
     const type = String(req.query.type || '') as JobType;
@@ -111,13 +112,14 @@ router.get('/models', gatewayAuthOptional, async (req, res) => {
       sendError(res, 400, 'Query type không hợp lệ', 'VALIDATION_ERROR');
       return;
     }
-    const lang = String(req.query.lang || '').toLowerCase();
-    if (lang && lang !== 'en' && lang !== 'vi') {
-      sendError(res, 400, 'Query lang chỉ hỗ trợ en hoặc vi', 'VALIDATION_ERROR');
+    const rawLang = String(req.query.lang || '').toLowerCase();
+    if (rawLang && rawLang !== 'en' && rawLang !== 'vi' && rawLang !== 'th') {
+      sendError(res, 400, 'Query lang supports en, vi, or th', 'VALIDATION_ERROR');
       return;
     }
+    const catalogLang = normalizeCatalogLang(rawLang);
     const envelope = await fetchModelsCatalog(type, readDomain(req), readOptionalBearerToken(req));
-    await enrichModelsCatalogLanguage(envelope, lang === 'en' ? 'en' : undefined);
+    await enrichModelsCatalogLanguage(envelope, catalogLang);
     res.json(envelope);
   } catch (err) {
     sendGommoError(res, err);

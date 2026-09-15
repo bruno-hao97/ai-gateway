@@ -1,16 +1,30 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { usePortalCopy } from '../composables/use-portal-copy';
 import type { ChatMessageMeta } from '../models/chat-storage';
 import { hasMessageMetaDetails } from '../models/chat-models';
+import type { PortalLocale } from '../models/portal-locale';
 import ChatIcon from './ChatIcon.vue';
 import ChatMetaPanel from './ChatMetaPanel.vue';
 
 const props = defineProps<{
   meta?: ChatMessageMeta;
   createdAt?: number;
+  locale?: PortalLocale;
   isVi?: boolean;
   disabled?: boolean;
 }>();
+
+const { m } = usePortalCopy(
+  computed(() => props.locale ?? (props.isVi ? 'vi' : 'en')),
+);
+
+const dateLocale = computed(() => {
+  const loc = props.locale ?? (props.isVi ? 'vi' : 'en');
+  if (loc === 'vi') return 'vi-VN';
+  if (loc === 'th') return 'th-TH';
+  return 'en-US';
+});
 
 const root = ref<HTMLElement | null>(null);
 const open = ref(false);
@@ -21,7 +35,7 @@ const hasMeta = computed(() => hasMessageMetaDetails(props.meta));
 const timeLabel = computed(() => {
   if (!props.createdAt) return '';
   try {
-    return new Intl.DateTimeFormat(props.isVi ? 'vi-VN' : 'en-US', {
+    return new Intl.DateTimeFormat(dateLocale.value, {
       weekday: 'long',
       hour: 'numeric',
       minute: '2-digit',
@@ -59,8 +73,8 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
       class="or-chat-msg-toolbar-btn"
       :class="{ active: open }"
       :disabled="disabled"
-      :title="isVi ? 'Thêm' : 'More'"
-      :aria-label="isVi ? 'Thêm' : 'More'"
+      :title="m('More', 'Thêm', 'เพิ่มเติม')"
+      :aria-label="m('More', 'Thêm', 'เพิ่มเติม')"
       @click.stop="toggleMenu"
     >
       <ChatIcon name="more" />
@@ -71,10 +85,10 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
 
       <button type="button" class="or-chat-more-item" :class="{ active: metaOpen }" @click="openMeta">
         <ChatIcon name="chart" />
-        <span>{{ isVi ? 'Metadata' : 'Metadata' }}</span>
+        <span>{{ m('Metadata', 'Metadata', 'เมทาดาทา') }}</span>
       </button>
 
-      <ChatMetaPanel v-if="metaOpen" :meta="meta" :is-vi="isVi" />
+      <ChatMetaPanel v-if="metaOpen" :meta="meta" :locale="locale" />
     </div>
   </div>
 </template>

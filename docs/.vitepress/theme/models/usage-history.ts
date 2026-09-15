@@ -246,26 +246,38 @@ export function exportUsageCsv(records: UsageRecord[]): string {
   return [header.join(','), ...rows].join('\n');
 }
 
-export function formatUsageTime(iso: string, isVi: boolean): string {
+type UsageLocale = 'en' | 'vi' | 'th';
+
+function normalizeUsageLocale(localeOrVi: UsageLocale | boolean): UsageLocale {
+  if (typeof localeOrVi === 'boolean') return localeOrVi ? 'vi' : 'en';
+  return localeOrVi;
+}
+
+export function formatUsageTime(iso: string, localeOrVi: UsageLocale | boolean): string {
   const d = Date.parse(iso);
   if (!Number.isFinite(d)) return iso;
-  return new Date(d).toLocaleTimeString(isVi ? 'vi-VN' : undefined, {
+  const locale = normalizeUsageLocale(localeOrVi);
+  const dateLocale = locale === 'vi' ? 'vi-VN' : locale === 'th' ? 'th-TH' : undefined;
+  return new Date(d).toLocaleTimeString(dateLocale, {
     hour: '2-digit',
     minute: '2-digit',
   });
 }
 
-export function jobTypeLabel(type: UsageJobType, isVi: boolean): string {
-  const map: Record<UsageJobType, [string, string]> = {
-    image: ['Image', 'Ảnh'],
-    video: ['Video', 'Video'],
-    music: ['Music', 'Nhạc'],
-    audio: ['Audio', 'Audio'],
-    chat: ['Chat', 'Chat'],
-    tool: ['Tool', 'Tool'],
-    upload: ['Upload', 'Upload'],
-    other: ['Other', 'Khác'],
+export function jobTypeLabel(type: UsageJobType, localeOrVi: UsageLocale | boolean): string {
+  const map: Record<UsageJobType, [string, string, string]> = {
+    image: ['Image', 'Ảnh', 'รูป'],
+    video: ['Video', 'Video', 'วิดีโอ'],
+    music: ['Music', 'Nhạc', 'เพลง'],
+    audio: ['Audio', 'Audio', 'เสียง'],
+    chat: ['Chat', 'Chat', 'แชท'],
+    tool: ['Tool', 'Tool', 'เครื่องมือ'],
+    upload: ['Upload', 'Upload', 'อัปโหลด'],
+    other: ['Other', 'Khác', 'อื่นๆ'],
   };
-  const pair = map[type] || map.other;
-  return isVi ? pair[1] : pair[0];
+  const locale = normalizeUsageLocale(localeOrVi);
+  const triple = map[type] || map.other;
+  if (locale === 'vi') return triple[1];
+  if (locale === 'th') return triple[2];
+  return triple[0];
 }
