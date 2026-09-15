@@ -332,11 +332,15 @@ function readActivityTab(): string {
 function redirectLegacyProfileSection(section: ProfileSection): boolean {
   if (typeof window === 'undefined') return false;
   if (section === 'usage') {
-    window.location.replace(`${prefix.value}/app/activity/?tab=trends`);
+    window.location.replace(
+      activityHubHref(prefix.value, { tab: 'trends', period: PROFILE_USAGE_PREVIEW_PERIOD }),
+    );
     return true;
   }
   if (section === 'logs') {
-    window.location.replace(`${prefix.value}/app/activity/?tab=explore`);
+    window.location.replace(
+      activityHubHref(prefix.value, { tab: 'explore', period: PROFILE_USAGE_PREVIEW_PERIOD }),
+    );
     return true;
   }
   if (section === 'activity') {

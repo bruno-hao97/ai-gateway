@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { activityHubHref, PROFILE_USAGE_PREVIEW_PERIOD } from '../models/activity-hub-url';
 import {
   formatCredits,
   formatOrderDate,
@@ -15,7 +16,9 @@ const props = defineProps<{
   prefix: string;
 }>();
 
-const activityHref = computed(() => `${props.prefix}/app/activity/`);
+const activityHref = computed(() =>
+  activityHubHref(props.prefix, { tab: 'billing', period: PROFILE_USAGE_PREVIEW_PERIOD }),
+);
 
 function orderStatusClass(status: TopupOrderStatus): string {
   return `or-app-order-status--${status}`;

@@ -287,11 +287,14 @@ function exploreTypeHref(jobType: UsageStatsType): string {
 function openJobDetail(row: UsageListItem) {
   selectedJob.value = row;
   jobDetailOpen.value = true;
+  const jobId = usageJobId(row);
+  if (jobId) setSharedJob(jobId);
 }
 
 function closeJobDetail() {
   jobDetailOpen.value = false;
   selectedJob.value = null;
+  if (sharedJobId.value) setSharedJob('');
 }
 
 function overviewJobShareHref(row: UsageListItem): string {
@@ -423,7 +426,7 @@ async function reloadActiveTab() {
 }
 
 async function reloadAll() {
-  await loadOverview();
+  await loadOverview(true);
   await trendsRef.value?.reloadRecords();
   await exploreRef.value?.reloadRecords();
   emit('refresh');

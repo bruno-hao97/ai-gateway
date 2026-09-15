@@ -504,9 +504,13 @@ async function tryOpenPendingJob() {
   if (found) {
     selectedJob.value = normalizeUsageListItem(found);
     jobDetailOpen.value = true;
+    pendingJobId.value = '';
   }
-  pendingJobId.value = '';
 }
+
+const exploreTrendsHref = computed(() =>
+  activityHubHref(props.prefix, { tab: 'trends', period: period.value }),
+);
 
 const exploreJobShareHref = computed(() => {
   const jobId = usageJobId(selectedJob.value);
@@ -563,11 +567,14 @@ watch(searchQuery, () => {
 
 watch(
   () => props.initialJobId,
-  (jobId) => {
+  (jobId, previousJobId) => {
     const id = (jobId || '').trim();
     applyInitialJobId(id);
-    if (!id || !logsOnly.value || loading.value) return;
+    if (!id || !logsOnly.value) return;
     if (jobDetailOpen.value && matchesUsageJobId(selectedJob.value, id)) return;
+    // Initial mount: reloadRecords opens modal after list load
+    if (previousJobId === undefined) return;
+    if (loading.value) return;
     void tryOpenPendingJob();
   },
   { immediate: true },
@@ -885,7 +892,7 @@ onMounted(() => {
         </div>
         <a
           v-if="logsOnly"
-          :href="`${prefix}/app/activity/?tab=trends`"
+          :href="exploreTrendsHref"
           class="or-profile-section-link or-profile-section-link--sm"
         >
           {{ isVi ? 'Trends' : 'Trends' }} →
