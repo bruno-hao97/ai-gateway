@@ -43,6 +43,9 @@ const gommoV2Status = ref<ConnectionStatus>('idle');
 const accountMessage = ref('');
 const gommoV2Message = ref('');
 const connectionSuccess = ref('');
+const connectionError = ref('');
+const connectionV2Hint = ref('');
+const copyError = ref('');
 const lastVerifiedAt = ref<number | null>(null);
 const lastActivityAt = ref('');
 const lastActivityJobId = ref('');
@@ -237,6 +240,7 @@ function markCopiedFlag() {
 
 async function copyToken() {
   if (!props.token) return;
+  copyError.value = '';
   try {
     await navigator.clipboard.writeText(props.token);
     markCopiedFlag();
@@ -245,7 +249,9 @@ async function copyToken() {
       copied.value = false;
     }, 2000);
   } catch {
-    /* ignore */
+    copyError.value = props.isVi
+      ? 'Không copy được — thử chọn token và copy thủ công.'
+      : 'Could not copy — try selecting the token and copying manually.';
   }
 }
 
@@ -300,15 +306,26 @@ async function checkGommoV2(): Promise<void> {
 
 function clearConnectionFeedback() {
   connectionSuccess.value = '';
+  connectionError.value = '';
+  connectionV2Hint.value = '';
 }
 
 async function testConnection() {
   clearConnectionFeedback();
   await Promise.all([checkAccount(), checkGommoV2()]);
-  if (accountStatus.value === 'connected' && gommoV2Status.value === 'connected') {
+  if (accountStatus.value === 'connected') {
     connectionSuccess.value = props.isVi
-      ? 'Kết nối OK — tài khoản và Jobs API.'
-      : 'Connected — account and Jobs API OK.';
+      ? 'Kết nối gateway OK — token hợp lệ.'
+      : 'Gateway connected — token is valid.';
+    if (gommoV2Status.value !== 'connected') {
+      connectionV2Hint.value = props.isVi
+        ? 'Jobs API trực tiếp (v2) không kiểm tra được từ browser — dùng gateway hoặc curl.'
+        : 'Direct Jobs API (v2) unreachable from browser — use gateway or curl.';
+    }
+  } else if (accountStatus.value === 'error') {
+    connectionError.value =
+      accountMessage.value ||
+      (props.isVi ? 'Không kết nối được gateway.' : 'Could not connect to gateway.');
   }
 }
 
@@ -325,7 +342,7 @@ async function loadLastActivity() {
     const data = await fetchUsageLogs({
       period: '30d',
       type: 'all',
-      language: 'VI',
+      language: props.isVi ? 'VI' : 'EN',
       page: 1,
       limit: 1,
     });
@@ -396,7 +413,14 @@ defineExpose({
         </button>
       </div>
 
+      <p v-if="connectionError" class="or-token-connection-error or-token-connection-error--fail" role="alert">
+        {{ connectionError }}
+      </p>
       <p v-if="connectionSuccess" class="or-token-connection-success" role="status">{{ connectionSuccess }}</p>
+      <p v-if="connectionV2Hint" class="or-token-connection-error" role="status">{{ connectionV2Hint }}</p>
+      <p v-if="copyError" class="or-token-connection-error or-token-connection-error--fail" role="alert">
+        {{ copyError }}
+      </p>
 
       <div class="or-token-meta-table-wrap">
         <table class="or-token-meta-table">

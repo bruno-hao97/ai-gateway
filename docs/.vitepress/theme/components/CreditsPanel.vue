@@ -37,6 +37,7 @@ const packages = ref<CreditPackage[]>([]);
 const billingReady = ref(true);
 const topupOrders = ref<TopupOrder[]>([]);
 const ordersLoading = ref(false);
+const ordersError = ref('');
 const showStalePending = ref(false);
 const checkoutOpen = ref(false);
 const checkoutPackage = ref<CreditPackage | null>(null);
@@ -87,13 +88,16 @@ function orderStatusClass(status: TopupOrderStatus): string {
 async function loadTopupOrders() {
   if (!props.username) {
     topupOrders.value = [];
+    ordersError.value = '';
     return;
   }
   ordersLoading.value = true;
+  ordersError.value = '';
   try {
     topupOrders.value = await fetchTopupOrders(props.username, 20);
-  } catch {
+  } catch (e) {
     topupOrders.value = [];
+    ordersError.value = e instanceof Error ? e.message : String(e);
   } finally {
     ordersLoading.value = false;
   }
@@ -291,10 +295,12 @@ defineExpose({ reload });
         </button>
       </div>
 
+      <p v-if="ordersError" class="or-app-alert" role="alert">{{ ordersError }}</p>
+
       <p v-if="ordersLoading && topupOrders.length === 0" class="or-app-muted">
         {{ isVi ? 'Đang tải lịch sử…' : 'Loading history…' }}
       </p>
-      <p v-else-if="visibleTopupOrders.length === 0" class="or-app-muted or-app-orders-empty">
+      <p v-else-if="!ordersError && visibleTopupOrders.length === 0" class="or-app-muted or-app-orders-empty">
         {{
           isVi
             ? 'Chưa có đơn nạp. Chọn gói VietQR ở trên để bắt đầu.'

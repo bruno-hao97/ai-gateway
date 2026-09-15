@@ -1075,6 +1075,11 @@ a.or-app-credits-pill:hover {
 .or-token-connection-error {
   margin: 0.75rem 0 0;
   font-size: 0.8125rem;
+  color: var(--or-text-muted);
+}
+
+.or-token-connection-error--fail {
+  color: #b91c1c;
 }
 
 .or-token-connection-success {

@@ -93,7 +93,12 @@ async function loadLibrary() {
   }
 }
 
+function refreshRecentUploads() {
+  uploadItems.value = loadRecentUploads();
+}
+
 async function reload() {
+  refreshRecentUploads();
   await loadLibrary();
 }
 
@@ -176,8 +181,12 @@ function itemKey(item: LibraryFileItem): string {
 }
 
 onMounted(() => {
-  uploadItems.value = loadRecentUploads();
-  void loadLibrary();
+  refreshRecentUploads();
+  if (uploadItems.value.length > 0) {
+    filter.value = 'uploads';
+  } else {
+    void loadLibrary();
+  }
 });
 
 defineExpose({ reload });
