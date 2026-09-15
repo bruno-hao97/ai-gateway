@@ -34,6 +34,12 @@ Raw body 50MB. Stream pipe khi URL có `/chat` hoặc `text/event-stream`.
 ## Env
 Xem `.env.example`. Không commit `.env` / `GOMMO_ACCESS_TOKEN`.
 
+## Multi-dealer (tenant)
+- Registry: `config/tenants.json` — `hosts` → `gommoDomain` (79ai, vmedia, …)
+- Portal: `initTenantContext()` on load; locked tenants hide domain override
+- API: `readDomain(req)` + header `X-Gateway-Tenant`; `GET /gateway/site`
+- Dev: `?tenant=vmedia` on `:5173`; localhost → default `79ai`
+
 ## Catalog EN (`?lang=en`)
 - Cache file: `cache/catalog-descriptions.en.json` — docs + portal + `GET /gateway/models?lang=en`
 - Warm offline: `npm run catalog:translate` (dùng **Gommo chat** + `GOMMO_ACCESS_TOKEN`, không cần OpenRouter)

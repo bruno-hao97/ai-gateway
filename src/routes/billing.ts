@@ -1,5 +1,11 @@
 import { Router } from 'express';
+import { readDomain } from '../middleware/gatewayAuth.js';
 import { config, isGommoMerchantConfigured, isPayOsConfigured, isByokEnabled } from '../config.js';
+import {
+  getDefaultTenant,
+  publicTenantPayload,
+  resolveTenantFromRequest,
+} from '../services/tenants.js';
 import { CREDIT_PACKAGES } from '../services/creditPackages.js';
 import { listCreditPackages, resolveCreditPackage } from '../services/gommoCreditPlans.js';
 import {
@@ -33,7 +39,8 @@ import { sendError } from '../utils/errors.js';
 
 const router = Router();
 
-router.get('/status', (_req, res) => {
+router.get('/status', (req, res) => {
+  const tenant = resolveTenantFromRequest(req) ?? getDefaultTenant();
   res.json({
     success: true,
     data: {
@@ -44,13 +51,15 @@ router.get('/status', (_req, res) => {
       byokEnabled: isByokEnabled(),
       webhookUrl: config.payos.webhookUrl || null,
       returnUrl: config.payos.returnUrl,
+      tenant: publicTenantPayload(tenant),
+      gommoDomain: readDomain(req),
     },
   });
 });
 
-router.get('/packages', async (_req, res) => {
+router.get('/packages', async (req, res) => {
   try {
-    const data = await listCreditPackages();
+    const data = await listCreditPackages(readDomain(req));
     res.json({ success: true, data });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -65,7 +74,8 @@ router.post('/payment/create', async (req, res) => {
     const accessToken = bearerAccessToken(String(req.headers.authorization || ''));
     const username = String(req.body?.username || '').trim();
     const packageId = String(req.body?.packageId || '').trim();
-    const creditPackage = await resolveCreditPackage(packageId);
+    const gommoDomain = readDomain(req);
+    const creditPackage = await resolveCreditPackage(packageId, gommoDomain);
 
     if (!username) {
       sendError(res, 400, 'username bắt buộc', 'VALIDATION_ERROR');
@@ -79,6 +89,7 @@ router.post('/payment/create', async (req, res) => {
     await verifyPaymentIdentity({
       accessToken,
       expectedUsername: username,
+      domain: gommoDomain,
       amountVnd: creditPackage.amountVnd,
     });
 
@@ -90,6 +101,7 @@ router.post('/payment/create', async (req, res) => {
 
     const payment = await createGommoPayment({
       accessToken,
+      domain: gommoDomain,
       idBase: creditPackage.gommoIdBase,
       amountVnd: creditPackage.amountVnd,
       invoiceBuyer,
@@ -140,6 +152,7 @@ router.post('/payment/sync', async (req, res) => {
 
     const result = await syncGommoPayment({
       accessToken,
+      domain: readDomain(req),
       orderCode,
       device: readPaymentDevice(req.body),
     });
@@ -166,7 +179,8 @@ router.post('/topup/create', async (req, res) => {
   try {
     const username = String(req.body?.username || '').trim();
     const packageId = String(req.body?.packageId || '').trim();
-    const creditPackage = await resolveCreditPackage(packageId);
+    const gommoDomain = readDomain(req);
+    const creditPackage = await resolveCreditPackage(packageId, gommoDomain);
 
     if (!username) {
       sendError(res, 400, 'username bắt buộc', 'VALIDATION_ERROR');
@@ -188,6 +202,7 @@ router.post('/topup/create', async (req, res) => {
     await verifyPaymentIdentity({
       accessToken: bearerAccessToken(String(req.headers.authorization || '')),
       expectedUsername: username,
+      domain: gommoDomain,
       amountVnd: creditPackage.amountVnd,
     });
 
@@ -264,6 +279,7 @@ router.get('/topup/orders', async (req, res) => {
     await verifyBearerUsername({
       accessToken: bearerAccessToken(String(req.headers.authorization || '')),
       expectedUsername: username,
+      domain: readDomain(req),
     });
 
     const orders = await listTopupOrdersForUsername(username, limit);

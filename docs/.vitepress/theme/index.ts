@@ -14,6 +14,7 @@ import {
   syncPlaygroundStorageFromUrl,
   tryHybridLocaleSwitch,
 } from './models/playground-locale-bridge';
+import { initTenantContext } from './models/tenant';
 import './brand.css';
 import './nav.css';
 import './scrollbars.css';
@@ -31,8 +32,11 @@ export default {
   extends: DefaultTheme,
   Layout,
   enhanceApp({ app, router }) {
-    if (typeof window !== 'undefined' && isAppShellPath(window.location.pathname)) {
-      syncPlaygroundStorageFromUrl();
+    if (typeof window !== 'undefined') {
+      initTenantContext();
+      if (isAppShellPath(window.location.pathname)) {
+        syncPlaygroundStorageFromUrl();
+      }
     }
 
     app.component('ModelsCatalog', ModelsCatalog);

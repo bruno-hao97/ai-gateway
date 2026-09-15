@@ -48,10 +48,10 @@ function isAuthMessage(message: string): boolean {
   return /token|đăng nhập|login|unauthori[sz]ed|expired|hết hạn/i.test(message);
 }
 
-async function fetchGommoMe(accessToken: string): Promise<GommoMeResponse> {
+async function fetchGommoMe(accessToken: string, domain: string): Promise<GommoMeResponse> {
   const body = new URLSearchParams({
     access_token: accessToken,
-    domain: config.gommo.apiDomain,
+    domain: domain.trim() || config.gommo.apiDomain,
     ...gommoServerDeviceFields(),
   }).toString();
   const url = `${config.gommo.authBaseUrl}${config.gommo.authPath}/ai/me`;
@@ -68,10 +68,14 @@ async function fetchGommoMe(accessToken: string): Promise<GommoMeResponse> {
   }
 }
 
-async function probeGommoPaymentDomain(accessToken: string, amountVnd?: number): Promise<void> {
+async function probeGommoPaymentDomain(
+  accessToken: string,
+  domain: string,
+  amountVnd?: number,
+): Promise<void> {
   const body = new URLSearchParams({
     access_token: accessToken,
-    domain: config.gommo.apiDomain,
+    domain: domain.trim() || config.gommo.apiDomain,
     plan_id: DOMAIN_PROBE_PLAN_ID,
     subscribe_type: 'MEMBER_PLAN_AI',
     type: 'ai_plan',
@@ -109,12 +113,13 @@ async function probeGommoPaymentDomain(accessToken: string, amountVnd?: number):
 export async function verifyBearerUsername(input: {
   accessToken: string;
   expectedUsername: string;
+  domain: string;
 }): Promise<{ username: string }> {
   if (!input.accessToken) {
     throw new PaymentIdentityError('Vui lòng đăng nhập trước khi nạp credit.', 401, 'AUTH_REQUIRED');
   }
 
-  const me = await fetchGommoMe(input.accessToken);
+  const me = await fetchGommoMe(input.accessToken, input.domain);
   const user = me.userInfo;
   if (me.error || me.success === false || (!user?.id_base && !user?.email)) {
     const upstreamMessage = String(me.message || '');
@@ -144,11 +149,13 @@ export async function verifyBearerUsername(input: {
 export async function verifyPaymentIdentity(input: {
   accessToken: string;
   expectedUsername: string;
+  domain: string;
   amountVnd?: number;
 }): Promise<{ username: string }> {
-  await probeGommoPaymentDomain(input.accessToken, input.amountVnd);
+  await probeGommoPaymentDomain(input.accessToken, input.domain, input.amountVnd);
   return verifyBearerUsername({
     accessToken: input.accessToken,
     expectedUsername: input.expectedUsername,
+    domain: input.domain,
   });
 }

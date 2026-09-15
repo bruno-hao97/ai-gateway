@@ -13,6 +13,7 @@
     "client:build": "npm run build --workspace=@ai-gateway/client",
     "client:test": "npm run test --workspace=@ai-gateway/client",
     "theme:test": "node --import tsx --test \"docs/.vitepress/theme/models/*.test.ts\"",
+    "test:tenants": "node --import tsx --test src/services/tenants.test.ts",
     "portal:smoke": "node scripts/portal-smoke-http.mjs",
     "test:aggregate": "node --import tsx --test src/services/usageAggregateCache.test.ts",
     "test:observability": "node --import tsx --test \"src/services/observability*.test.ts\"",

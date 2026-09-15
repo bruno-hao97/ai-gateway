@@ -1,0 +1,20 @@
+{
+  "defaultTenantId": "79ai",
+  "devQueryParam": "tenant",
+  "tenants": [
+    {
+      "id": "79ai",
+      "hosts": ["localhost", "127.0.0.1", "::1"],
+      "gommoDomain": "79ai.net",
+      "appName": "79ai",
+      "lockDomain": false
+    },
+    {
+      "id": "vmedia",
+      "hosts": ["vmedia.docs.example.com", "vmedia.localhost"],
+      "gommoDomain": "vmedia.net",
+      "appName": "VMedia",
+      "lockDomain": true
+    }
+  ]
+}

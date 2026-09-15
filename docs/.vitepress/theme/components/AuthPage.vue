@@ -2,11 +2,10 @@
 import { computed, ref } from 'vue';
 import { useHybridLocale } from '../composables/use-hybrid-locale';
 import {
-  DEFAULT_DOMAIN,
+  getStoredDomain,
   getStoredToken,
   loginWithEmail,
   registerAccount,
-  setStoredDomain,
   setStoredToken,
   readRedirectFromLocation,
 } from '../models/auth-api';
@@ -59,7 +58,6 @@ async function onSubmit() {
       const pasted = pasteToken.value.trim();
       if (!pasted) throw new Error(t('Enter a token', 'Nhập token', 'ใส่โทเค็น'));
       setStoredToken(pasted);
-      setStoredDomain(DEFAULT_DOMAIN);
       await prefetchProfile();
       window.location.href = afterAuthRedirect();
       return;

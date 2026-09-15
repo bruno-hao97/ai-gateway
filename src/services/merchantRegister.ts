@@ -6,6 +6,7 @@ export interface GommoRegisterInput {
   password: string;
   phone: string;
   note?: string;
+  domain?: string;
 }
 
 export interface GommoRegisterResult {
@@ -52,7 +53,7 @@ export async function registerGommoUser(input: GommoRegisterInput): Promise<Gomm
     phone,
     note,
     ref: managerId,
-    domain: config.gommo.apiDomain,
+    domain: (input.domain || config.gommo.apiDomain).trim(),
     manager_id: managerId,
     expired_time: config.gommo.registerExpiredTime,
     access_token: config.gommo.accessToken,

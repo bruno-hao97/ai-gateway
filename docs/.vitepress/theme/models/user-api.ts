@@ -1,5 +1,5 @@
 import { apiBase } from './gateway-base';
-import { getStoredDomain, getStoredToken } from './auth-api';
+import { getStoredDomain, getStoredToken, tenantApiHeaders } from './auth-api';
 import { appendDeviceToForm, gommoClientDeviceFields } from './gommo-device';
 import type { UsageRecord } from './usage-history';
 import type {
@@ -133,7 +133,7 @@ export interface BillingStatus {
 
 function authHeaders(json = true): HeadersInit {
   const token = getStoredToken();
-  const headers: Record<string, string> = { Accept: 'application/json' };
+  const headers: Record<string, string> = { Accept: 'application/json', ...tenantApiHeaders() };
   if (token) headers.Authorization = `Bearer ${token}`;
   if (json) headers['Content-Type'] = 'application/json';
   return headers;
@@ -265,7 +265,8 @@ export async function fetchBillingStatus(): Promise<BillingStatus> {
 }
 
 export async function fetchBillingPackages(): Promise<CreditPackage[]> {
-  const res = await fetch(`${apiBase()}/billing/packages`, { headers: authHeaders(false) });
+  const q = gatewayQueryParams();
+  const res = await fetch(`${apiBase()}/billing/packages?${q}`, { headers: authHeaders(false) });
   const data = (await res.json().catch(() => ({}))) as { data?: CreditPackage[] };
   if (!res.ok) throw new Error('Could not load packages');
   return data.data || [];

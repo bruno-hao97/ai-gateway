@@ -19,8 +19,7 @@ export const GOMMO_KEY_TO_PACKAGE_ID: Record<string, string> = {
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
-let cachedPackages: CreditPackage[] | null = null;
-let cachedAt = 0;
+const cachedPackagesByDomain = new Map<string, { packages: CreditPackage[]; cachedAt: number }>();
 
 interface GommoCreditPlanRow {
   key?: string;
@@ -66,10 +65,10 @@ function parsePlansPayload(raw: unknown): CreditPackage[] {
   return packages;
 }
 
-async function fetchGommoCreditPlans(accessToken: string): Promise<CreditPackage[]> {
+async function fetchGommoCreditPlans(accessToken: string, domain: string): Promise<CreditPackage[]> {
   const body = new URLSearchParams({
     access_token: accessToken,
-    domain: config.gommo.apiDomain,
+    domain: domain.trim() || config.gommo.apiDomain,
     language: 'en',
     ...gommoServerDeviceFields(),
   });
@@ -97,18 +96,19 @@ async function fetchGommoCreditPlans(accessToken: string): Promise<CreditPackage
 }
 
 /** List packages — live Gommo credit_plans with short TTL cache, static fallback. */
-export async function listCreditPackages(): Promise<CreditPackage[]> {
+export async function listCreditPackages(domain?: string): Promise<CreditPackage[]> {
+  const gommoDomain = (domain || config.gommo.apiDomain).trim();
   const now = Date.now();
-  if (cachedPackages && now - cachedAt < CACHE_TTL_MS) {
-    return cachedPackages;
+  const cached = cachedPackagesByDomain.get(gommoDomain);
+  if (cached && now - cached.cachedAt < CACHE_TTL_MS) {
+    return cached.packages;
   }
 
   const token = isGommoMerchantConfigured() ? config.gommo.accessToken : '';
   if (token) {
     try {
-      const live = await fetchGommoCreditPlans(token);
-      cachedPackages = live;
-      cachedAt = now;
+      const live = await fetchGommoCreditPlans(token, gommoDomain);
+      cachedPackagesByDomain.set(gommoDomain, { packages: live, cachedAt: now });
       return live;
     } catch (err) {
       console.warn(
@@ -121,12 +121,14 @@ export async function listCreditPackages(): Promise<CreditPackage[]> {
   return [...CREDIT_PACKAGES];
 }
 
-export async function resolveCreditPackage(packageId: string): Promise<CreditPackage | undefined> {
-  const packages = await listCreditPackages();
+export async function resolveCreditPackage(
+  packageId: string,
+  domain?: string,
+): Promise<CreditPackage | undefined> {
+  const packages = await listCreditPackages(domain);
   return packages.find((item) => item.id === packageId) ?? getStaticCreditPackage(packageId);
 }
 
 export function clearCreditPackagesCache(): void {
-  cachedPackages = null;
-  cachedAt = 0;
+  cachedPackagesByDomain.clear();
 }

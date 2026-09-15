@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
-import { config } from '../config.js';
 import { GommoApiError, GommoClient } from '../services/gommoClient.js';
+import { resolveGommoDomain } from '../services/tenants.js';
 import { sendError } from '../utils/errors.js';
 import { getMediaGatewayAuth } from './byokMediaAuth.js';
 
@@ -19,10 +19,7 @@ function readBearerToken(req: Request): string | null {
 }
 
 export function readDomain(req: Request): string {
-  const fromQuery = typeof req.query.domain === 'string' ? req.query.domain.trim() : '';
-  const fromBody =
-    req.body && typeof req.body.domain === 'string' ? req.body.domain.trim() : '';
-  return fromQuery || fromBody || config.gommo.apiDomain;
+  return resolveGommoDomain(req);
 }
 
 export function gatewayAuth(req: Request, res: Response, next: NextFunction): void {

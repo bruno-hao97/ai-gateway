@@ -4,6 +4,8 @@ import { gommoClientDeviceFields } from './gommo-device';
 
 export const STORAGE_TOKEN = 'gw_access_token';
 export const STORAGE_DOMAIN = 'gw_login_domain';
+export const STORAGE_TENANT_ID = 'gw_tenant_id';
+export const STORAGE_TENANT_LOCK = 'gw_tenant_lock_domain';
 export const DEFAULT_DOMAIN = '79ai.net';
 
 export function gatewayBase(): string {
@@ -24,12 +26,47 @@ export function setStoredToken(token: string): void {
 
 export function getStoredDomain(): string {
   if (typeof window === 'undefined') return DEFAULT_DOMAIN;
+  const locked = localStorage.getItem(STORAGE_TENANT_LOCK)?.trim();
+  if (locked) return locked;
   return (localStorage.getItem(STORAGE_DOMAIN) || DEFAULT_DOMAIN).trim();
 }
 
 export function setStoredDomain(domain: string): void {
   if (typeof window === 'undefined') return;
+  if (localStorage.getItem(STORAGE_TENANT_LOCK)) return;
   localStorage.setItem(STORAGE_DOMAIN, domain.trim() || DEFAULT_DOMAIN);
+}
+
+export function applyTenantBinding(tenant: {
+  id: string;
+  gommoDomain: string;
+  lockDomain: boolean;
+}): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_TENANT_ID, tenant.id);
+    if (tenant.lockDomain) {
+      localStorage.setItem(STORAGE_TENANT_LOCK, tenant.gommoDomain);
+      localStorage.setItem(STORAGE_DOMAIN, tenant.gommoDomain);
+    } else {
+      localStorage.removeItem(STORAGE_TENANT_LOCK);
+      if (!localStorage.getItem(STORAGE_DOMAIN)) {
+        localStorage.setItem(STORAGE_DOMAIN, tenant.gommoDomain);
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getStoredTenantId(): string {
+  if (typeof window === 'undefined') return '';
+  return (localStorage.getItem(STORAGE_TENANT_ID) || '').trim();
+}
+
+export function tenantApiHeaders(): Record<string, string> {
+  const id = getStoredTenantId();
+  return id ? { 'X-Gateway-Tenant': id } : {};
 }
 
 export function clearAuth(): void {
@@ -125,8 +162,17 @@ function loginDevicePayload(): Record<string, string> {
 export async function loginWithEmail(email: string, password: string): Promise<string> {
   const res = await fetch(`${gatewayBase()}/gateway/auth/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ email: email.trim(), password, ...loginDevicePayload() }),
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...tenantApiHeaders(),
+    },
+    body: JSON.stringify({
+      email: email.trim(),
+      password,
+      domain: getStoredDomain(),
+      ...loginDevicePayload(),
+    }),
   });
   const data = await parseJsonResponse(res);
   if (!res.ok) {
@@ -135,7 +181,6 @@ export async function loginWithEmail(email: string, password: string): Promise<s
   const token = extractToken(data);
   if (!token) throw new Error('No access_token in response');
   setStoredToken(token);
-  setStoredDomain(DEFAULT_DOMAIN);
   return token;
 }
 
@@ -147,12 +192,17 @@ export async function registerAccount(input: {
 }): Promise<string> {
   const res = await fetch(`${gatewayBase()}/gateway/auth/register`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...tenantApiHeaders(),
+    },
     body: JSON.stringify({
       email: input.email.trim(),
       password: input.password,
       phone: input.phone.trim(),
       name: input.name?.trim() || undefined,
+      domain: getStoredDomain(),
       ...loginDevicePayload(),
     }),
   });
@@ -163,6 +213,5 @@ export async function registerAccount(input: {
   const token = extractToken(data);
   if (!token) throw new Error('No access_token in response');
   setStoredToken(token);
-  setStoredDomain(DEFAULT_DOMAIN);
   return token;
 }

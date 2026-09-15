@@ -53,7 +53,7 @@ function sharedThemeConfig(opts: {
       pattern: `${GITHUB_REPO}/edit/${EDIT_BRANCH}/docs/:path`,
       text: opts.editText,
     },
-    socialLinks: [{ icon: 'github' as const, link: GITHUB_REPO }],
+    socialLinks: [],
     outline: { level: [2, 3] as [number, number] },
     docFooter: { prev: opts.prev, next: opts.next },
     darkModeSwitchLabel: labels.appearance,

@@ -19,6 +19,11 @@ import { loginGommoUser, GommoAuthError } from '../services/gommoAuth.js';
 import { GommoRegisterError, registerGommoUser } from '../services/merchantRegister.js';
 import { createJobAndPoll } from '../services/polling.js';
 import type { JobType, PollMedia } from '../types/gommo.js';
+import {
+  getDefaultTenant,
+  publicTenantPayload,
+  resolveTenantFromRequest,
+} from '../services/tenants.js';
 import { sendError } from '../utils/errors.js';
 
 const JOB_TYPES = new Set<JobType>([
@@ -38,6 +43,18 @@ const JOB_TYPES = new Set<JobType>([
 const POLL_MEDIA = new Set<PollMedia>(['image', 'video', 'music']);
 
 const router = Router();
+
+/** GET /gateway/site — public tenant/dealer context for docs + portal */
+router.get('/site', (req, res) => {
+  const tenant = resolveTenantFromRequest(req) ?? getDefaultTenant();
+  res.json({
+    success: true,
+    data: {
+      ...publicTenantPayload(tenant),
+      gommoDomain: readDomain(req),
+    },
+  });
+});
 
 function readLoginDevice(body: Record<string, unknown> | undefined) {
   const device_id = typeof body?.device_id === 'string' ? body.device_id.trim() : '';
@@ -89,6 +106,7 @@ router.post('/auth/register', async (req, res) => {
       password: String(password),
       phone: String(phone),
       note: typeof note === 'string' ? note : undefined,
+      domain: readDomain(req),
     });
     res.json({
       success: true,
