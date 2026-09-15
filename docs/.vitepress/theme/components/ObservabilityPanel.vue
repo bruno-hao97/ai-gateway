@@ -69,6 +69,9 @@ const activityHref = computed(() => `${props.prefix}/app/activity/?period=7d`);
 const creditsHref = computed(() => `${props.prefix}/app/credits/`);
 const usageDocsHref = computed(() => `${props.prefix}/reference/usage`);
 const observabilityDocsHref = computed(() => `${props.prefix}/reference/observability`);
+const observabilityVerifyDocsHref = computed(
+  () => `${observabilityDocsHref.value}#automated-background-verify-live`,
+);
 const mcpHref = computed(() => `${props.prefix}/mcp/`);
 
 const webhookSlotsLeft = computed(() => Math.max(0, MAX_WEBHOOKS - webhooks.value.length));
@@ -440,9 +443,23 @@ defineExpose({ reload: reloadAll });
       <p class="or-obs-section-sub">
         {{
           isVi
-            ? 'Gateway POST JSON tới endpoint HTTPS của bạn. Chỉ media jobs qua POST /gateway/jobs/* — ưu tiên wait=true. Không đảm bảo delivery cho job async (wait=false).'
-            : 'Gateway POSTs JSON to your HTTPS endpoint. Media jobs via POST /gateway/jobs/* only — prefer wait=true. Not guaranteed for async jobs (wait=false).'
+            ? 'Gateway POST JSON tới endpoint HTTPS của bạn. Chỉ media jobs qua POST /gateway/jobs/* — ưu tiên wait=true. Job async (wait=false) vẫn có thể nhận webhook sau poll nền khi đã đăng ký webhook.'
+            : 'Gateway POSTs JSON to your HTTPS endpoint. Media jobs via POST /gateway/jobs/* only — prefer wait=true. Async jobs (wait=false) can still receive webhooks after background poll when webhooks are registered.'
         }}
+      </p>
+      <p class="or-obs-section-sub or-obs-verify-hint">
+        <template v-if="isVi">
+          Kiểm tra live:
+          <code>npm run observability:verify-background</code>
+          (cần token trong <code>.env</code>) —
+          <a :href="observabilityVerifyDocsHref" class="or-obs-beta-notice-link">hướng dẫn →</a>
+        </template>
+        <template v-else>
+          Live check:
+          <code>npm run observability:verify-background</code>
+          (token in <code>.env</code>) —
+          <a :href="observabilityVerifyDocsHref" class="or-obs-beta-notice-link">docs →</a>
+        </template>
       </p>
 
       <details class="or-obs-payload-details">

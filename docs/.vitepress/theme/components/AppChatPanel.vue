@@ -171,7 +171,7 @@ const showLowCreditBanner = computed(() => {
   if (lowCreditDismissed.value) return false;
   const balance = creditsBalance.value;
   if (balance == null) return false;
-  return balance > 0 && balance < LOW_CREDIT_THRESHOLD;
+  return balance < LOW_CREDIT_THRESHOLD;
 });
 
 const byokMappedIds = computed(

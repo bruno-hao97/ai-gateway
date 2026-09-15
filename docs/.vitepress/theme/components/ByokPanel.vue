@@ -158,6 +158,14 @@ function eventStatusTone(event: ByokUsageEvent): 'ok' | 'error' {
   return event.ok ? 'ok' : 'error';
 }
 
+function eventSourceLabel(event: ByokUsageEvent): string {
+  return event.source === 'byok' ? 'BYOK' : 'Platform';
+}
+
+function eventSourceTone(event: ByokUsageEvent): 'byok' | 'platform' {
+  return event.source === 'byok' ? 'byok' : 'platform';
+}
+
 function providerStatusLabel(provider: ByokProviderInfo): string {
   if (provider.configured) {
     return props.isVi
@@ -659,8 +667,13 @@ defineExpose({
         <div v-if="usageEvents.length" class="or-app-panel">
           <h3>{{ isVi ? 'Gần đây' : 'Recent' }}</h3>
           <article v-for="event in usageEvents" :key="event.id" class="or-byok-usage-row">
-            <div>
-              <strong>{{ event.source }}</strong>
+            <div class="or-byok-usage-row-title">
+              <span
+                class="or-byok-source-badge"
+                :class="`or-byok-source-badge--${eventSourceTone(event)}`"
+              >
+                {{ eventSourceLabel(event) }}
+              </span>
               <span class="or-app-muted"> · {{ event.provider || '—' }} · {{ event.model }}</span>
             </div>
             <div class="or-byok-usage-row-meta">
@@ -854,6 +867,33 @@ defineExpose({
 .or-byok-usage-row {
   padding: 0.65rem 0;
   border-bottom: 1px solid var(--vp-c-divider);
+}
+
+.or-byok-usage-row-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.or-byok-source-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.or-byok-source-badge--byok {
+  background: color-mix(in srgb, var(--vp-c-brand-1) 14%, transparent);
+  color: var(--vp-c-brand-1);
+}
+
+.or-byok-source-badge--platform {
+  background: color-mix(in srgb, var(--or-text-muted, var(--vp-c-text-2)) 12%, transparent);
+  color: var(--or-text-muted, var(--vp-c-text-2));
 }
 
 .or-byok-usage-row-meta {

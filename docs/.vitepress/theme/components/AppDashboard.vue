@@ -772,13 +772,6 @@ useVitepressUrlSync(syncDashboardFromLocation);
               >
                 {{ copied ? (isVi ? 'Đã copy!' : 'Copied!') : isVi ? 'Copy token' : 'Copy token' }}
               </button>
-              <a
-                v-if="creditsLow && !showLowCreditsBanner"
-                :href="`${prefix}/app/credits/`"
-                class="or-app-btn or-app-btn-ghost"
-              >
-                {{ isVi ? 'Nạp credits' : 'Top up credits' }}
-              </a>
             </div>
           </div>
 

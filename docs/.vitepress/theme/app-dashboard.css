@@ -2238,6 +2238,10 @@ a.or-app-credits-pill:hover {
   line-height: 1.45;
 }
 
+.or-obs-verify-hint code {
+  font-size: 0.75rem;
+}
+
 .or-obs-row {
   display: flex;
   align-items: flex-start;
