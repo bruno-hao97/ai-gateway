@@ -35,6 +35,7 @@ Embed full-screen — không có sidebar/header app. Xem [API Playground](/vi/re
 - [ ] Đã login → playground nhận token (Connection OK / list models)
 - [ ] **List models** → chọn model + ratio từ catalog
 - [ ] **Image job** bật **wait** → có `resultUrl` / preview
+- [ ] Sau **SUCCESS**, chuyển **REQUEST** / **ENDPOINTS** / **AI GUIDE** — tab giữ nguyên (poll không kéo về **RESULT**)
 - [ ] URL đổi khi đổi worker (`?worker=create-video`, …)
 - [ ] Link **Playground** từ [Models](/vi/models/) → `?model=` điền sẵn
 - [ ] Tuỳ chọn: Observability **Local mirror** bật → có dòng job sau chạy
@@ -103,4 +104,6 @@ Xem [Billing & credits](./billing-credits.md). Kiểm tra nhanh:
 npm run theme:test
 npm run test:aggregate
 npm run portal:smoke
+node scripts/verify-request-tab.mjs   # pin tab Playground (cần docs:stack)
+npm run observability:verify-background   # job async + webhook live (cần token trong .env)
 ```

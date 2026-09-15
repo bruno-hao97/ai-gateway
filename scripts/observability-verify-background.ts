@@ -26,7 +26,12 @@ const GATEWAY_URL = (
   'http://localhost:3001'
 ).replace(/\/$/, '');
 
-const TOKEN = (process.env.OBSERVABILITY_VERIFY_TOKEN || process.env.GATEWAY_VERIFY_TOKEN || '').trim();
+const TOKEN = (
+  process.env.OBSERVABILITY_VERIFY_TOKEN ||
+  process.env.GATEWAY_VERIFY_TOKEN ||
+  process.env.BILLING_VERIFY_TOKEN ||
+  ''
+).trim();
 const DOMAIN = (process.env.OBSERVABILITY_VERIFY_DOMAIN || process.env.GOMMO_API_DOMAIN || '79ai.net').trim();
 const MODEL_SLUG = (process.env.OBSERVABILITY_VERIFY_MODEL_SLUG || '').trim();
 const TIMEOUT_MS = Number(process.env.OBSERVABILITY_VERIFY_TIMEOUT_MS) || 6 * 60 * 1000;
@@ -164,33 +169,63 @@ function extractResultUrl(envelope: Record<string, unknown>): string | null {
   return null;
 }
 
-async function pickImageModel(): Promise<{ slug: string; ratio: string }> {
-  if (MODEL_SLUG) return { slug: MODEL_SLUG, ratio: '1:1' };
+function pickCatalogValue(item: unknown): string {
+  if (typeof item === 'string' || typeof item === 'number') return String(item);
+  if (item && typeof item === 'object') {
+    const row = item as Record<string, unknown>;
+    const v =
+      row.value ?? row.type ?? row.ratio ?? row.mode ?? row.resolution ?? row.duration ?? row.id;
+    if (v != null && String(v).trim()) return String(v).trim();
+    const name = row.name ?? row.label;
+    if (name != null && String(name).trim()) return String(name).trim();
+  }
+  return '';
+}
 
-  const models = await gatewayJson<{ data?: unknown[] }>(`/gateway/models?type=image&domain=${encodeURIComponent(DOMAIN)}`);
-  const list = Array.isArray(models.data) ? models.data : [];
-  if (!list.length) fail('No image models in catalog');
-
-  const first = list[0] as Record<string, unknown>;
-  const slug = String(first.model ?? first.slug ?? '').trim();
-  if (!slug) fail('Could not read model slug from catalog');
-
-  let ratio = '1:1';
-  const ratios = first.ratios;
-  if (Array.isArray(ratios) && ratios.length) {
-    const r0 = ratios[0];
-    if (typeof r0 === 'string') ratio = r0;
-    else if (r0 && typeof r0 === 'object' && typeof (r0 as { value?: string }).value === 'string') {
-      ratio = (r0 as { value: string }).value;
+function pickCatalogList(model: Record<string, unknown>, ...keys: string[]): string[] {
+  for (const key of keys) {
+    const val = model[key];
+    if (Array.isArray(val) && val.length) {
+      return val.map(pickCatalogValue).filter(Boolean);
     }
   }
+  return [];
+}
 
-  return { slug, ratio };
+function modelSlugFromRow(row: Record<string, unknown>): string {
+  return String(row.model ?? row.slug ?? row.model_id ?? row.id ?? '').trim();
+}
+
+async function pickImageModel(): Promise<{ slug: string; fields: Record<string, string> }> {
+  const models = await gatewayJson<{ data?: unknown[] }>(
+    `/gateway/models?type=image&domain=${encodeURIComponent(DOMAIN)}`,
+  );
+  const list = (Array.isArray(models.data) ? models.data : []).filter(
+    (m): m is Record<string, unknown> => Boolean(m) && typeof m === 'object' && !Array.isArray(m),
+  );
+  if (!list.length) fail('No image models in catalog');
+
+  const preferred =
+    (MODEL_SLUG ? list.find((m) => modelSlugFromRow(m) === MODEL_SLUG) : null) ??
+    list.find((m) => modelSlugFromRow(m) === 'flux-schnell') ??
+    list[0];
+  const slug = modelSlugFromRow(preferred);
+  if (!slug) fail('Could not read model slug from catalog');
+
+  const fields: Record<string, string> = {};
+  const ratios = pickCatalogList(preferred, 'ratios', 'ratio');
+  if (ratios.length) fields.ratio = ratios[0];
+  const resolutions = pickCatalogList(preferred, 'resolutions', 'resolution');
+  if (resolutions.length) fields.resolution = resolutions[0];
+  const modes = pickCatalogList(preferred, 'modes', 'mode');
+  if (modes.length) fields.mode = modes[0];
+
+  return { slug, fields };
 }
 
 async function main() {
   if (!TOKEN) {
-    skip('Set OBSERVABILITY_VERIFY_TOKEN (or GATEWAY_VERIFY_TOKEN) in .env');
+    skip('Set OBSERVABILITY_VERIFY_TOKEN (or GATEWAY_VERIFY_TOKEN or BILLING_VERIFY_TOKEN) in .env');
   }
 
   console.log(`Observability background verify — gateway ${GATEWAY_URL}, domain ${DOMAIN}`);
@@ -215,8 +250,11 @@ async function main() {
     webhookId = created.data.id;
     console.log(`Registered webhook ${webhookId}`);
 
-    const { slug, ratio } = await pickImageModel();
-    console.log(`Creating async image job model=${slug} ratio=${ratio} wait=false`);
+    const { slug, fields: catalogFields } = await pickImageModel();
+    const fieldSummary = Object.entries(catalogFields)
+      .map(([k, v]) => `${k}=${v}`)
+      .join(' ');
+    console.log(`Creating async image job model=${slug} ${fieldSummary} wait=false`);
 
     const jobEnvelope = await gatewayJson<Record<string, unknown>>('/gateway/jobs/image', {
       method: 'POST',
@@ -226,7 +264,7 @@ async function main() {
         domain: DOMAIN,
         fields: {
           prompt: 'Observability background verify — small test image',
-          ratio,
+          ...catalogFields,
         },
       },
     });

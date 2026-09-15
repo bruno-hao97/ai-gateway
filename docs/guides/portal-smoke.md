@@ -35,6 +35,7 @@ Immersive embed — no app sidebar/header. See [API Playground](/reference/playg
 - [ ] Logged in → playground picks up token (Connection OK / can list models)
 - [ ] **List models** → pick catalog model + ratio from list (not guessed)
 - [ ] **Image job** with **wait** checked → `resultUrl` in response / preview
+- [ ] After **SUCCESS**, switch **REQUEST** / **ENDPOINTS** / **AI GUIDE** — tab stays pinned (poll does not steal **RESULT**)
 - [ ] URL updates when switching worker (`?worker=create-video`, etc.)
 - [ ] Deep link from [Models](/models/) **Playground** button → `?model=` pre-filled
 - [ ] Optional: Observability **Local mirror** on → job row appears after run
@@ -103,4 +104,6 @@ See [Billing & credits](./billing-credits.md). Quick pass:
 npm run theme:test      # URL helpers, usage normalize
 npm run test:aggregate  # usage aggregate cache (Activity Overview)
 npm run portal:smoke    # route + fragment checks (docs :5173 + API :3001)
+node scripts/verify-request-tab.mjs   # Playground response tab pin (needs docs:stack)
+npm run observability:verify-background   # live async job + webhook (needs token in .env)
 ```

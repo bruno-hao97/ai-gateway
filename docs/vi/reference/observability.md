@@ -152,12 +152,13 @@ Cần gateway chạy, Bearer user và credit cho một job ảnh nhỏ:
 
 ```bash
 # .env: OBSERVABILITY_VERIFY_TOKEN=<access_token từ /ai/login>
+# (hoặc GATEWAY_VERIFY_TOKEN / BILLING_VERIFY_TOKEN)
 npm run observability:verify-background
 ```
 
 Script: receiver local → đăng ký webhook → `POST /gateway/jobs/image` `wait: false` → đợi event `data.background: true` → xóa webhook.
 
-Thoát **SKIP** nếu model trả kết quả ngay (sync). Env tuỳ chọn: `OBSERVABILITY_VERIFY_GATEWAY_URL`, `OBSERVABILITY_VERIFY_MODEL_SLUG`, `OBSERVABILITY_VERIFY_TIMEOUT_MS` (mặc định 6 phút).
+Thoát **SKIP** nếu model trả kết quả ngay (sync). Chọn `ratio` / `resolution` / `mode` từ catalog (không đoán). Env tuỳ chọn: `OBSERVABILITY_VERIFY_GATEWAY_URL`, `OBSERVABILITY_VERIFY_MODEL_SLUG`, `OBSERVABILITY_VERIFY_TIMEOUT_MS` (mặc định 6 phút).
 
 ### Smoke test checklist
 

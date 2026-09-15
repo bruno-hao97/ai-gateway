@@ -153,6 +153,7 @@ Requires a running gateway, user Bearer token, and credits for one small image j
 
 ```bash
 # .env: OBSERVABILITY_VERIFY_TOKEN=<access_token from /ai/login>
+# (or GATEWAY_VERIFY_TOKEN / BILLING_VERIFY_TOKEN)
 npm run observability:verify-background
 ```
 
@@ -164,7 +165,7 @@ The script:
 4. Waits for `job.completed` or `job.failed` with `data.background: true`
 5. Deletes the webhook
 
-Exits **SKIP** if the model returns a result immediately (sync path). Optional env: `OBSERVABILITY_VERIFY_GATEWAY_URL`, `OBSERVABILITY_VERIFY_MODEL_SLUG`, `OBSERVABILITY_VERIFY_TIMEOUT_MS` (default 6 min).
+Exits **SKIP** if the model returns a result immediately (sync path). Picks `ratio` / `resolution` / `mode` from the catalog (never guessed). Optional env: `OBSERVABILITY_VERIFY_GATEWAY_URL`, `OBSERVABILITY_VERIFY_MODEL_SLUG`, `OBSERVABILITY_VERIFY_TIMEOUT_MS` (default 6 min).
 
 ### Smoke test checklist
 
