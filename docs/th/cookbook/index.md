@@ -34,7 +34,7 @@ $h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/x-www
 
 | สูตร | สิ่งที่สร้าง |
 |------|-------------|
-| [งานรูปแรก (wait)](./image-job-wait.md) | Login → models → รูป พร้อม server poll |
+| [งานรูปแรก](./image-job-wait.md) | Login → models → รูป + client poll |
 | [งาน async + poll loop](./job-poll-async.md) | `wait: false` → poll เอง / loop |
 
 ### มีเดีย

@@ -1,53 +1,46 @@
 ---
-title: 'สูตร: แชท + stream'
-description: Agent chat และสตรีม SSE ผ่าน gateway
+title: 'Recipe: แชท + stream'
+description: Agent chat และ SSE streaming ผ่าน Gommo platform API
 ---
 
 # แชท + stream
 
-`POST /gateway/chat` — upstream ต้องมี **`messages` ไม่ว่าง**
+`POST https://api.gommo.net/api/v2/chat` — upstream ต้องการ **`messages` ไม่ว่าง**
 
-## Chat (response JSON)
+## แชท (JSON response)
 
 ```powershell
-$h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/json' }
-$body = @{
-  action = 'chat'
-  query = 'Say hello in one short sentence.'
-  messages = @(@{ role = 'user'; text = 'Say hello in one short sentence.' })
-} | ConvertTo-Json -Depth 5
-
+$h = @{ Authorization = "Bearer $env:TOKEN" }
+$body = "action=chat&domain=79ai.net&query=Say hello in one short sentence.&messages=[{\"role\":\"user\",\"text\":\"Say hello in one short sentence.\"}]"
 Invoke-RestMethod -Method POST `
-  -Uri "http://localhost:3001/gateway/chat" `
-  -Headers $h -Body $body
+  -Uri "https://api.gommo.net/api/v2/chat" `
+  -Headers $h `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body $body
 ```
 
-ทางเลือก: ส่ง `sessionId` จาก response ก่อนหน้าสำหรับหลายเทิร์น
+ทางเลือก: ส่ง `sessionId` จาก response ก่อนหน้าสำหรับ multi-turn
 
 ## Stream (SSE)
 
-ใช้ `curl -N` อ่านสตรีมในเทอร์มินัล:
+ใช้ `curl -N` อ่านสตรีมบน terminal:
 
 ```powershell
-$body = @{
-  action = 'stream'
-  query = 'Tell a very short story.'
-  messages = @(@{ role = 'user'; text = 'Tell a very short story.' })
-} | ConvertTo-Json -Depth 5
-
-curl.exe -N -X POST "http://localhost:3001/gateway/chat" `
-  -H "Authorization: Bearer $env:TOKEN" `
-  -H "Content-Type: application/json" `
-  -d $body
+curl.exe -N -X POST "https://api.gommo.net/api/v2/chat" ^
+  -H "Authorization: Bearer %TOKEN%" ^
+  -H "Content-Type: application/x-www-form-urlencoded" ^
+  -d "action=stream&domain=79ai.net&query=Tell a very short story.&messages=[{\"role\":\"user\",\"text\":\"Tell a very short story.\"}]"
 ```
 
-Gateway pipe SSE โดยไม่ buffer
+## ทางเลือก: gateway dev
+
+`POST http://localhost:3001/gateway/chat` — JSON wrapper เมื่อ self-host local
 
 ## Playground
 
-แผง **Chat** → action **stream** → Run request
+**Chat** panel → action **stream** → Run request
 
 ## ถัดไป
 
 - [อ้างอิงแชท](../reference/chat.md)
-- [Flow HTTP เอเจนต์](./agent-http-flow.md)
+- [Agent HTTP flow](./agent-http-flow.md)

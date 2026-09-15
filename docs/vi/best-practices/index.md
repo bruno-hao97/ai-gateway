@@ -1,108 +1,102 @@
 ---
 title: Best practices
-description: Poll, CORS, rate limit, tham số model
+description: Pattern tích hợp — poll, auth, tham số model trên Gommo
 ---
 
 # Best practices
 
-Pattern khuyến nghị khi tích hợp AI Gateway.
+Pattern khuyến nghị cho tích hợp **Gommo public API** ổn định.
 
 ## 1. Luôn list models trước job
 
-Không hard-code hoặc đoán `ratio`, `mode`, `resolution`, `duration`.
+Không hard-code hoặc đoán `ratio`, `mode`, `resolution`, hoặc `duration`.
 
 ```http
-GET /gateway/models?type=image
-Authorization: Bearer {token}
+POST https://v2.api.gommo.net/ai/models?type=image
+Authorization: Bearer {access_token}
+Content-Type: application/x-www-form-urlencoded
+
+type=image&domain=79ai.net
 ```
+
+Dùng giá trị từ mảng response của **model đó**. Giá trị sai gây upstream từ chối hoặc output kém.
 
 → [Models](../models/) · [Media jobs](../features/media-jobs.md)
 
-## 2. Chọn chiến lược poll rõ ràng
+## 2. Poll rõ ràng
 
 | Chiến lược | Khi dùng |
 |------------|----------|
-| `wait: true` | Script, backend đơn giản |
-| Client poll | UI progress, job dài |
-| Mode C / Direct | Tự implement 3.5s × 80 lần |
+| Client poll `POST …/ai/jobs/{id}?media=…` | Mọi tích hợp direct — **3500 ms** × **80** max |
+| UI có progress | Cùng poll loop; hiện status từ response |
+| Self-host `wait: true` | Gateway JSON tùy chọn — một HTTP round-trip |
 
-Gommo **không webhook**. Mặc định gateway: **3500 ms**, **80** lần.
+Gommo **không webhook** khi job hoàn thành mặc định. Lên kế hoạch timeout và đường retry cho user.
 
-## 3. Mode B cho client mới
+## 3. Ưu tiên public API trực tiếp
 
-JSON `/gateway/*`, lỗi có cấu trúc, domain inject server.
+Gọi **`v2.api.gommo.net`** và **`api.gommo.net`** từ backend hoặc client tin cậy. Self-host [AI Gateway](../routing/integration-modes.md) chỉ khi cần portal billing, BYOK, hoặc JSON REST wrapper.
 
-→ [Choosing a mode](../routing/choosing-a-mode.md)
-
-## 4. Secret ở server
+## 4. Giữ secret trên server
 
 | Nên | Không |
 |-----|-------|
-| Token user ngắn hạn | `GOMMO_ACCESS_TOKEN` trên browser |
-| `/admin` từ tool nội bộ | `x-admin-key` trên FE |
-| PayOS key trên platform | Commit `.env` |
+| Login từ backend hoặc token user ngắn hạn | Ship `GOMMO_ACCESS_TOKEN` ra browser |
+| Merchant key chỉ trong deploy secrets | Commit `.env` |
+| User Bearer cho generation | Expose admin key trên frontend |
 
-→ [Privacy](../privacy/)
+→ [Privacy & security](../privacy/)
 
-## 5. CORS khi cần
+## 5. CORS khi browser gọi Gommo cross-origin
 
-**Không cần CORS:** server-side, `/portal` same-origin.
+Browser gọi thẳng `v2.api.gommo.net` cần CORS policy Gommo. Pattern thường: **backend của bạn** proxy token user sang Gommo.
 
-**Cần `GATEWAY_CORS_ORIGIN`:** SPA browser origin khác.
+[Playground](/vi/app/playground/) same-origin dùng site proxy cho tiện dev.
 
-Rỗng = CORS không mount — cross-origin browser fail (by design).
+## 6. Chat: luôn gửi messages
 
-## 6. Rate limit
+Upstream yêu cầu `messages` không rỗng cho chat:
 
-| Scope | Mặc định | Env |
-|-------|----------|-----|
-| `/gateway/*` | 120/phút/IP | `GATEWAY_RATE_LIMIT_MAX` |
-| `/admin/*` | 30/phút/IP | `ADMIN_RATE_LIMIT_MAX` |
-| `/billing/*` | 60/phút/IP | `BILLING_RATE_LIMIT_MAX` |
+```
+POST https://api.gommo.net/api/v2/chat
+Content-Type: application/x-www-form-urlencoded
 
-`429` → `{ "code": "RATE_LIMITED" }`. Backoff phía client.
-
-## 7. Chat: messages không rỗng
-
-```json
-{
-  "action": "chat",
-  "query": "Xin chào",
-  "messages": [{ "role": "user", "text": "Xin chào" }]
-}
+access_token=…&domain=79ai.net&action=chat&query=Hello&messages=[…]
 ```
 
-Stream: `action=stream`, consume SSE.
+Streaming: dùng `action=stream` và consume SSE.
 
-## 8. Upload trước job
+→ [Chat](../features/chat.md)
 
-Upload → URL → truyền vào `fields` job. Giới hạn body **50 MB**.
+## 7. Upload trước job khi cần
 
-## 9. Xử lý lỗi
+Flow image-to-video và edit:
 
-| Code | Hành động |
-|------|-----------|
-| `UNAUTHORIZED` | Login lại |
-| `VALIDATION_ERROR` | Sửa body |
-| `INSUFFICIENT_CREDITS` | Topup |
-| `UPSTREAM_ERROR` | Retry |
-| `RATE_LIMITED` | Backoff |
-| `NOT_CONFIGURED` | Sửa env server |
+1. `POST https://v2.api.gommo.net/ai/upload/image` (hoặc video) → lấy URL
+2. Truyền URL trong job form (tên field từ catalog model)
+3. Create job và poll
 
-## 10. Health check trước deploy
+## 8. Xử lý lỗi upstream
 
-```bash
-curl https://api.yourdomain.com/health
-```
+Kiểm tra `success`, `message`, và HTTP status. Không retry credential không đổi khi auth fail.
 
-## 11. Billing tách generation
+| Triệu chứng | Hành động thường |
+|-------------|------------------|
+| Token / domain errors | Login lại; xác minh domain đăng ký |
+| Validation | Sửa form field từ catalog |
+| Insufficient credits | Top up qua platform payment |
+| Rate limit | Back off |
 
-Nạp credit ở `/billing/*` — **Gommo VietQR mặc định** (`/billing/payment/*`), không gắn dưới `/gateway`. PayOS legacy (`/billing/topup/*`) là tùy chọn.
+## 9. Tách billing khỏi generation
 
-## 12. Test playground trước
+Nạp credit dùng endpoint payment **`api.gommo.net`**. Site docs có thể expose `/billing/*` khi self-host — xem [Billing & credits](../guides/billing-credits.md).
 
-[/vi/app/playground/](/vi/app/playground/) — đăng nhập trên docs.
+## 10. Test playground trước
+
+[/vi/app/playground/](/vi/app/playground/) — tab **Endpoints** hiện URL public đầy đủ theo thao tác.
+
+Sau đó tích hợp từ app với cùng token flow như [Quickstart](../quickstart.md).
 
 ## Tiếp theo
 
-→ [Deploy](../deploy/) · [FAQ](../faq.md)
+→ [Principles](../principles.md) · [Privacy](../privacy/) · [FAQ](../faq.md)

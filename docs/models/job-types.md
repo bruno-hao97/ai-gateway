@@ -1,11 +1,11 @@
 ---
 title: Job types
-description: type= query values for GET /gateway/models and POST /gateway/jobs
+description: type= query values for Gommo models list and job create
 ---
 
 # Job types
 
-Pass `type` to `GET /gateway/models?type=` and use the same value for `POST /gateway/jobs/{type}`.
+Pass `type` to `POST https://v2.api.gommo.net/ai/models?type=` and use the same value in `POST …/ai/jobs/{type}/{model_id}`.
 
 ## Media & generation
 
@@ -40,7 +40,9 @@ When polling async jobs, `media` query depends on job type:
 | `video` | `video`, video tools |
 | `music` | `music` |
 
-Gateway REST: `GET /gateway/jobs/{id}?media=image|video|music`
+```http
+POST https://v2.api.gommo.net/ai/jobs/{id_base}?media=image
+```
 
 ## Next
 

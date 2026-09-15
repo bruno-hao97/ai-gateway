@@ -1,58 +1,45 @@
 ---
 title: Features
-description: Tính năng gateway — media jobs, chat, upload, audio
+description: Khả năng Gommo — media jobs, chat, upload, audio
 ---
 
 # Features
 
-AI Gateway expose capability Gommo qua **REST** (`/gateway/*`) và **proxy** (Mode C). Section này giải thích *từng tính năng* — chi tiết API đầy đủ ở [API Reference](../reference/media.md).
+Gommo expose khả năng generation trên hai public host. Section này giải thích *từng tính năng làm gì* — chi tiết request/response đầy đủ ở [API Reference](../reference/media.md) và [Gommo public API](../reference/gommo-public-api.md).
 
 ## Bảng tính năng
 
-| Tính năng | Gateway REST | Upstream | Async? |
-|-----------|--------------|----------|--------|
-| [Media jobs](./media-jobs.md) | `/gateway/jobs/*`, `/gateway/models` | `v2.api.gommo.net` | Có — poll hoặc `wait: true` |
-| [Chat](./chat.md) | `/gateway/chat` | `api.gommo.net/api/v2/chat` | Stream tùy chọn (SSE) |
-| [Upload](./upload.md) | `/gateway/upload/*` | `v2.api.gommo.net` | Không — trả URL ngay |
-| [Audio / TTS](./audio.md) | `/gateway/audio/*` | `api.gommo.net/ai/audio` | TTS trả file URL |
+| Tính năng | Public API | Host | Async? |
+|-----------|------------|------|--------|
+| [Media jobs](./media-jobs.md) | `POST v2…/ai/models`, `…/ai/jobs/*` | `v2.api.gommo.net` | Có — client poll |
+| [Chat](./chat.md) | `POST …/api/v2/chat` | `api.gommo.net` | Stream tùy chọn (SSE) |
+| [Upload](./upload.md) | `POST …/ai/upload/image\|video` | `v2.api.gommo.net` | Không — URL ngay |
+| [Audio / TTS](./audio.md) | `POST …/ai/audio` | `api.gommo.net` | TTS trả file URL |
 
-Cần **user access token** (`Authorization: Bearer`). Xem [Authentication](../authentication.md).
-
-## Mode B vs Mode C
-
-| | Mode B REST | Mode C Proxy |
-|---|-------------|--------------|
-| Body | JSON (gateway dịch) | Form / multipart Gommo |
-| Domain | Tùy chọn — env server | Bắt buộc form |
-| Lỗi | `{ success, message, code }` | Envelope Gommo |
-| Phù hợp | Tích hợp mới | Client legacy |
-
-→ [Choosing a mode](../routing/choosing-a-mode.md)
+Mọi tính năng cần **user access token** (`Authorization: Bearer`). Xem [Authentication](../authentication.md).
 
 ## Quy tắc chung
 
-1. **List models trước** — không đoán `ratio`, `mode`, …
-2. **Không webhook** — dùng `wait: true` hoặc poll client.
-3. **Merchant token chỉ server** — billing và `/admin`.
+1. **List models trước** cho media jobs — không đoán `ratio`, `mode`, `resolution`, `duration`.
+2. **Không webhook** — poll media jobs mỗi **3.5s**, tối đa **80** lần.
+3. **Gửi `domain`** trong form body — cùng domain đăng ký tài khoản.
+4. **Merchant token chỉ server** — không trong browser.
 
-## Env mặc định
+## Tùy chọn: self-host gateway
 
-| Env | Dùng cho |
-|-----|----------|
-| `GOMMO_API_DOMAIN` | Mọi upstream (Mode B inject) |
-| `GOMMO_CHAT_SERVER`, `GOMMO_CHAT_MODEL`, `GOMMO_CHAT_AGENT_ID` | Chat |
+Repo này có thể wrap cùng upstream call thành JSON REST tại `{gateway}/gateway/*` — xem [Integration modes](../routing/integration-modes.md). Dùng cho portal billing, BYOK, hoặc dev local.
 
 ## Trong section này
 
-- [Media jobs](./media-jobs.md)
-- [Chat](./chat.md)
-- [Upload](./upload.md)
-- [Audio & TTS](./audio.md)
+- [Media jobs](./media-jobs.md) — image, video, music, upscale, …
+- [Chat](./chat.md) — agent chat và SSE streaming
+- [Upload](./upload.md) — asset ảnh/video cho jobs
+- [Audio & TTS](./audio.md) — tìm voice và text-to-speech
 
 ## API reference
 
-→ [Media](../reference/media.md) · [Chat](../reference/chat.md) · [Upload](../reference/upload.md) · [Audio](../reference/audio.md)
+→ [Media & jobs](../reference/media.md) · [Chat](../reference/chat.md) · [Upload](../reference/upload.md) · [Audio](../reference/audio.md)
 
 ## Tiếp theo
 
-→ [Models & routing](../routing/) · [Quickstart](../quickstart.md)
+→ [Models](../models/) · [Quickstart](../quickstart.md)

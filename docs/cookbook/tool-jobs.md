@@ -5,33 +5,37 @@ description: Upload source asset, list tool models, run image or video tools
 
 # Tool jobs (upscale, remove-bg)
 
-Tool jobs use the same REST shape as media jobs — only the **job `type`** and **poll `media`** change.
+Tool jobs use the same **form-urlencoded** shape as media jobs — only the **job `type`** and **poll `?media=`** change.
 
-| Tool type | Endpoint | Poll `?media=` |
-|-----------|----------|----------------|
-| `image-upscale` | `POST /gateway/jobs/image-upscale` | `image` |
-| `remove-bg` | `POST /gateway/jobs/remove-bg` | `image` |
-| `video-upscale` | `POST /gateway/jobs/video-upscale` | `video` |
-| `video-vfx`, `video-subtitle`, `video-cut` | `POST /gateway/jobs/{type}` | `video` |
+| Tool type | Create URL | Poll `?media=` |
+|-----------|------------|----------------|
+| `image-upscale` | `POST v2…/ai/jobs/image-upscale/{slug}` | `image` |
+| `remove-bg` | `POST v2…/ai/jobs/remove-bg/{slug}` | `image` |
+| `video-upscale` | `POST v2…/ai/jobs/video-upscale/{slug}` | `video` |
+| `video-vfx`, `video-subtitle`, `video-cut` | `POST v2…/ai/jobs/{type}/{slug}` | `video` |
 
 ## 1. Upload source (if needed)
 
 Many tools need an input URL first — see [Upload image](./upload-image.md).
 
 ```powershell
-$upload = curl.exe -s -X POST "http://localhost:3001/gateway/upload/image" `
+$domain = if ($env:GOMMO_API_DOMAIN) { $env:GOMMO_API_DOMAIN } else { '79ai.net' }
+$upload = curl.exe -s -X POST "https://v2.api.gommo.net/ai/upload/image" `
   -H "Authorization: Bearer $env:TOKEN" `
-  -F "file=@C:\path\to\product.png" | ConvertFrom-Json
-$imageUrl = $upload.data.url
+  -F "access_token=$env:TOKEN" -F "domain=$domain" `
+  -F "project_id=default" -F "file=@C:\path\to\product.png" | ConvertFrom-Json
+$imageUrl = $upload.data.url ?? $upload.url
 ```
 
 ## 2. List tool models
 
 ```powershell
 $type = 'remove-bg'   # or image-upscale, video-upscale, …
-$models = Invoke-RestMethod `
-  -Uri "http://localhost:3001/gateway/models?type=$type" `
-  -Headers @{ Authorization = "Bearer $env:TOKEN" }
+$models = Invoke-RestMethod -Method POST `
+  -Uri "https://v2.api.gommo.net/ai/models?type=$type" `
+  -Headers @{ Authorization = "Bearer $env:TOKEN" } `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body "type=$type&domain=$domain"
 $m = $models.data[0]
 $slug = $m.model ?? $m.slug
 ```
@@ -43,28 +47,18 @@ Add catalog fields (`ratio`, `mode`, `resolution`, …) from the model entry —
 Pass extra field names from the model catalog (e.g. image URL). Common pattern after upload:
 
 ```powershell
-$h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/json' }
-$fields = @{
-  prompt = 'Product on white background'
-  image_url = $imageUrl   # field name from catalog if required
-}
-# Add ratio/mode/resolution from catalog when present:
-# $fields.ratio = $ratio
+$h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/x-www-form-urlencoded' }
+# Field names from catalog — e.g. image_url, url, image
+$body = "domain=$domain&project_id=default&prompt=Product on white background&image_url=$imageUrl"
 
-$jobBody = @{
-  modelSlug = $slug
-  wait = $true
-  fields = $fields
-} | ConvertTo-Json -Depth 5
-
-$job = Invoke-RestMethod -Method POST `
-  -Uri "http://localhost:3001/gateway/jobs/$type" `
-  -Headers $h -Body $jobBody
-$job.data.resultUrl
+$created = Invoke-RestMethod -Method POST `
+  -Uri "https://v2.api.gommo.net/ai/jobs/$type/$slug" `
+  -Headers $h -Body $body
+$jobId = $created.imageInfo.id_base ?? $created.data.id_base
 ```
 
 ::: tip Field names
-If the catalog expects a different key (`url`, `image`, …), use that exact key from upstream — check `GET /gateway/models?type=…` or the RESPONSE in [Playground](/app/playground/).
+If the catalog expects a different key (`url`, `image`, …), use that exact key from upstream — check `POST v2…/ai/models?type=…` or the RESPONSE in [Playground](/app/playground/).
 :::
 
 ## 4. Async + poll

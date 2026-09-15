@@ -5,53 +5,61 @@ description: Minimal HTTP loop for scripts and LLM agents
 
 # Agent HTTP flow
 
-Minimal **Mode B** loop for automation — no MCP required.
+Minimal loop for automation on the **Gommo public API** — no MCP or gateway required.
 
 ## Flow
 
 ```mermaid
 flowchart LR
-  A[Login or token] --> B[GET /gateway/models]
-  B --> C[POST /gateway/jobs/type]
-  C --> D{wait?}
-  D -->|true| E[resultUrl in response]
-  D -->|false| F[GET /gateway/jobs/id]
-  F --> E
+  A[Login or token] --> B[POST v2…/ai/models]
+  B --> C[POST v2…/ai/jobs/type/slug]
+  C --> D[POST v2…/ai/jobs/id?media=]
+  D --> E[resultUrl]
 ```
 
 ## Script skeleton (PowerShell)
 
 ```powershell
-$base = 'http://localhost:3001'
-# 1. Token — login or $env:TOKEN
-$h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/json' }
+$domain = if ($env:GOMMO_API_DOMAIN) { $env:GOMMO_API_DOMAIN } else { '79ai.net' }
+$h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/x-www-form-urlencoded' }
 
-# 2. Catalog
-$models = Invoke-RestMethod "$base/gateway/models?type=image" -Headers @{ Authorization = "Bearer $env:TOKEN" }
+# 1. Catalog
+$models = Invoke-RestMethod -Method POST `
+  -Uri "https://v2.api.gommo.net/ai/models?type=image" `
+  -Headers @{ Authorization = "Bearer $env:TOKEN" } `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body "type=image&domain=$domain"
 $m = $models.data[0]
 $slug = $m.model ?? $m.slug
 $ratio = $m.ratios[0]
 if ($ratio -is [pscustomobject]) { $ratio = $ratio.value }
 
-# 3. Job
-$job = Invoke-RestMethod -Method POST -Uri "$base/gateway/jobs/image" -Headers $h -Body (@{
-  modelSlug = $slug; wait = $true
-  fields = @{ prompt = 'A red apple'; ratio = $ratio }
-} | ConvertTo-Json -Depth 5)
+# 2. Create job
+$body = "domain=$domain&project_id=default&prompt=A red apple&ratio=$ratio"
+$created = Invoke-RestMethod -Method POST `
+  -Uri "https://v2.api.gommo.net/ai/jobs/image/$slug" `
+  -Headers $h -Body $body
+$jobId = $created.imageInfo.id_base ?? $created.data.id_base
 
-# 4. Output
-$job.data.resultUrl
+# 3. Poll
+$pollBody = "access_token=$env:TOKEN&domain=$domain"
+for ($i = 1; $i -le 80; $i++) {
+  $poll = Invoke-RestMethod -Method POST `
+    -Uri "https://v2.api.gommo.net/ai/jobs/$jobId?media=image" `
+    -Headers $h -Body $pollBody
+  $url = $poll.imageInfo.result_url ?? $poll.data?.resultUrl
+  if ($url) { $url; break }
+  Start-Sleep -Seconds 3.5
+}
 ```
 
 ## Error handling
 
-Gateway returns `{ "success": false, "message": "...", "code": "..." }` — agents should read `code` before retrying.
-
-Common codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `UPSTREAM_ERROR`.
+Gommo returns upstream envelopes — agents should read `message` / status fields before retrying. Gateway Mode B adds `{ "success", "code" }` when you route through a self-hosted instance.
 
 ## MCP vs HTTP
 
-Cursor **MCP tools** (`gommo_*`) are separate from this gateway. For production integrations use HTTP — see [MCP & agents](../mcp/).
+Cursor **MCP tools** (`gommo_*`) are separate from HTTP. For production integrations use the public API — see [MCP & agents](../mcp/).
 
 ## Next
 

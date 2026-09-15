@@ -151,12 +151,12 @@ In dev, VitePress proxies `/gateway`, `/ai`, and `/billing` to `:3001`. In produ
 
 Set this when running `npm run docs:build`. It is embedded into the static bundle (not a runtime secret).
 
-| Feature | Uses `VITE_GATEWAY_URL` |
-|---------|-------------------------|
-| Models catalog / compare | `GET /gateway/models` |
-| Sign in / sign up | `POST /gateway/auth/*` |
-| Dashboard `/app/*` | `POST /ai/me`, `/billing/*` |
-| Playground embed | `{API}/portal/playground.html?embed=1` (iframe + postMessage) |
+| Feature | Primary API | Uses `VITE_GATEWAY_URL` when set |
+|---------|-------------|----------------------------------|
+| Models catalog / compare | `POST https://v2.api.gommo.net/ai/models` or [/models/](/models/) UI | Optional proxy for dev |
+| Sign in / sign up | `POST https://api.gommo.net/api/apps/go-mmo/auth/login` or [/login/](/login/) | `POST /gateway/auth/*` (self-host) |
+| Dashboard `/app/*` | `POST https://api.gommo.net/ai/me` | `/billing/*` on self-host |
+| Playground embed | Public URLs in **Endpoints** tab | `{API}/portal/playground.html?embed=1` (iframe) |
 
 **Dev** — leave unset; VitePress proxy handles API calls on `:5173`.
 

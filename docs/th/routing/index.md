@@ -5,7 +5,7 @@ description: โมเดล Gommo โฮสต์ upstream และโหม�
 
 # โมเดล & routing
 
-AI Gateway อยู่ระหว่าง client กับ **โฮสต์ upstream Gommo สองตัว** เกตเวย์ไม่โฮสต์โมเดล — คุณ **route** คำขอไปโฮสต์และโหมดที่ถูก (Direct, REST หรือ Proxy)
+การเชื่อมต่อ **แนะนำ:** เรียก **โฮสต์ upstream Gommo สองตัว** โดยตรง ทางเลือก: self-host AI Gateway (Mode B/C) สำหรับ JSON REST, portal billing หรือ BYOK
 
 ## สแต็ก routing
 
@@ -42,7 +42,7 @@ Client
 1. **ลิสต์โมเดล** — `type=image|video|music|…`
 2. **เลือก `modelSlug`** และฟิลด์ที่อนุญาต (`ratio`, `mode`, `resolution`, …) จาก response
 3. **สร้างงาน** — ห้ามเดาพารามิเตอร์
-4. **Poll** — gateway (`wait: true`) หรือ client (`GET /gateway/jobs/:id`)
+4. **Poll** — client (`POST v2…/ai/jobs/{id}?media=…`) หรือ gateway ทางเลือก (`wait: true`)
 
 ดู [ภาพรวมโมเดล](../models/) สำหรับรายละเอียดแคตตาล็อก
 
@@ -59,13 +59,13 @@ Gateway map env ไปโฮสต์เหล่านี้ รายละเ
 
 ## แผนที่ endpoint ย่อ
 
-| การดำเนินการ | โหมด B (REST) | โหมด C (proxy) | โหมด A (direct) |
-|-------------|---------------|----------------|-----------------|
-| ลิสต์โมเดล | `GET /gateway/models?type=` | `POST /v2/ai/models?type=` | `POST v2…/ai/models?type=` |
-| สร้างงาน | `POST /gateway/jobs/:type` | `POST /v2/ai/jobs/:type/:slug` | เหมือน upstream |
-| Poll งาน | `GET /gateway/jobs/:id?media=` | `POST /v2/ai/jobs/:id?media=` | เหมือน upstream |
-| แชท | `POST /gateway/chat` | `POST /api/v2/chat` | `POST api…/api/v2/chat` |
-| Login | — | `POST /api/apps/go-mmo/auth/login` | เหมือน upstream |
+| การดำเนินการ | โหมด A (Direct) | โหมด B (REST) | โหมด C (Proxy) |
+|-------------|-----------------|---------------|----------------|
+| ลิสต์โมเดล | `POST v2…/ai/models?type=` | `GET /gateway/models?type=` | `POST /v2/ai/models?type=` |
+| สร้างงาน | `POST v2…/ai/jobs/:type/:slug` | `POST /gateway/jobs/:type` | `POST /v2/ai/jobs/:type/:slug` |
+| Poll งาน | `POST v2…/ai/jobs/:id?media=` | `GET /gateway/jobs/:id?media=` | `POST /v2/ai/jobs/:id?media=` |
+| แชท | `POST api…/api/v2/chat` | `POST /gateway/chat` | `POST /api/v2/chat` |
+| Login | `POST api…/api/apps/go-mmo/auth/login` | — | `POST /api/apps/go-mmo/auth/login` |
 
 ตารางฉบับเต็ม → [แผนที่ endpoint](./endpoint-map.md)
 

@@ -5,7 +5,7 @@ description: โหมด A Direct, โหมด B REST และโหมด C 
 
 # โหมดการเชื่อมต่อ
 
-AI Gateway รองรับสามวิธีเข้าถึง Gommo ทุกโหมดใช้ **token ผู้ใช้เดียวกัน** และ **แคตตาล็อกโมเดลเดียวกัน** — ต่างแค่รูปแบบ URL และความสะดวก
+สามวิธีเข้าถึง Gommo **โหมด A Direct (แนะนำ)** เรียก `v2.api.gommo.net` และ `api.gommo.net` โดยตรง โหมด B/C ผ่าน self-host AI Gateway — ทางเลือกสำหรับ dev, portal billing หรือ BYOK
 
 ## เปรียบเทียบเร็ว
 
@@ -17,7 +17,7 @@ AI Gateway รองรับสามวิธีเข้าถึง Gommo �
 | ซ่อน URL upstream | ไม่ | ใช่ | ใช่ |
 | Poll / wrap | ทำเอง | `wait: true` ในตัว | Gommo envelope ดิบ |
 | รูปแบบ response | Gommo native | `{ success, data, message, code }` | Gommo native |
-| เหมาะสำหรับ | Backend ไม่มี gateway | การเชื่อมต่อใหม่ | FE Gommo legacy |
+| เหมาะสำหรับ | **Production — แนะนำ** | Self-host JSON REST | FE Gommo legacy drop-in |
 
 `{gateway}` = `http://localhost:3001` (dev) หรือ URL API production
 
@@ -97,7 +97,7 @@ Content-Type: application/json
 { "success": false, "message": "…", "code": "VALIDATION_ERROR" }
 ```
 
-แนะนำสำหรับ script ใหม่ SPA (พร้อม CORS ถ้า cross-origin) และ automation
+ทางเลือกเมื่อ self-host gateway — JSON REST, `wait: true`, portal billing
 
 ---
 

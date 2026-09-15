@@ -5,46 +5,56 @@ description: Upload ảnh và video cho media jobs
 
 # Upload
 
-Upload asset lên Gommo trước khi truyền URL vào media job (image-to-video, edit, …).
+Upload asset lên Gommo storage trước khi truyền URL vào media jobs (vd. image-to-video, edit workflows).
 
-## Endpoint
+## Endpoints (khuyến nghị)
 
-| Asset | REST | Proxy |
-|-------|------|-------|
-| Ảnh | `POST /gateway/upload/image` | `POST /v2/ai/upload/image` |
-| Video | `POST /gateway/upload/video` | `POST /v2/ai/upload/video` |
+| Asset | URL |
+|-------|-----|
+| Image | `POST https://v2.api.gommo.net/ai/upload/image` |
+| Video | `POST https://v2.api.gommo.net/ai/upload/video` |
 
-Auth: `Authorization: Bearer {token}`.
+Auth: `Authorization: Bearer {access_token}`. Form: `domain`, `project_id=default`, file field.
 
-Mode B: `domain` tùy chọn.
+## Multipart fields
 
-## Multipart
-
-| Loại | Field |
-|------|-------|
-| Ảnh | `file` (+ `fileName` tùy chọn) |
-| Video | `video_file` hoặc `file` |
-
-Giới hạn gateway: **50 MB**.
+| Loại | Tên field | Ghi chú |
+|------|-----------|---------|
+| Image | `file` | `fileName` tùy chọn |
+| Video | `video_file` hoặc `file` | Tuân giới hạn size upstream |
 
 ## Upload ảnh
 
 ```bash
-curl -X POST "http://localhost:3001/gateway/upload/image" \
-  -H "Authorization: Bearer TOKEN" \
+curl -X POST "https://v2.api.gommo.net/ai/upload/image" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "domain=79ai.net" \
+  -F "project_id=default" \
   -F "file=@photo.png"
 ```
 
-Response có URL dùng trong `fields` job tiếp theo.
+Response gồm URL dùng trong job form tiếp theo (tên field chính xác phụ thuộc model target).
+
+## Upload video
+
+```bash
+curl -X POST "https://v2.api.gommo.net/ai/upload/video" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "domain=79ai.net" \
+  -F "project_id=default" \
+  -F "video_file=@clip.mp4"
+```
 
 ## Luồng điển hình
 
 ```
-Upload → URL
-   ↓
-List models
-   ↓
-POST /gateway/jobs/video + wait hoặc poll
+Upload asset  →  URL trong response
+       ↓
+POST v2…/ai/models?type=video
+       ↓
+POST v2…/ai/jobs/video/{model_id}  với URL + prompt + ratio từ catalog
+       ↓
+Poll POST v2…/ai/jobs/{id}?media=video
 ```
 
 ## Portal UI
@@ -52,17 +62,16 @@ POST /gateway/jobs/video + wait hoặc poll
 Quản lý upload tại [Files](/vi/app/files/) (sidebar **Developer → Files**, badge **beta**):
 
 - Album Gommo (ảnh/video) từ library API
-- **Upload gần đây** lưu `localStorage` trên trình duyệt này
-- **Copy URL** hoặc **Copy fields** (JSON snippet cho `POST /gateway/jobs/*`)
+- **Copy URL** dùng trong job form fields
 
-## Mode C / Direct
+## Tùy chọn: self-host gateway
 
-Form: `access_token`, `domain`, `project_id=default`, `file` / `video_file`.
+`POST {gateway}/gateway/upload/image` — multipart JSON wrapper. Xem [Upload reference](../reference/upload.md).
 
 ## API đầy đủ
 
-→ [Upload reference](../reference/upload.md) · [Media jobs](./media-jobs.md)
+→ [Upload reference](../reference/upload.md) · [Gommo public API](../reference/gommo-public-api.md)
 
 ## Tiếp theo
 
-→ [Media jobs](./media-jobs.md)
+→ [Media jobs](./media-jobs.md) · [Features overview](./)

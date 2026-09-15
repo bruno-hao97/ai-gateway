@@ -433,7 +433,7 @@
       <h3 class="pg-ep-detail-h3">${pgT('ep.auth.credentials')}</h3>
       <ul class="pg-ep-detail-list">
         <li><code>Authorization: Bearer &lt;ACCESS_TOKEN&gt;</code></li>
-        <li>${pgT('ep.auth.loginVia')} <code>POST /gateway/auth/login</code></li>
+        <li>${pgT('ep.auth.loginVia')} <code>POST api.gommo.net/api/apps/go-mmo/auth/login</code></li>
       </ul>`;
   }
 

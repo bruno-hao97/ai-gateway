@@ -156,9 +156,9 @@ defineExpose({ reload });
           <p class="or-profile-section-sub">
             {{
               m(
-                'Bearer token for /gateway/* — snippets, health checks, and MCP on the Access token page.',
-                'Bearer token cho /gateway/* — snippet, health check và MCP trên trang Access token.',
-                'Bearer token สำหรับ /gateway/* — snippet, health check และ MCP ในหน้า Access token',
+                'Gommo Bearer token for api.gommo.net and v2.api.gommo.net — snippets and MCP on the Access token page.',
+                'Bearer token Gommo cho api.gommo.net và v2.api.gommo.net — snippet và MCP trên trang Access token.',
+                'Gommo Bearer token สำหรับ api.gommo.net และ v2.api.gommo.net — snippet และ MCP ในหน้า Access token',
               )
             }}
           </p>

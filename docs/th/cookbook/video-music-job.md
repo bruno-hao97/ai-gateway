@@ -1,61 +1,57 @@
 ---
-title: 'สูตร: งานวิดีโอหรือเพลง'
-description: ลิสต์โมเดลและสร้างงานวิดีโอหรือเพลง
+title: 'Recipe: งานวิดีโอหรือเพลง'
+description: ลิสต์โมเดลและสร้างงานวิดีโอ/เพลง
 ---
 
 # งานวิดีโอหรือเพลง
 
-รูปแบบ REST เหมือนรูป — เปลี่ยน `type` และ poll `media`
+รูปแบบ public API เดียวกับรูป — เปลี่ยน `type` และ poll `media`
 
 ## 1. ลิสต์โมเดล
 
 ```powershell
-# วิดีโอ
-Invoke-RestMethod `
-  -Uri "http://localhost:3001/gateway/models?type=video" `
-  -Headers @{ Authorization = "Bearer $env:TOKEN" }
+$h = @{ Authorization = "Bearer $env:TOKEN" }
 
-# เพลง
-Invoke-RestMethod `
-  -Uri "http://localhost:3001/gateway/models?type=music" `
-  -Headers @{ Authorization = "Bearer $env:TOKEN" }
+# Video
+Invoke-RestMethod -Method POST `
+  -Uri "https://v2.api.gommo.net/ai/models?type=video" `
+  -Headers $h -ContentType "application/x-www-form-urlencoded" `
+  -Body "type=video&domain=79ai.net"
+
+# Music
+Invoke-RestMethod -Method POST `
+  -Uri "https://v2.api.gommo.net/ai/models?type=music" `
+  -Headers $h -ContentType "application/x-www-form-urlencoded" `
+  -Body "type=music&domain=79ai.net"
 ```
 
-แยก `modelSlug` และฟิลด์แคตตาล็อก (`ratio`, `mode`, `duration`, …) จาก response — **ห้ามเดา**
+แยก model id และฟิลด์แคตตาล็อก (`ratio`, `mode`, `duration`, …) จาก response — **ห้ามเดา**
 
 ## 2. สร้างงานเพลง (ตัวอย่าง)
 
 ```powershell
-$h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/json' }
-$jobBody = @{
-  modelSlug = $slug
-  wait = $true
-  fields = @{
-    prompt = 'Upbeat electronic loop'
-    ratio = $ratio   # จากแคตตาล็อกถ้ามี
-  }
-} | ConvertTo-Json -Depth 5
-
+$body = "domain=79ai.net&project_id=default&prompt=Upbeat electronic loop&ratio=$ratio"
 Invoke-RestMethod -Method POST `
-  -Uri "http://localhost:3001/gateway/jobs/music" `
-  -Headers $h -Body $jobBody
+  -Uri "https://v2.api.gommo.net/ai/jobs/music/$slug" `
+  -Headers $h -ContentType "application/x-www-form-urlencoded" `
+  -Body $body
 ```
 
-วิดีโอ: `POST /gateway/jobs/video` ด้วยโมเดล `type=video`
+วิดีโอ: `POST https://v2.api.gommo.net/ai/jobs/video/{model_id}` กับโมเดล `type=video`
 
 ## 3. Poll media
 
 | ประเภทงาน | `?media=` |
 |-----------|-----------|
-| `video`, `avatar-lipsync`, เครื่องมือ `video-*` | `video` |
+| `video`, `avatar-lipsync`, `video-*` tools | `video` |
 | `music` | `music` |
 | `image`, `image-upscale`, `remove-bg` | `image` |
 
 ## Playground
 
-Sidebar **Music job** หรือ **Video job** → ดึงโมเดลประเภทเดียวกันก่อน
+Sidebar **Music job** หรือ **Video job** → fetch models ประเภทเดียวกันก่อน
 
 ## ถัดไป
 
-- [Poll async](./job-poll-async.md)
+- [Async poll](./job-poll-async.md)
 - [อ้างอิงมีเดีย](../reference/media.md)

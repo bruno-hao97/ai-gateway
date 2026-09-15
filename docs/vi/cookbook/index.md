@@ -34,7 +34,7 @@ $h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/x-www
 
 | Recipe | Mục tiêu |
 |--------|----------|
-| [Image job đầu tiên (wait)](./image-job-wait.md) | Login → models → image, server poll |
+| [Image job đầu tiên](./image-job-wait.md) | Login → models → image + client poll |
 | [Job async + poll loop](./job-poll-async.md) | `wait: false` → poll thủ công / loop |
 
 ### Media

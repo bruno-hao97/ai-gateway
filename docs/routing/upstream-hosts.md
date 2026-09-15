@@ -5,7 +5,7 @@ description: Gommo v2 and platform hosts — env vars and routing rules
 
 # Upstream hosts
 
-Gommo exposes **two HTTP bases**. AI Gateway routes each mount to the correct upstream based on server env — clients using Mode B never need to know the hostnames.
+Gommo exposes **two HTTP bases**. **Production integrations call them directly** — clients using optional gateway Modes B/C route through your deploy.
 
 ## Host map
 
@@ -35,13 +35,29 @@ Body: `application/x-www-form-urlencoded` with `domain`, `project_id`, job field
 ### `api.gommo.net` (platform)
 
 - `POST {GOMMO_AUTH_PATH}/auth/login` — user login
-- `POST {GOMMO_AUTH_PATH}/ai/me` — profile + credits
+- `POST /ai/me` — profile + credits
 - `POST /api/v2/chat` — chat (supports SSE stream)
 - `POST /ai/audio` — voices, TTS lists
 
 Auth: Bearer for `/api/v2/*`; form `access_token` (+ Bearer where required) for platform routes.
 
-## Gateway proxy mounts (Mode C)
+## Direct calls (Mode A — recommended)
+
+```
+POST https://v2.api.gommo.net/ai/jobs/image/flux-dev
+  Authorization: Bearer {token}
+  domain=79ai.net&prompt=...
+
+POST https://api.gommo.net/api/v2/chat
+  action=chat&access_token={token}&domain=79ai.net&...
+
+POST https://api.gommo.net/api/apps/go-mmo/auth/login
+  email=...&password=...&domain=79ai.net
+```
+
+→ [Gommo public API](../reference/gommo-public-api.md)
+
+## Gateway proxy mounts (Mode C — optional)
 
 | Client path on gateway | Upstream base | Notes |
 |------------------------|---------------|-------|
@@ -70,7 +86,7 @@ POST /api/apps/go-mmo/auth/login
 - **Streaming** — pipe response when URL contains `/chat` or `Content-Type: text/event-stream`
 - **Errors** — proxy failures return `502 { success: false, message }`
 
-## Mode B REST mapping
+## Mode B REST mapping (optional)
 
 Mode B does not expose raw upstream paths. Instead, `/gateway/*` calls the same upstream hosts internally:
 
@@ -86,4 +102,4 @@ See [Endpoint map](./endpoint-map.md) for the full table.
 
 ## Next
 
-→ [Integration modes](./integration-modes.md) · [Choosing a mode](./choosing-a-mode.md)
+→ [Gommo public API](../reference/gommo-public-api.md) · [Integration modes](./integration-modes.md) · [Choosing a mode](./choosing-a-mode.md)

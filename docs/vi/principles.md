@@ -1,101 +1,100 @@
 ---
 title: Nguyên tắc
-description: Nguyên tắc thiết kế cốt lõi của AI Gateway
+description: Nguyên tắc cốt lõi khi tích hợp Gommo public API
 ---
 
 # Nguyên tắc
 
-Nguyên tắc cốt lõi khi xây dựng trên AI Gateway — nền tảng **API** kiểu OpenRouter trên [Gommo](https://gommo.net). Đọc trước khi chọn [integration mode](./routing/integration-modes.md).
+Nguyên tắc cốt lõi khi xây dựng trên [Gommo](https://gommo.net) — đọc trước [Quickstart](./quickstart.md) hoặc [Models](./models/).
 
 ## Luồng request
 
 ```
 App của bạn
   │
-  ├─ Mode A (direct) ──► v2.api.gommo.net  (jobs · models · upload)
-  │                   └─► api.gommo.net    (login · chat · audio)
+  ├─ v2.api.gommo.net  ──► models · create/poll jobs · upload image/video
   │
-  └─ Mode B/C ──► AI Gateway (tùy chọn)
-                    ├─► v2.api.gommo.net
-                    └─► api.gommo.net
+  └─ api.gommo.net     ──► login · /ai/me · chat · audio · job info
 ```
 
-## Vì sao AI Gateway?
+Tùy chọn: self-host [AI Gateway](./routing/integration-modes.md) (Mode B/C) cho JSON REST, billing portal, BYOK — không bắt buộc khi tích hợp Gommo trực tiếp.
 
-Gommo có **hai upstream host** và nhiều kiểu auth (Bearer cho V2 jobs, form `access_token` cho platform API). AI Gateway giúp integrator:
+## Hai upstream host
 
-- **Một API deploy được** — ẩn URL upstream, tập trung env và secret.
-- **REST dự đoán được** — JSON in/out, lỗi có cấu trúc, poll phía server tùy chọn (`wait: true`).
-- **Mặc định an toàn** — domain và merchant credential ở server.
+| Host | Dùng cho |
+|------|----------|
+| **`https://v2.api.gommo.net`** | Models, create/poll media jobs, upload |
+| **`https://api.gommo.net`** | Login, profile/credits, chat, platform audio |
+
+Auth: **`Authorization: Bearer <access_token>`** qua HTTPS. Form platform và V2 gồm **`domain`** (cùng domain đăng ký tài khoản).
 
 ## Nguyên tắc thiết kế
 
-### 1. Giao diện thống nhất
+### 1. Gọi URL public Gommo
 
-Client chỉ gọi `{gateway}`:
+Integrator nhắm thẳng upstream host. Bản đồ đầy đủ → [Gommo public API](./reference/gommo-public-api.md).
 
-| Dev | Production |
-|-----|------------|
-| `http://localhost:3001` | `https://api.yourdomain.com` |
-
-Mapping upstream ghi trong [Models & routing](./routing/) — client Mode B/C không nên hard-code `v2.api.gommo.net` trong app.
+| Thao tác | URL |
+|----------|-----|
+| List models | `POST https://v2.api.gommo.net/ai/models?type={type}` |
+| Create job | `POST https://v2.api.gommo.net/ai/jobs/{type}/{model_id}` |
+| Poll job | `POST https://v2.api.gommo.net/ai/jobs/{id}?media={media}` |
+| Login | `POST https://api.gommo.net/api/apps/go-mmo/auth/login` |
+| Me / credits | `POST https://api.gommo.net/ai/me` |
 
 ### 2. Không đoán tham số model
 
-`ratio`, `mode`, `resolution`, `duration` **bắt buộc** lấy từ catalog:
+`ratio`, `mode`, `resolution`, và `duration` **bắt buộc** lấy từ catalog model:
 
 ```http
-GET /gateway/models?type=image
-Authorization: Bearer {user_token}
+POST https://v2.api.gommo.net/ai/models?type=image
+Authorization: Bearer {access_token}
+Content-Type: application/x-www-form-urlencoded
+
+type=image&domain=79ai.net
 ```
 
-Đoán giá trị sẽ bị upstream từ chối hoặc chất lượng kém. Xem [Models](./models/).
+Đoán giá trị gây upstream từ chối hoặc chất lượng kém. Xem [Models](./models/).
 
 ### 3. Job async, poll rõ ràng
 
-Job media Gommo không webhook về app. Gateway:
+Job media Gommo không push webhook về app mặc định. Client phải poll:
 
-- Tạo job upstream.
-- Poll khi `wait: true` (**3500ms** interval, tối đa **80** lần).
-- Trả `resultUrl` hoặc lỗi timeout.
+- **3500 ms** interval
+- **80** lần tối đa (~5 phút)
+- `POST …/ai/jobs/{id}?media=…` đến trạng thái terminal
 
-Client `wait: false` phải tự poll `GET /gateway/jobs/:id?media=…` với cùng quy tắc.
+Gateway self-host có thể poll phía server (`wait: true`) — xem [Integration modes](./routing/integration-modes.md).
 
-### 4. Domain thuộc server (Mode B)
+### 4. Domain trong mọi form body
 
-`GOMMO_API_DOMAIN` trong `.env` gateway được inject khi client bỏ qua `domain`.
+Gửi `domain` khớp domain đăng ký (vd. `79ai.net`, `vmedia`). Domain sai → lỗi auth hoặc thanh toán.
 
-Mode C (proxy) và Mode A (direct) vẫn cần `domain` trong form — dùng domain đăng ký tài khoản Gommo.
+Docs portal multi-tenant có thể khóa domain theo dealer — xem [Tenants](./routing/upstream-hosts.md).
 
-### 5. Merchant vs user credential
+### 5. User vs merchant credential
 
 | Credential | Vị trí | Dùng cho |
 |------------|--------|----------|
-| User `access_token` | Client Bearer / form | `/gateway/*`, proxy user routes |
-| `GOMMO_ACCESS_TOKEN` | Server env only | `/admin/*`, fulfillment PayOS legacy |
-| `ADMIN_API_KEY` | Server env only | Bảo vệ `/admin/*` |
+| User `access_token` | Client Bearer / form | Mọi user API call |
+| `GOMMO_ACCESS_TOKEN` | Server env only | Merchant ops, catalog translate warm |
+| `ADMIN_API_KEY` | Server env only | Self-hosted `/admin/*` |
 
 Không expose merchant hoặc admin secret ra browser/mobile.
 
-### 6. Billing tách khỏi generation
+### 6. Billing trên platform auth host
 
-Nạp credit ở **`/billing/*`**, không phải `/gateway`. **Mặc định:** Gommo `create_payment` + client `payment_sync` (chuyển khoản VietQR). **Legacy tùy chọn:** webhook PayOS → `sendBalances` nội bộ. Xem [Billing & credits](./guides/billing-credits.md).
+Nạp credit dùng Gommo `create_payment` + `payment_sync` trên **`api.gommo.net`**. Site docs có thể wrap billing dưới `/billing/*` khi self-host — xem [Billing & credits](./guides/billing-credits.md).
 
-### 7. Lỗi đáng tin cậy
+### 7. Lỗi upstream
 
-REST trả:
-
-```json
-{ "success": false, "message": "…", "code": "VALIDATION_ERROR" }
-```
-
-Code thường gặp: `UNAUTHORIZED`, `UPSTREAM_ERROR`, `RATE_LIMITED`, `NOT_CONFIGURED`, `INSUFFICIENT_CREDITS`.
+Gommo trả JSON với `message`, `success`, `error`. Kiểm tra HTTP status và body — không retry credential không đổi khi auth fail.
 
 ## Ưu tiên
 
-- **Tốc độ integrator** — quickstart vài phút, playground tại `/portal/`.
-- **Vận hành rõ ràng** — health check, log có cấu trúc, Docker deploy.
-- **Trung thành upstream** — proxy Mode C giữ envelope Gommo khi cần drop-in.
+- **Tốc độ integrator** — [Quickstart](./quickstart.md) vài phút, [Playground](/vi/app/playground/) với URL public
+- **Trung thành catalog** — không bịa enum; list models trước
+- **Host rõ ràng** — v2 cho media, api cho auth/chat/audio
 
 ## Tiếp theo
 

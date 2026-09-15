@@ -2,11 +2,12 @@
 import { computed, ref } from 'vue';
 import { useHybridLocale } from '../composables/use-hybrid-locale';
 import {
+  clearAuth,
   getStoredDomain,
   getStoredToken,
   loginWithEmail,
   registerAccount,
-  setStoredToken,
+  saveAndVerifyToken,
   readRedirectFromLocation,
 } from '../models/auth-api';
 import { fetchMe } from '../models/user-api';
@@ -42,14 +43,6 @@ const pasteToken = ref(getStoredToken());
 
 const isSignup = computed(() => props.mode === 'signup');
 
-async function prefetchProfile() {
-  try {
-    await fetchMe();
-  } catch {
-    /* Overview will retry — avoid blocking redirect */
-  }
-}
-
 async function onSubmit() {
   error.value = '';
   loading.value = true;
@@ -57,8 +50,7 @@ async function onSubmit() {
     if (tokenMode.value) {
       const pasted = pasteToken.value.trim();
       if (!pasted) throw new Error(t('Enter a token', 'Nhập token', 'ใส่โทเค็น'));
-      setStoredToken(pasted);
-      await prefetchProfile();
+      await saveAndVerifyToken(pasted);
       window.location.href = afterAuthRedirect();
       return;
     }
@@ -77,9 +69,10 @@ async function onSubmit() {
     } else {
       await loginWithEmail(email.value, password.value);
     }
-    await prefetchProfile();
+    await fetchMe();
     window.location.href = afterAuthRedirect();
   } catch (e) {
+    clearAuth();
     error.value = e instanceof Error ? e.message : String(e);
   } finally {
     loading.value = false;

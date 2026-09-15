@@ -25,7 +25,7 @@ description: วิธีรายงาน bug และปัญหา upstrea
 |-------|----------|
 | **Environment** | local / Railway / Fly, Node version |
 | **Mode** | B REST / C proxy / direct upstream |
-| **Endpoint** | `POST /gateway/jobs/image` |
+| **Endpoint** | `POST https://v2.api.gommo.net/ai/jobs/image/{model_id}` (หรือ `{gateway}/gateway/jobs/image` เมื่อ dev) |
 | **Request** | Redact tokens — แสดงเฉพาะรูปแบบ JSON |
 | **Response** | Error envelope เต็ม |
 | **Expected** | สิ่งที่คาดหวังแทน |

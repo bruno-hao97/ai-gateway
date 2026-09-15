@@ -19,7 +19,7 @@ Remote MCP at `https://api.gommo.net/api/v2/gommo-mcp` — **10 `gommo_*` tools*
 | **Claude Desktop** | ✅ | [Other hosts](./other-hosts.md) |
 | **Windsurf** | ✅ | [Other hosts](./other-hosts.md) |
 | **VS Code / Zed** | ⚠️ Depends on extension | [Other hosts](./other-hosts.md) |
-| **Apps / backends** | HTTP, not MCP | [`/gateway/*`](../routing/endpoint-map.md) |
+| **Apps / backends** | HTTP, not MCP | [Gommo public API](../reference/gommo-public-api.md) · [Quickstart](../quickstart.md) |
 
 ## 10 tools when connected
 
@@ -57,11 +57,11 @@ Templates: [Cursor](/mcp-cursor-79ai.example.json) · [Claude](/mcp-claude-79ai.
 
 ## MCP vs HTTP
 
-| | **79ai MCP** | **HTTP `/gateway/*`** |
-|---|-------------|----------------------|
+| | **79ai MCP** | **HTTP (Gommo public API)** |
+|---|-------------|---------------------------|
 | Cursor / Claude / IDE | ✅ | ❌ |
 | Website / mobile / scripts | ❌ | ✅ |
-| Needs gateway running | ❌ | ✅ (deployed API) |
+| Needs self-host gateway | ❌ | ❌ (call `v2.api.gommo.net` / `api.gommo.net`) |
 
 Same login token — different integration style.
 

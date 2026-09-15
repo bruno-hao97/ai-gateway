@@ -18,13 +18,9 @@ Create: `POST https://v2.api.gommo.net/ai/jobs/image/{model_id}` (form body). Po
 Assume `$env:TOKEN`, `$slug`, `$ratio` from [First image job](./image-job-wait.md).
 
 ```powershell
+$domain = if ($env:GOMMO_API_DOMAIN) { $env:GOMMO_API_DOMAIN } else { '79ai.net' }
 $h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/x-www-form-urlencoded' }
-$body = @{
-  access_token = $env:TOKEN
-  domain = '79ai.net'
-  prompt = 'A cute cat'
-  ratio = $ratio
-} | ForEach-Object { $_ }
+$body = "domain=$domain&project_id=default&prompt=A cute cat&ratio=$ratio"
 
 $created = Invoke-RestMethod -Method POST `
   -Uri "https://v2.api.gommo.net/ai/jobs/image/$slug" `
@@ -37,7 +33,7 @@ Write-Host "jobId=$jobId"
 ## 2. Poll once
 
 ```powershell
-$pollBody = @{ access_token = $env:TOKEN; domain = '79ai.net' }
+$pollBody = "access_token=$env:TOKEN&domain=$domain"
 $poll = Invoke-RestMethod -Method POST `
   -Uri "https://v2.api.gommo.net/ai/jobs/$jobId?media=image" `
   -Headers $h -Body $pollBody

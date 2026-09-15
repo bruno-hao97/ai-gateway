@@ -29,11 +29,8 @@ Source: `packages/gateway-client`. Local dev: `npm run client:build` then `npm i
 
 ## When to use Client SDKs
 
-- **Backend / scripts** — typed calls instead of raw curl
-- **Browser apps** — same origin or CORS-enabled gateway
-- **Polling helpers** — `pollUntilDone`, `createAndPoll` when `wait: false`
-
-For copy-paste recipes without a package, use [Cookbook](../cookbook/).
+- **Self-hosted gateway (Mode B)** — typed calls to `/gateway/*` and `/billing/*`
+- **Direct Gommo integration** — use [Gommo public API](../reference/gommo-public-api.md) with `fetch` or OpenAPI-generated clients (recommended for production)
 
 ::: info Agent SDK
 AI Gateway does **not** ship a separate Agent SDK yet. Multi-turn agents: use `client.chat` + your orchestration, or [MCP & agents](../mcp/) for Cursor IDE tools.

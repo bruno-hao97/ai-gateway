@@ -19,7 +19,7 @@ MCP remote tại `https://api.gommo.net/api/v2/gommo-mcp` — **10 tool** `gommo
 | **Claude Desktop** | ✅ | [Host khác](./other-hosts.md) |
 | **Windsurf** | ✅ | [Host khác](./other-hosts.md) |
 | **VS Code / Zed** | ⚠️ Tùy extension | [Host khác](./other-hosts.md) |
-| **App / backend** | HTTP, không MCP | [`/gateway/*`](/vi/routing/endpoint-map.md) |
+| **App / backend** | HTTP, không MCP | [Gommo public API](/vi/reference/gommo-public-api.md) · [Quickstart](/vi/quickstart.md) |
 
 ## 10 tools khi connected
 
@@ -57,11 +57,11 @@ Mẫu: [Cursor](/mcp-cursor-79ai.example.json) · [Claude](/mcp-claude-79ai.exam
 
 ## MCP vs HTTP
 
-| | **79ai MCP** | **HTTP `/gateway/*`** |
-|---|-------------|----------------------|
+| | **79ai MCP** | **HTTP (Gommo public API)** |
+|---|-------------|---------------------------|
 | IDE (Cursor, Claude…) | ✅ | ❌ |
 | Web / mobile / script | ❌ | ✅ |
-| Cần gateway | ❌ | ✅ |
+| Cần self-host gateway | ❌ | ❌ (gọi `v2.api.gommo.net` / `api.gommo.net`) |
 
 Cùng token — khác cách tích hợp. [Self-hosted](./self-hosted.md) — tùy chọn nâng cao.
 

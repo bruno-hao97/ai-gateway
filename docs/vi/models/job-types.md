@@ -1,11 +1,11 @@
 ---
 title: Job types
-description: Giá trị type= cho GET /gateway/models và POST /gateway/jobs
+description: Giá trị type= cho Gommo models list và job create
 ---
 
 # Job types
 
-Truyền `type` vào `GET /gateway/models?type=` và dùng cùng giá trị cho `POST /gateway/jobs/{type}`.
+Truyền `type` vào `POST https://v2.api.gommo.net/ai/models?type=` và dùng cùng giá trị trong `POST …/ai/jobs/{type}/{model_id}`.
 
 ## Media & generation
 
@@ -13,7 +13,7 @@ Truyền `type` vào `GET /gateway/models?type=` và dùng cùng giá trị cho 
 |--------|----------|
 | `image` | Text-to-image, edit |
 | `video` | Text/image-to-video |
-| `tts` | Text-to-speech |
+| `tts` | Text-to-speech jobs |
 | `music` | Tạo nhạc |
 | `avatar-lipsync` | Avatar nói |
 
@@ -28,19 +28,21 @@ Truyền `type` vào `GET /gateway/models?type=` và dùng cùng giá trị cho 
 | `video-subtitle` | Phụ đề |
 | `video-cut` | Cắt video |
 
-Endpoint map đầy đủ → [Media reference](../reference/media.md).
+Endpoint map đầy đủ và poll media theo type → [Media & jobs reference](../reference/media.md).
 
 ## Poll media
 
 Khi poll job async, query `media` phụ thuộc loại job:
 
-| `media` poll | Job types |
+| Poll `media` | Job types |
 |--------------|-----------|
 | `image` | `image`, tool trên ảnh |
 | `video` | `video`, tool video |
 | `music` | `music` |
 
-Gateway REST: `GET /gateway/jobs/{id}?media=image|video|music`
+```http
+POST https://v2.api.gommo.net/ai/jobs/{id_base}?media=image
+```
 
 ## Tiếp theo
 

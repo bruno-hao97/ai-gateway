@@ -1,149 +1,102 @@
 ---
-title: ???????????????
-description: รูปแบบ integration — polling, CORS, rate limits และพารามิเตอร์โมเดล
+title: Best practices
+description: รูปแบบการเชื่อมต่อ — polling, auth และพารามิเตอร์โมเดลบน Gommo
 ---
 
 # Best practices
 
-รูปแบบที่แนะนำสำหรับ integration AI Gateway ที่เชื่อถือได้ — สรุปจากพฤติกรรม upstream Gommo และการออกแบบ gateway
+รูปแบบที่แนะนำสำหรับการเชื่อมต่อ **Gommo public API** ที่เชื่อถือได้
 
 ## 1. รายการโมเดลก่อน job เสมอ
 
 ห้าม hard-code หรือเดา `ratio`, `mode`, `resolution` หรือ `duration`
 
 ```http
-GET /gateway/models?type=image
-Authorization: Bearer {token}
+POST https://v2.api.gommo.net/ai/models?type=image
+Authorization: Bearer {access_token}
+Content-Type: application/x-www-form-urlencoded
+
+type=image&domain=79ai.net
 ```
 
 ใช้ค่าจาก array ใน response ของ **โมเดลนั้น** ค่าผิดทำให้ upstream ปฏิเสธหรือผลลัพธ์ไม่ดี
 
 → [Models](../models/) · [Media jobs](../features/media-jobs.md)
 
-## 2. เลือกกลยุทธ์ polling อย่างชัดเจน
+## 2. Poll อย่างชัดเจน
 
 | กลยุทธ์ | ใช้เมื่อ |
 |---------|---------|
-| `wait: true` ตอน create | Scripts, backend ง่าย, agents — HTTP round-trip เดียว |
-| Client poll `GET /gateway/jobs/:id` | Job ยาว, UI มี progress bar, รองรับ cancel |
-| Mode C / Direct | คุณ implement 3.5s × 80 ครั้ง (~5 นาทีสูงสุด) |
+| Client poll `POST …/ai/jobs/{id}?media=…` | ทุกการเชื่อมต่อ direct — **3500 ms** × **80** สูงสุด |
+| UI มี progress | poll loop เดียวกัน แสดงสถานะจาก response |
+| Self-host `wait: true` | gateway JSON ทางเลือก — HTTP round-trip เดียว |
 
-Gommo **ไม่ webhook** เมื่อ job เสร็จ วางแผน timeout และแสดงทาง retry ให้ผู้ใช้
+Gommo **ไม่ webhook** เมื่องานเสร็จโดยค่าเริ่มต้น วางแผน timeout และทาง retry ให้ผู้ใช้
 
-Gateway poll default: interval **3500 ms**, สูงสุด **80** ครั้ง
+## 3. ใช้ public API โดยตรงเป็นหลัก
 
-## 3. ใช้ Mode B สำหรับ client ใหม่
-
-เลือก `/gateway/*` JSON ยกเว้นมี Gommo FE legacy:
-
-- Structured errors (`code`, `message`)
-- `domain` inject จาก server (optional)
-- Auth สม่ำเสมอ (`Authorization: Bearer`)
-
-→ [Choosing a mode](../routing/choosing-a-mode.md)
+เรียก **`v2.api.gommo.net`** และ **`api.gommo.net`** จาก backend หรือ client ที่เชื่อถือได้ self-host [AI Gateway](../routing/integration-modes.md) เฉพาะเมื่อต้องการ portal billing, BYOK หรือ JSON REST wrapper
 
 ## 4. เก็บ secrets บน server
 
 | ทำ | ห้าม |
 |----|------|
 | Login จาก backend หรือใช้ user token อายุสั้น | ส่ง `GOMMO_ACCESS_TOKEN` ไป browser |
-| เรียก `/admin` จาก cron/internal tools เท่านั้น | Expose `x-admin-key` ใน frontend |
-| เก็บ PayOS keys ใน deploy secrets | Commit `.env` |
+| เก็บ merchant keys ใน deploy secrets เท่านั้น | Commit `.env` |
+| ใช้ user Bearer สำหรับ generation | Expose admin keys ใน frontend |
 
 → [Privacy & security](../privacy/)
 
-## 5. CORS เฉพาะเมื่อจำเป็น
+## 5. CORS เมื่อ browser เรียก Gommo cross-origin
 
-**ไม่ต้อง CORS สำหรับ:**
+browser เรียก `v2.api.gommo.net` โดยตรงต้องการ CORS policy ของ Gommo รูปแบบทั่วไป: **backend ของคุณ** proxy user token ไป Gommo
 
-- Server-side clients (Node, Python, curl)
-- Same-origin `/portal` playground (`localhost:3001/portal`)
+[Playground](/th/app/playground/) same-origin ใช้ site proxy สำหรับความสะดวกใน dev
 
-**ตั้ง `GATEWAY_CORS_ORIGIN` เมื่อ:**
+## 6. Chat: ส่ง messages เสมอ
 
-- Browser SPA บน origin อื่น (เช่น `https://app.example.com`)
-- หลาย origin คั่นด้วย comma: `https://a.com,https://b.com`
+upstream ต้องการ `messages` ไม่ว่างสำหรับ chat:
 
-`GATEWAY_CORS_ORIGIN` ว่าง = ไม่ mount CORS middleware — browser cross-origin จะล้มเหลว (ตาม design)
+```
+POST https://api.gommo.net/api/v2/chat
+Content-Type: application/x-www-form-urlencoded
 
-## 6. เคารพ rate limits
-
-Default ต่อ IP (ตั้งผ่าน env):
-
-| Scope | Default | Env |
-|-------|---------|-----|
-| `/gateway/*` | 120 req / min | `GATEWAY_RATE_LIMIT_MAX` |
-| `/admin/*` | 30 req / min | `ADMIN_RATE_LIMIT_MAX` |
-| `/billing/*` | 60 req / min | `BILLING_RATE_LIMIT_MAX` |
-| Window | 60 s | `GATEWAY_RATE_LIMIT_WINDOW_MS` |
-
-เมื่อ `429` response:
-
-```json
-{ "success": false, "message": "Too many requests", "code": "RATE_LIMITED" }
+access_token=…&domain=79ai.net&action=chat&query=Hello&messages=[…]
 ```
 
-ใช้ exponential backoff ใน client; batch admin operations
-
-## 7. Chat: ส่ง messages เสมอ
-
-Upstream ต้องการ `messages` ไม่ว่างสำหรับ `action=chat`:
-
-```json
-{
-  "action": "chat",
-  "query": "Hello",
-  "messages": [{ "role": "user", "text": "Hello" }]
-}
-```
-
-สำหรับ streaming ใช้ `action=stream` และ consume SSE — ไม่ buffer response เต็มใน client ที่หันไป gateway
+สำหรับ streaming ใช้ `action=stream` และ consume SSE
 
 → [Chat](../features/chat.md)
 
-## 8. Upload ก่อน job เมื่อจำเป็น
+## 7. Upload ก่อน job เมื่อจำเป็น
 
-Flow image-to-video และแก้ไข:
+flow image-to-video และแก้ไข:
 
-1. Upload → ได้ URL
-2. ส่ง URL ใน `fields` ของ job (ชื่อฟิลด์จาก model catalog)
-3. Create job พร้อม `wait` หรือ poll
+1. `POST https://v2.api.gommo.net/ai/upload/image` (หรือ video) → ได้ URL
+2. ส่ง URL ใน job form (ชื่อฟิลด์จากแคตตาล็อกโมเดล)
+3. สร้างงานและ poll
 
-เคารพขีด body **50 MB** บน proxy/upload routes
+## 8. จัดการข้อผิดพลาด upstream
 
-## 9. จัดการ errors สม่ำเสมอ
+ตรวจ `success`, `message` และ HTTP status ไม่ retry credential เดิมเมื่อ auth ล้มเหลว
 
-ตรวจ `success` และ `code` บน Mode B:
+| อาการ | การดำเนินการทั่วไป |
+|-------|-------------------|
+| Token / domain errors | Login ใหม่ ตรวจโดเมนลงทะเบียน |
+| Validation | แก้ form fields จากแคตตาล็อก |
+| Insufficient credits | Top up ผ่าน platform payment |
+| Rate limit | Back off |
 
-| Code | การดำเนินการทั่วไป |
-|------|-------------------|
-| `UNAUTHORIZED` | Refresh หรือ login ใหม่ |
-| `VALIDATION_ERROR` | แก้ request body |
-| `INSUFFICIENT_CREDITS` | แนะนำ topup หรือ admin send |
-| `UPSTREAM_ERROR` | Retry พร้อม backoff; ตรวจสถานะ Gommo |
-| `RATE_LIMITED` | Back off |
-| `NOT_CONFIGURED` | แก้ server env (admin, merchant; PayOS เฉพาะ legacy topup) |
+## 9. แยก billing จาก generation
 
-## 10. Health check ก่อน deploy
+เติมเครดิตใช้ endpoint payment บน **`api.gommo.net`** site docs อาจ expose `/billing/*` เมื่อ self-host — ดู [Billing & เครดิต](../guides/billing-credits.md)
 
-```bash
-curl https://api.yourdomain.com/health
-```
+## 10. ทดสอบด้วย playground ก่อน
 
-ตรวจ `merchantConfigured` และ `adminConfigured` ตรงความคาดหวังก่อนเปิด billing หรือ admin tools
+[/th/app/playground/](/th/app/playground/) — แท็บ **Endpoints** แสดง URL public ฉบับเต็มต่อการดำเนินการ
 
-## 11. แยก billing จาก generation
+จากนั้น integrate จากแอปด้วย token flow เดียวกับ [เริ่มต้นใช้งาน](../quickstart.md)
 
-ใช้ `/billing/*` สำหรับเติม credits — **Gommo VietQR เป็น default** (`/billing/payment/*`) ไม่ใช่ `/gateway` PayOS legacy (`/billing/topup/*`) เป็นทางเลือก แยก payment flow จาก media/chat APIs
+## ถัดไป
 
-## 12. ทดสอบด้วย playground ก่อน
-
-Dev same-origin หลีกเลี่ยงตั้ง CORS:
-
-[/app/playground/](/app/playground/) — login บน docs site
-
-จากนั้น integrate จากแอปด้วย token flow เดียวกับ [Quickstart](../quickstart.md)
-
-## ขั้นตอนถัดไป
-
-→ [Deploy & ops](../deploy/) · [Privacy](../privacy/) · [FAQ](../faq.md)
+→ [หลักการ](../principles.md) · [Privacy](../privacy/) · [FAQ](../faq.md)

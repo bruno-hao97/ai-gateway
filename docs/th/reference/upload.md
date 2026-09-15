@@ -1,83 +1,54 @@
 ---
-title: อัปโหลด
-description: endpoint อัปโหลดรูปและวิดีโอ
+title: Upload
+description: อัปโหลดรูปและวิดีโอบน Gommo V2
 ---
 
-# อัปโหลด
+# Upload
 
-| การดำเนินการ | Gommo (Direct) | Gateway REST | Gateway proxy |
-|-------------|----------------|--------------|---------------|
-| อัปโหลดรูป | `POST https://v2.api.gommo.net/ai/upload/image` | `POST /gateway/upload/image` | `POST /v2/ai/upload/image` |
-| อัปโหลดวิดีโอ | `POST https://v2.api.gommo.net/ai/upload/video` | `POST /gateway/upload/video` | `POST /v2/ai/upload/video` |
+| การดำเนินการ | Gommo public API (แนะนำ) | Gateway (ทางเลือก) |
+|-----------|------------------------|-------------------|
+| Upload image | `POST https://v2.api.gommo.net/ai/upload/image` | `POST /gateway/upload/image` |
+| Upload video | `POST https://v2.api.gommo.net/ai/upload/video` | `POST /gateway/upload/video` |
 
-REST auth: `Authorization: Bearer {token}` Domain REST: ทางเลือก (ฟิลด์ multipart `domain` เพื่อ override)
-
-ฟิลด์ multipart:
-
-| ประเภท | ฟิลด์ |
-|--------|-------|
-| รูป | `file` (+ `fileName` ทางเลือก) |
-| วิดีโอ | `video_file` หรือ `file` |
+Auth: `Authorization: Bearer` และ/หรือ form `access_token` multipart มี `domain`, `project_id`
 
 ---
 
-## อัปโหลดรูป
+## Upload image
 
 ::: code-group
-
-```bash [curl — REST]
-curl.exe -X POST "http://localhost:3001/gateway/upload/image" ^
-  -H "Authorization: Bearer %TOKEN%" ^
-  -F "file=@C:\path\to\photo.png"
-```
-
-```powershell [PowerShell]
-curl.exe -X POST "http://localhost:3001/gateway/upload/image" `
-  -H "Authorization: Bearer $env:TOKEN" `
-  -F "file=@C:\path\to\photo.png"
-```
 
 ```bash [curl — Direct]
 curl.exe -X POST "https://v2.api.gommo.net/ai/upload/image" ^
   -H "Authorization: Bearer %TOKEN%" ^
-  -F "access_token=%TOKEN%" -F "domain=%GOMMO_API_DOMAIN%" ^
-  -F "project_id=default" -F "file=@photo.png"
+  -F "domain=79ai.net" -F "project_id=default" -F "file=@photo.png"
 ```
 
-```bash [curl — Proxy]
-curl.exe -X POST "http://localhost:3001/v2/ai/upload/image" ^
-  -H "Authorization: Bearer %TOKEN%" ^
-  -F "access_token=%TOKEN%" -F "domain=%GOMMO_API_DOMAIN%" ^
-  -F "file=@photo.png"
+```powershell [PowerShell — Direct]
+$d = if ($env:GOMMO_API_DOMAIN) { $env:GOMMO_API_DOMAIN } else { '79ai.net' }
+curl.exe -X POST "https://v2.api.gommo.net/ai/upload/image" `
+  -H "Authorization: Bearer $env:TOKEN" `
+  -F "domain=$d" -F "project_id=default" -F "file=@photo.png"
 ```
 
 :::
 
 ---
 
-## อัปโหลดวิดีโอ
+## Upload video
 
 ::: code-group
-
-```bash [curl — REST]
-curl.exe -X POST "http://localhost:3001/gateway/upload/video" ^
-  -H "Authorization: Bearer %TOKEN%" ^
-  -F "video_file=@C:\path\to\clip.mp4"
-```
-
-```powershell [PowerShell]
-curl.exe -X POST "http://localhost:3001/gateway/upload/video" `
-  -H "Authorization: Bearer $env:TOKEN" `
-  -F "video_file=@C:\path\to\clip.mp4"
-```
 
 ```bash [curl — Direct]
 curl.exe -X POST "https://v2.api.gommo.net/ai/upload/video" ^
   -H "Authorization: Bearer %TOKEN%" ^
-  -F "access_token=%TOKEN%" -F "domain=%GOMMO_API_DOMAIN%" ^
-  -F "project_id=default" -F "video_file=@clip.mp4"
+  -F "domain=79ai.net" -F "project_id=default" -F "video_file=@clip.mp4"
 ```
 
 :::
 
-Response มี URL สาธารณะสำหรับฟิลด์งานมีเดีย (ชื่อฟิลด์จากแคตตาล็อกโมเดล)
+---
+
+## ทางเลือก: self-host gateway
+
+→ [Gommo public API](./gommo-public-api.md) · [Upload recipe](../cookbook/upload-image.md)

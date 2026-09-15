@@ -1,89 +1,62 @@
 ---
 title: เสียง & TTS
-description: ค้นหาเสียงและ text-to-speech ผ่าน /gateway/audio
+description: ค้นหาเสียงและ text-to-speech บน Gommo platform API
 ---
 
 # เสียง & TTS
 
-Text-to-speech และค้นหาเสียงผ่าน platform audio API ของ Gommo ต่างจากงานมีเดีย V2 — route เสียงไป **`api.gommo.net`**
+text-to-speech และค้นหาเสียงผ่าน platform audio API ของ Gommo บน **`https://api.gommo.net/ai/audio`**
 
-## Endpoints (โหมด B)
+## Endpoint
 
-| การดำเนินการ | Method | Path |
-|-------------|--------|------|
-| ค้นหาเสียง | `POST` | `/gateway/audio/voices` |
-| Text-to-speech | `POST` | `/gateway/audio/tts` |
-| ลิสต์ประวัติ | `GET` | `/gateway/audio/lists` |
+ทุกการดำเนินการใช้ **`POST https://api.gommo.net/ai/audio`** พร้อม form fields (`access_token` หรือ Bearer, `domain`, `action_type`, …)
 
-Auth: `Authorization: Bearer {user_access_token}`
+Auth: `Authorization: Bearer {access_token}`
 
-เทียบเท่า proxy: `POST /ai/audio` ด้วยฟิลด์ form `action_type`
-
-## ผู้ให้บริการเสียง
+## Voice providers
 
 ค่า `server` ทั่วไป:
 
 | Server | หมายเหตุ |
 |--------|----------|
-| `elevenlabs_cheap` | เสียง ElevenLabs |
+| `elevenlabs_cheap` | ElevenLabs voices |
 | `minimaxai_cheap` | MiniMax |
-| `omnivoice_local` | Omnivoice local |
+| `omnivoice_local` | Local Omnivoice |
 
 ค้นหาเสียงก่อน TTS เพื่อได้ `voice_id` ที่ถูกต้อง
 
 ## ค้นหาเสียง
 
 ```http
-POST /gateway/audio/voices
-Authorization: Bearer {token}
-Content-Type: application/json
+POST https://api.gommo.net/ai/audio
+Content-Type: application/x-www-form-urlencoded
 
-{
-  "server": "elevenlabs_cheap",
-  "page": 0
-}
+access_token=…&domain=79ai.net&action_type=search_voices&server=elevenlabs_cheap&page=0
 ```
 
-เลือก `voice_id` จาก `data.voices[]`
+เลือก `voice_id` จากรายการ voices ใน response
 
 ## Text-to-speech
 
 ```http
-POST /gateway/audio/tts
-Authorization: Bearer {token}
-Content-Type: application/json
+POST https://api.gommo.net/ai/audio
+Content-Type: application/x-www-form-urlencoded
 
-{
-  "text": "Hello world",
-  "voice_id": "VOICE_ID_FROM_SEARCH",
-  "server": "elevenlabs_cheap",
-  "model": "eleven_multilingual_v2"
-}
+access_token=…&domain=79ai.net&action_type=tts&text=Hello world&voice_id=…&server=elevenlabs_cheap
 ```
 
-Response สำเร็จมี **`data.fileUrl`** — ลิงก์ตรงไปไฟล์เสียงที่สร้าง
+response สำเร็จมี **`fileUrl`** — ลิงก์ตรงไปยัง audio ที่สร้าง
 
-## ประวัติเสียง
+## vs media `tts` job type
 
-```http
-GET /gateway/audio/lists
-Authorization: Bearer {token}
-```
+Gommo ยังมี `type=tts` ภายใต้ **งานมีเดีย V2** (`POST v2…/ai/jobs/tts/{model_id}`) ใช้:
 
-คืนการสร้าง TTS ก่อนหน้าของผู้ใช้
-
-## เทียบกับงานมีเดีย `type=tts`
-
-Gommo ยังมี `type=tts` ภายใต้ **งานมีเดีย V2** (`/gateway/jobs/tts`) ใช้:
-
-- **`/gateway/audio/*`** — platform TTS พร้อมค้นหาเสียง (หน้านี้)
-- **`/gateway/jobs/tts`** — pipeline งาน V2 พร้อมแคตตาล็อกโมเดลและ semantics poll
-
-ดู [งานมีเดีย](./media-jobs.md) สำหรับ flow งาน async
+- **`/ai/audio`** — platform TTS พร้อมค้นหาเสียง (หน้านี้)
+- **V2 tts jobs** — job pipeline พร้อมแคตตาล็อกโมเดลและ semantics poll
 
 ## API ฉบับเต็ม
 
-→ [อ้างอิงเสียง](../reference/audio.md) · [แผนที่ endpoint](../routing/endpoint-map.md)
+→ [อ้างอิงเสียง](../reference/audio.md) · [Gommo public API](../reference/gommo-public-api.md)
 
 ## ถัดไป
 

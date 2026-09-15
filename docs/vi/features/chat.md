@@ -1,69 +1,58 @@
 ---
 title: Chat
-description: Agent chat và SSE streaming qua /gateway/chat
+description: Agent chat với SSE streaming tùy chọn trên Gommo platform API
 ---
 
 # Chat
 
-Chat AI qua platform Gommo. Gateway REST wrap `POST /api/v2/chat` — Mode C giữ form upstream.
+Chat AI qua platform chat API Gommo trên **`https://api.gommo.net`**.
 
-## Endpoint
+## Endpoint (khuyến nghị)
 
-| Mode | Path |
-|------|------|
-| REST | `POST /gateway/chat` |
-| Proxy | `POST /api/v2/chat` |
+```http
+POST https://api.gommo.net/api/v2/chat
+Authorization: Bearer {access_token}
+Content-Type: application/x-www-form-urlencoded
 
-Auth: `Authorization: Bearer {token}`.
+action=chat&domain=79ai.net&query=Hello&messages=[{"role":"user","text":"Hello"}]
+```
+
+Form có thể dùng `access_token` thay Bearer header — cùng token.
 
 ## Actions
 
 | `action` | Hành vi |
 |----------|---------|
 | `chat` | Response JSON một lần |
-| `stream` | **SSE** — gateway pipe không buffer |
-| `set_model` | Đổi model session |
+| `stream` | **SSE** stream |
+| `set_model` | Đổi chat model cho session |
+| `agent` | **set_model** (best-effort) rồi **chat** — text agent flow |
+| `models` | List chat models có sẵn |
 
-## Request REST
+## Messages không rỗng
 
-```json
-{
-  "action": "chat",
-  "query": "Xin chào",
-  "messages": [{ "role": "user", "text": "Xin chào" }]
-}
-```
-
-::: warning messages không rỗng
-Upstream yêu cầu **ít nhất một** `{ "role": "user", "text": "..." }`.
-:::
-
-`domain` không cần trong body REST — gateway dùng `GOMMO_API_DOMAIN`.
-
-## Env mặc định
-
-| Env | Mục đích |
-|-----|----------|
-| `GOMMO_CHAT_SERVER` | Server chat |
-| `GOMMO_CHAT_MODEL` | Model id |
-| `GOMMO_CHAT_AGENT_ID` | Agent id |
+Upstream `action=chat` yêu cầu **`messages` có ít nhất một entry** — vd. `{ "role": "user", "text": "..." }`.
 
 ## Streaming
 
-`"action": "stream"` → SSE token-by-token. Gateway pipe khi URL có `/chat` hoặc SSE content-type.
-
-## Mode C
-
-Form: `action=chat&access_token=…&domain=…&query=…`
+Đặt `action=stream` cho SSE token-by-token. Consume stream trên client — không kỳ vọng một JSON body.
 
 ## Credits
 
-Chat tiêu credit user Gommo. Kiểm tra qua `/api/apps/go-mmo/ai/me`.
+Chat tiêu credit user Gommo. Kiểm tra số dư qua `POST https://api.gommo.net/ai/me`.
+
+## Portal chat
+
+[/vi/app/chat/](/vi/app/chat/) dùng cùng upstream API. Lịch sử chat trong portal **chỉ local** — export/import JSON từ sidebar để backup.
+
+## Tùy chọn: self-host gateway
+
+JSON wrapper tại `POST {gateway}/gateway/chat` — xem [Chat reference](../reference/chat.md) phần Mode B.
 
 ## API đầy đủ
 
-→ [Chat reference](../reference/chat.md)
+→ [Chat reference](../reference/chat.md) · [Gommo public API](../reference/gommo-public-api.md)
 
 ## Tiếp theo
 
-→ [Audio](./audio.md) · [Media jobs](./media-jobs.md)
+→ [Audio & TTS](./audio.md) · [Media jobs](./media-jobs.md)

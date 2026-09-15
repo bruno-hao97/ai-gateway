@@ -42,7 +42,7 @@ type ConnectionStatus = 'idle' | 'checking' | 'connected' | 'error';
 const revealToken = ref(false);
 const copied = ref(false);
 const copiedSnippet = ref<SnippetTab | ''>('');
-const activeTab = ref<SnippetTab>('gateway');
+const activeTab = ref<SnippetTab>('curl');
 const accountStatus = ref<ConnectionStatus>('idle');
 const gommoV2Status = ref<ConnectionStatus>('idle');
 const accountMessage = ref('');
@@ -203,11 +203,11 @@ const lastVerifiedLabel = computed(() => {
 });
 
 const snippetTabs = computed(() => [
-  { id: 'gateway' as const, label: 'Gateway' },
-  { id: 'auth' as const, label: 'Authorization' },
   { id: 'curl' as const, label: 'curl (Gommo)' },
   { id: 'javascript' as const, label: 'JavaScript' },
   { id: 'python' as const, label: 'Python' },
+  { id: 'auth' as const, label: 'Authorization' },
+  { id: 'gateway' as const, label: m('Gateway (dev)', 'Gateway (dev)', 'Gateway (dev)') },
   { id: 'mcp' as const, label: 'MCP JSON' },
 ]);
 
@@ -350,21 +350,21 @@ async function testConnection() {
   await Promise.all([checkAccount(), checkGommoV2()]);
   if (accountStatus.value === 'connected') {
     connectionSuccess.value = m(
-      'Gateway connected — token is valid.',
-      'Kết nối gateway OK — token hợp lệ.',
-      'เชื่อมต่อเกตเวย์สำเร็จ — โทเค็นถูกต้อง',
+      'Gommo account connected — token is valid.',
+      'Kết nối tài khoản Gommo OK — token hợp lệ.',
+      'เชื่อมต่อบัญชี Gommo สำเร็จ — โทเค็นถูกต้อง',
     );
     if (gommoV2Status.value !== 'connected') {
       connectionV2Hint.value = m(
-        'Direct Jobs API (v2) unreachable from browser — use gateway or curl.',
-        'Jobs API trực tiếp (v2) không kiểm tra được từ browser — dùng gateway hoặc curl.',
-        'Jobs API (v2) โดยตรงไม่สามารถตรวจสอบจากเบราว์เซอร์ — ใช้เกตเวย์หรือ curl',
+        'v2 catalog check skipped from browser (CORS) — use curl or the snippets below.',
+        'Không kiểm tra catalog v2 từ browser (CORS) — dùng curl hoặc snippet bên dưới.',
+        'ข้ามการตรวจ catalog v2 จากเบราว์เซอร์ (CORS) — ใช้ curl หรือ snippet ด้านล่าง',
       );
     }
   } else if (accountStatus.value === 'error') {
     connectionError.value =
       accountMessage.value ||
-      m('Could not connect to gateway.', 'Không kết nối được gateway.', 'ไม่สามารถเชื่อมต่อเกตเวย์');
+      m('Could not verify Gommo token.', 'Không xác minh được token Gommo.', 'ไม่สามารถยืนยันโทเค็น Gommo');
   }
 }
 

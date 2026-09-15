@@ -1,51 +1,44 @@
 ---
 title: 'Recipe: Chat + stream'
-description: Agent chat và SSE streaming qua gateway
+description: Agent chat và SSE streaming qua Gommo platform API
 ---
 
 # Chat + stream
 
-`POST /gateway/chat` — upstream yêu cầu **`messages` không rỗng**.
+`POST https://api.gommo.net/api/v2/chat` — upstream yêu cầu **`messages` không rỗng**.
 
 ## Chat (JSON response)
 
 ```powershell
-$h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/json' }
-$body = @{
-  action = 'chat'
-  query = 'Say hello in one short sentence.'
-  messages = @(@{ role = 'user'; text = 'Say hello in one short sentence.' })
-} | ConvertTo-Json -Depth 5
-
+$h = @{ Authorization = "Bearer $env:TOKEN" }
+$body = "action=chat&domain=79ai.net&query=Say hello in one short sentence.&messages=[{\"role\":\"user\",\"text\":\"Say hello in one short sentence.\"}]"
 Invoke-RestMethod -Method POST `
-  -Uri "http://localhost:3001/gateway/chat" `
-  -Headers $h -Body $body
+  -Uri "https://api.gommo.net/api/v2/chat" `
+  -Headers $h `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body $body
 ```
 
 Tùy chọn: truyền `sessionId` từ response trước cho multi-turn.
 
 ## Stream (SSE)
 
-Dùng `curl -N` để đọc stream trên terminal:
+Dùng `curl -N` đọc stream trên terminal:
 
 ```powershell
-$body = @{
-  action = 'stream'
-  query = 'Tell a very short story.'
-  messages = @(@{ role = 'user'; text = 'Tell a very short story.' })
-} | ConvertTo-Json -Depth 5
-
-curl.exe -N -X POST "http://localhost:3001/gateway/chat" `
-  -H "Authorization: Bearer $env:TOKEN" `
-  -H "Content-Type: application/json" `
-  -d $body
+curl.exe -N -X POST "https://api.gommo.net/api/v2/chat" ^
+  -H "Authorization: Bearer %TOKEN%" ^
+  -H "Content-Type: application/x-www-form-urlencoded" ^
+  -d "action=stream&domain=79ai.net&query=Tell a very short story.&messages=[{\"role\":\"user\",\"text\":\"Tell a very short story.\"}]"
 ```
 
-Gateway pipe SSE không buffer.
+## Tùy chọn: gateway dev
+
+`POST http://localhost:3001/gateway/chat` — JSON wrapper khi self-host local.
 
 ## Playground
 
-Panel **Chat** → action **stream** → Run request.
+**Chat** panel → action **stream** → Run request.
 
 ## Tiếp theo
 

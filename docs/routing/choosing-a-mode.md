@@ -5,7 +5,7 @@ description: Decision guide — Direct vs REST vs Proxy for your integration
 
 # Choosing a mode
 
-Pick the integration mode once per client surface. You can mix modes across different apps (e.g. Mode C for legacy web, Mode B for a new admin tool) — they share the same tokens and catalog.
+Pick the integration mode once per client surface. All modes share the same tokens and catalog.
 
 ## Decision tree
 
@@ -13,37 +13,38 @@ Pick the integration mode once per client surface. You can mix modes across diff
 Do you already have a Gommo frontend using /v2 and /api/v2 paths?
 ├─ YES → Mode C (change base URL to gateway only)
 └─ NO
-    ├─ Do you want JSON, structured errors, and optional wait: true?
-    │   ├─ YES → Mode B REST (/gateway/*)
+    ├─ Can you call Gommo upstream directly (recommended)?
+    │   ├─ YES → Mode A Direct (v2.api.gommo.net + api.gommo.net)
     │   └─ NO
-    │       └─ Can you call Gommo upstream directly (trusted backend)?
-    │           ├─ YES → Mode A Direct
-    │           └─ NO → Mode B (simplest path through gateway)
+    │       └─ Do you need billing, BYOK, or wait: true on a self-hosted server?
+    │           ├─ YES → Mode B REST (/gateway/*)
+    │           └─ NO → Mode A Direct (simplest — no gateway dependency)
 ```
 
 ## By use case
 
 | Use case | Recommended | Why |
 |----------|-------------|-----|
-| New SPA or mobile app (via your backend) | **Mode B** | JSON, `wait: true`, domain on server |
+| **New app or backend** | **Mode A** | Public API, no gateway dependency |
+| Mobile app (via your backend) | **Mode A** | Direct upstream; you control poll |
+| Internal batch scripts | **Mode A** or **Mode B** | A = no infra; B = `wait: true` on self-host |
 | Existing site-ai / Gommo FE client | **Mode C** | Minimal code change — swap base URL |
-| Internal batch scripts | **Mode B** | Easier error handling and polling |
-| Service that must not depend on gateway | **Mode A** | Direct upstream; you implement poll |
-| Browser playground (dev) | **Mode B or C** | Same-origin `/portal` — no CORS |
-| Cross-origin browser app | **Mode B** + `GATEWAY_CORS_ORIGIN` | REST + CORS config on gateway |
-| LLM agent / automation | **Mode B** | Structured `{ code, message }` for retries |
+| Service needing gateway billing / BYOK | **Mode B** | VietQR, BYOK, JSON errors |
+| Browser playground (dev) | **Mode A** or **B/C** | Playground shows public URLs; dev may proxy |
+| Cross-origin browser + self-host | **Mode B** + `GATEWAY_CORS_ORIGIN` | REST + CORS on gateway |
+| LLM agent / automation | **Mode A** or **79ai MCP** | Direct HTTP or hosted MCP tools |
 
 ## Trade-offs
 
-### Mode A — Direct
+### Mode A — Direct (recommended)
 
-**Pros:** No gateway dependency; lowest latency hop count.  
-**Cons:** Two hostnames in client config; manual polling; expose upstream URLs; `domain` in every form.
+**Pros:** No gateway dependency; lowest latency; official Gommo hosts.  
+**Cons:** Two hostnames in client config; manual polling; `domain` in every form.
 
 ### Mode B — REST
 
-**Pros:** One path prefix; JSON; built-in poll; optional domain injection; consistent errors.  
-**Cons:** Different API shape from raw Gommo — not drop-in for legacy FE.
+**Pros:** One path prefix; JSON; built-in poll; optional domain injection; billing/BYOK.  
+**Cons:** Requires self-hosted gateway; different API shape from raw Gommo.
 
 ### Mode C — Proxy
 
@@ -54,21 +55,21 @@ Do you already have a Gommo frontend using /v2 and /api/v2 paths?
 
 | From → To | Effort |
 |-----------|--------|
-| C → B | Medium — rewrite calls to `/gateway/*` JSON |
 | A → B | Medium — point to gateway, adopt JSON bodies |
+| C → B | Medium — rewrite calls to `/gateway/*` JSON |
+| B → A | Low — use public hosts, form bodies + client poll |
 | B → C | Low for media — map REST back to `/v2` paths |
-| Any → A | Low — remove gateway from URL config |
 
 Tokens and model slugs stay the same across modes.
 
 ## Checklist before you commit
 
 - [ ] Listed models for your job `type` and copied `ratio` from response
-- [ ] Confirmed where `domain` is sent (client vs server env)
-- [ ] Planned polling strategy (`wait: true` vs client poll)
-- [ ] CORS configured if browser is on another origin (Mode B)
+- [ ] Confirmed where `domain` is sent (client form for Mode A)
+- [ ] Planned polling strategy (client poll 3.5s / 80 attempts, or gateway `wait: true`)
+- [ ] CORS configured only if browser calls self-hosted gateway (Mode B)
 - [ ] Merchant token **not** in client (only user Bearer)
 
 ## Next
 
-→ [Integration modes](./integration-modes.md) · [Quickstart](../quickstart.md) · [FAQ](../faq.md)
+→ [Gommo public API](../reference/gommo-public-api.md) · [Integration modes](./integration-modes.md) · [Quickstart](../quickstart.md)

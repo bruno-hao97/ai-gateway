@@ -1,149 +1,102 @@
 ---
 title: Best practices
-description: Integration patterns — polling, CORS, rate limits, and model parameters
+description: Integration patterns — polling, auth, and model parameters on Gommo
 ---
 
 # Best practices
 
-Recommended patterns for reliable AI Gateway integrations — distilled from Gommo upstream behavior and gateway design.
+Recommended patterns for reliable **Gommo public API** integrations.
 
 ## 1. Always list models before jobs
 
 Never hard-code or guess `ratio`, `mode`, `resolution`, or `duration`.
 
 ```http
-GET /gateway/models?type=image
-Authorization: Bearer {token}
+POST https://v2.api.gommo.net/ai/models?type=image
+Authorization: Bearer {access_token}
+Content-Type: application/x-www-form-urlencoded
+
+type=image&domain=79ai.net
 ```
 
 Use values from **that model's** response arrays. Wrong values cause upstream rejection or poor output.
 
 → [Models](../models/) · [Media jobs](../features/media-jobs.md)
 
-## 2. Choose polling strategy explicitly
+## 2. Poll explicitly
 
 | Strategy | When to use |
 |----------|-------------|
-| `wait: true` on create | Scripts, simple backends, agents — one HTTP round-trip |
-| Client poll `GET /gateway/jobs/:id` | Long jobs, UI with progress bar, cancel support |
-| Mode C / Direct | You implement 3.5s × 80 attempts (~5 min max) |
+| Client poll `POST …/ai/jobs/{id}?media=…` | All direct integrations — **3500 ms** × **80** max |
+| UI with progress | Same poll loop; show status from response |
+| Self-host `wait: true` | Optional gateway JSON — one HTTP round-trip |
 
-Gommo **does not webhook** job completion. Plan for timeouts and show users a retry path.
+Gommo **does not webhook** job completion by default. Plan for timeouts and show users a retry path.
 
-Default gateway poll: **3500 ms** interval, **80** max attempts.
+## 3. Prefer direct public API
 
-## 3. Use Mode B for new clients
-
-Prefer `/gateway/*` JSON unless you have a legacy Gommo FE:
-
-- Structured errors (`code`, `message`)
-- Optional `domain` injection from server
-- Consistent auth (`Authorization: Bearer`)
-
-→ [Choosing a mode](../routing/choosing-a-mode.md)
+Call **`v2.api.gommo.net`** and **`api.gommo.net`** from your backend or trusted client. Self-host [AI Gateway](../routing/integration-modes.md) only when you need portal billing, BYOK, or JSON REST wrapper.
 
 ## 4. Keep secrets on the server
 
 | Do | Don't |
 |----|-------|
 | Login from backend or use short-lived user tokens | Ship `GOMMO_ACCESS_TOKEN` to browser |
-| Call `/admin` from cron/internal tools only | Expose `x-admin-key` in frontend |
-| Store PayOS keys in deploy secrets | Commit `.env` |
+| Store merchant keys in deploy secrets only | Commit `.env` |
+| Use user Bearer for generation | Expose admin keys in frontend |
 
 → [Privacy & security](../privacy/)
 
-## 5. CORS only when needed
+## 5. CORS when browser calls Gommo cross-origin
 
-**No CORS required for:**
+Direct browser calls to `v2.api.gommo.net` require Gommo CORS policy. Typical pattern: **your backend** proxies user token to Gommo.
 
-- Server-side clients (Node, Python, curl)
-- Same-origin `/portal` playground (`localhost:3001/portal`)
+Same-origin docs [Playground](/app/playground/) uses site proxy for dev convenience.
 
-**Set `GATEWAY_CORS_ORIGIN` when:**
+## 6. Chat: always send messages
 
-- Browser SPA on another origin (e.g. `https://app.example.com`)
-- Comma-separate multiple origins: `https://a.com,https://b.com`
+Upstream requires non-empty `messages` for chat:
 
-Empty `GATEWAY_CORS_ORIGIN` = CORS middleware not mounted — browser cross-origin calls will fail (by design).
+```
+POST https://api.gommo.net/api/v2/chat
+Content-Type: application/x-www-form-urlencoded
 
-## 6. Respect rate limits
-
-Per-IP defaults (configurable via env):
-
-| Scope | Default | Env |
-|-------|---------|-----|
-| `/gateway/*` | 120 req / min | `GATEWAY_RATE_LIMIT_MAX` |
-| `/admin/*` | 30 req / min | `ADMIN_RATE_LIMIT_MAX` |
-| `/billing/*` | 60 req / min | `BILLING_RATE_LIMIT_MAX` |
-| Window | 60 s | `GATEWAY_RATE_LIMIT_WINDOW_MS` |
-
-On `429`, response:
-
-```json
-{ "success": false, "message": "Too many requests", "code": "RATE_LIMITED" }
+access_token=…&domain=79ai.net&action=chat&query=Hello&messages=[…]
 ```
 
-Implement exponential backoff in clients; batch admin operations.
-
-## 7. Chat: always send messages
-
-Upstream requires non-empty `messages` for `action=chat`:
-
-```json
-{
-  "action": "chat",
-  "query": "Hello",
-  "messages": [{ "role": "user", "text": "Hello" }]
-}
-```
-
-For streaming, use `action=stream` and consume SSE — do not buffer the full response in gateway-facing clients.
+For streaming, use `action=stream` and consume SSE.
 
 → [Chat](../features/chat.md)
 
-## 8. Upload before job when needed
+## 7. Upload before job when needed
 
 Image-to-video and edit flows:
 
-1. Upload → get URL
-2. Pass URL in job `fields` (field name from model catalog)
-3. Create job with `wait` or poll
+1. `POST https://v2.api.gommo.net/ai/upload/image` (or video) → get URL
+2. Pass URL in job form (field name from model catalog)
+3. Create job and poll
 
-Respect **50 MB** body limit on proxy/upload routes.
+## 8. Handle upstream errors
 
-## 9. Handle errors consistently
+Check `success`, `message`, and HTTP status. Do not retry unchanged credentials on auth failures.
 
-Check `success` and `code` on Mode B:
+| Symptom | Typical action |
+|---------|----------------|
+| Token / domain errors | Re-login; verify registration domain |
+| Validation | Fix form fields from catalog |
+| Insufficient credits | Top up via platform payment |
+| Rate limit | Back off |
 
-| Code | Typical action |
-|------|----------------|
-| `UNAUTHORIZED` | Refresh or re-login |
-| `VALIDATION_ERROR` | Fix request body |
-| `INSUFFICIENT_CREDITS` | Prompt topup or admin send |
-| `UPSTREAM_ERROR` | Retry with backoff; check Gommo status |
-| `RATE_LIMITED` | Back off |
-| `NOT_CONFIGURED` | Fix server env (admin, merchant; PayOS only for legacy topup) |
+## 9. Separate billing from generation
 
-## 10. Health check before deploy
+Credit top-up uses **`api.gommo.net`** payment endpoints. This docs site may expose `/billing/*` when self-hosted — see [Billing & credits](../guides/billing-credits.md).
 
-```bash
-curl https://api.yourdomain.com/health
-```
+## 10. Test with playground first
 
-Verify `merchantConfigured` and `adminConfigured` match expectations before enabling billing or admin tools.
-
-## 11. Separate billing from generation
-
-Use `/billing/*` for credit top-up — **Gommo VietQR by default** (`/billing/payment/*`), not `/gateway`. Legacy PayOS (`/billing/topup/*`) is optional. Keeps payment flows isolated from media/chat APIs.
-
-## 12. Test with playground first
-
-Same-origin dev tests avoid CORS setup:
-
-[/app/playground/](/app/playground/) — sign in on the docs site.
+[/app/playground/](/app/playground/) — **Endpoints** tab shows full public URLs per operation.
 
 Then integrate from your app with the same token flow as [Quickstart](../quickstart.md).
 
 ## Next
 
-→ [Deploy & ops](../deploy/) · [Privacy](../privacy/) · [FAQ](../faq.md)
+→ [Principles](../principles.md) · [Privacy](../privacy/) · [FAQ](../faq.md)

@@ -5,7 +5,7 @@ description: Mode A Direct, Mode B REST, Mode C Proxy
 
 # Integration modes
 
-Ba cách gọi Gommo qua gateway. Cùng user token và catalog — khác URL và ergonomics.
+Ba cách gọi Gommo. **Mode A Direct (khuyến nghị)** gọi `v2.api.gommo.net` và `api.gommo.net` trực tiếp. Mode B/C qua self-host AI Gateway — tùy chọn cho dev, portal billing, hoặc BYOK.
 
 ## So sánh nhanh
 
@@ -17,7 +17,7 @@ Ba cách gọi Gommo qua gateway. Cùng user token và catalog — khác URL và
 | Ẩn upstream | Không | Có | Có |
 | Poll / wrap | Tự implement | `wait: true` | Envelope Gommo |
 | Response | Gommo native | `{ success, data, message, code }` | Gommo native |
-| Phù hợp | Backend không gateway | Tích hợp mới | FE Gommo drop-in |
+| Phù hợp | **Production — khuyến nghị** | Self-host JSON REST | FE Gommo legacy drop-in |
 
 ---
 
@@ -66,7 +66,7 @@ Domain tự điền từ `GOMMO_API_DOMAIN` nếu client không gửi.
 
 Auth: `Authorization: Bearer {user_access_token}`.
 
-Khuyến nghị cho script, SPA, automation mới.
+Tùy chọn khi self-host gateway — JSON REST, `wait: true`, portal billing.
 
 ---
 

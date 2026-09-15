@@ -229,9 +229,9 @@ onMounted(() => {
         <p class="or-compare-sub">
           {{
             m(
-              'Compare credits, catalog parameters, and job types — same data as GET /gateway/models.',
-              'So sánh credits, tham số catalog và loại job — cùng nguồn GET /gateway/models.',
-              'เปรียบเทียบเครดิต พารามิเตอร์แคตตาล็อก และประเภทงาน — ข้อมูลเดียวกับ GET /gateway/models',
+              'Compare credits, catalog parameters, and job types — same data as POST v2.api.gommo.net/ai/models.',
+              'So sánh credits, tham số catalog và loại job — cùng nguồn POST v2.api.gommo.net/ai/models.',
+              'เปรียบเทียบเครดิต พารามิเตอร์แคตตาล็อก และประเภทงาน — ข้อมูลเดียวกับ POST v2.api.gommo.net/ai/models',
             )
           }}
         </p>

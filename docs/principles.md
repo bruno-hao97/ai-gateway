@@ -1,101 +1,100 @@
 ---
 title: Principles
-description: Core design principles of AI Gateway
+description: Core principles for integrating with Gommo public API
 ---
 
 # Principles
 
-Core principles for building on AI Gateway — an OpenRouter-style **API platform** over [Gommo](https://gommo.net). Read this before choosing [integration mode](./routing/integration-modes.md).
+Core principles for building on [Gommo](https://gommo.net) — read this before [Quickstart](./quickstart.md) or [Models](./models/).
 
 ## Request flow
 
 ```
 Your app
   │
-  ├─ Mode A (direct) ──► v2.api.gommo.net  (jobs · models · upload)
-  │                   └─► api.gommo.net    (login · chat · audio)
+  ├─ v2.api.gommo.net  ──► models · create/poll jobs · upload image/video
   │
-  └─ Mode B/C ──► AI Gateway (optional)
-                    ├─► v2.api.gommo.net
-                    └─► api.gommo.net
+  └─ api.gommo.net     ──► login · /ai/me · chat · audio · job info
 ```
 
-## Why AI Gateway?
+Optional: self-host [AI Gateway](./routing/integration-modes.md) (Mode B/C) for JSON REST, billing portal, BYOK — not required for direct Gommo integration.
 
-Gommo exposes **two upstream hosts** and mixed auth styles (Bearer for V2 jobs, form `access_token` for platform APIs). AI Gateway gives integrators:
+## Two upstream hosts
 
-- **One deployable API** — hide upstream URLs, centralize env and secrets.
-- **Predictable REST** — JSON in/out, structured errors, optional server-side poll (`wait: true`).
-- **Safe defaults** — domain and merchant credentials stay on the server.
+| Host | Use for |
+|------|---------|
+| **`https://v2.api.gommo.net`** | Models, create/poll media jobs, upload |
+| **`https://api.gommo.net`** | Login, profile/credits, chat, platform audio |
+
+Auth: **`Authorization: Bearer <access_token>`** on HTTPS. Platform and V2 form bodies include **`domain`** (same as account registration domain).
 
 ## Design principles
 
-### 1. Unified interface
+### 1. Call Gommo public URLs
 
-Clients target `{gateway}` only:
+Integrators target upstream hosts directly. Full map → [Gommo public API](./reference/gommo-public-api.md).
 
-| Dev | Production |
-|-----|------------|
-| `http://localhost:3001` | `https://api.yourdomain.com` |
-
-Upstream mapping is documented in [Models & routing](./routing/) — clients should not hard-code `v2.api.gommo.net` in app code when using Mode B/C.
+| Operation | URL |
+|-----------|-----|
+| List models | `POST https://v2.api.gommo.net/ai/models?type={type}` |
+| Create job | `POST https://v2.api.gommo.net/ai/jobs/{type}/{model_id}` |
+| Poll job | `POST https://v2.api.gommo.net/ai/jobs/{id}?media={media}` |
+| Login | `POST https://api.gommo.net/api/apps/go-mmo/auth/login` |
+| Me / credits | `POST https://api.gommo.net/ai/me` |
 
 ### 2. Never guess model parameters
 
-`ratio`, `mode`, `resolution`, and `duration` **must** come from the model catalog returned by:
+`ratio`, `mode`, `resolution`, and `duration` **must** come from the model catalog:
 
 ```http
-GET /gateway/models?type=image
-Authorization: Bearer {user_token}
+POST https://v2.api.gommo.net/ai/models?type=image
+Authorization: Bearer {access_token}
+Content-Type: application/x-www-form-urlencoded
+
+type=image&domain=79ai.net
 ```
 
 Guessing values causes upstream rejection or silent quality issues. See [Models](./models/).
 
 ### 3. Async jobs, explicit polling
 
-Gommo media jobs do not push webhooks to your app. The gateway:
+Gommo media jobs do not push webhooks to your app by default. Your client must poll:
 
-- Creates the job upstream.
-- Optionally polls when `wait: true` ( **3500ms** interval, **80** max attempts).
-- Returns `resultUrl` or a timeout error.
+- **3500 ms** interval
+- **80** max attempts (~5 min)
+- `POST …/ai/jobs/{id}?media=…` until terminal status
 
-Clients that set `wait: false` must poll `GET /gateway/jobs/:id?media=…` themselves with the same semantics.
+Optional hosted gateway can poll server-side (`wait: true`) — see [Integration modes](./routing/integration-modes.md).
 
-### 4. Domain belongs on the server (Mode B)
+### 4. Domain in every form body
 
-`GOMMO_API_DOMAIN` in gateway `.env` is injected when the client omits `domain`. This reduces client bugs and keeps registration domain consistent.
+Send `domain` matching the domain you registered on (e.g. `79ai.net`, `vmedia`). Wrong domain → auth or payment errors.
 
-Mode C (proxy) and Mode A (direct) still require `domain` in form bodies — use the same value as your Gommo account registration domain.
+Multi-tenant docs portal may lock domain per dealer — see [Tenants](./routing/upstream-hosts.md).
 
-### 5. Merchant vs user credentials
+### 5. User vs merchant credentials
 
 | Credential | Where | Used for |
 |------------|-------|----------|
-| User `access_token` | Client Bearer / form | `/gateway/*`, proxy user routes |
-| `GOMMO_ACCESS_TOKEN` | Server env only | `/admin/*`, legacy PayOS fulfillment |
-| `ADMIN_API_KEY` | Server env only | Protect `/admin/*` |
+| User `access_token` | Client Bearer / form | All user API calls |
+| `GOMMO_ACCESS_TOKEN` | Server env only | Merchant ops, catalog translate warm |
+| `ADMIN_API_KEY` | Server env only | Self-hosted `/admin/*` |
 
 Never expose merchant or admin secrets to browsers or mobile apps.
 
-### 6. Billing is separate from generation
+### 6. Billing on platform auth host
 
-Credit topup flows live under **`/billing/*`**, not `/gateway`. **Default:** Gommo `create_payment` + client `payment_sync` (VietQR bank transfer). **Optional legacy:** PayOS webhook → internal `sendBalances`. See [Billing & credits](./guides/billing-credits.md).
+Credit topup uses Gommo `create_payment` + `payment_sync` on **`api.gommo.net`**. This docs site may wrap billing under `/billing/*` when self-hosted — see [Billing & credits](./guides/billing-credits.md).
 
-### 7. Errors you can rely on
+### 7. Upstream errors
 
-REST routes return:
-
-```json
-{ "success": false, "message": "…", "code": "VALIDATION_ERROR" }
-```
-
-Common codes: `UNAUTHORIZED`, `UPSTREAM_ERROR`, `RATE_LIMITED`, `NOT_CONFIGURED`, `INSUFFICIENT_CREDITS`.
+Gommo returns JSON with `message`, `success`, `error`. Check HTTP status and body — do not retry unchanged credentials on auth failures.
 
 ## What we optimize for
 
-- **Integrator speed** — quickstart in minutes, playground at [/app/playground/](/app/playground/).
-- **Operational clarity** — health check, structured logs, Docker deploy.
-- **Upstream fidelity** — proxy Mode C preserves Gommo envelopes when you need drop-in compatibility.
+- **Integrator speed** — [Quickstart](./quickstart.md) in minutes, [Playground](/app/playground/) with public URLs
+- **Catalog fidelity** — never invent enums; list models first
+- **Clear hosts** — v2 for media, api for auth/chat/audio
 
 ## Next
 

@@ -34,8 +34,8 @@ $h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/x-www
 
 | Recipe | What you build |
 |--------|----------------|
-| [First image job (wait)](./image-job-wait.md) | Login → models → image with server poll |
-| [Async job + poll loop](./job-poll-async.md) | `wait: false` → manual / loop poll |
+| [First image job (wait)](./image-job-wait.md) | Login → models → image → poll until done |
+| [Async job + poll loop](./job-poll-async.md) | Create job → manual / loop poll |
 
 ### Media
 

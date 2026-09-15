@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useHybridLocale } from '../composables/use-hybrid-locale';
 import { pickMsg } from '../models/portal-locale';
-import { apiBase } from '../models/gateway-base';
+import { GOMMO_V2_HOST } from '../models/gommo-hosts';
 import {
   JOB_TYPES,
   catalogProviders,
@@ -68,18 +68,18 @@ const pillars = computed(() => [
     n: '01',
     title: m('One gate, one contract', 'Một cổng, một contract', 'หนึ่งเกตเวย์ หนึ่งสัญญา'),
     desc: m(
-      'Hide v2.api.gommo.net and api.gommo.net — deploy the gateway, clients keep one base URL.',
-      'Ẩn v2.api.gommo.net và api.gommo.net — deploy gateway, client chỉ nhớ một base URL.',
-      'ซ่อน v2.api.gommo.net และ api.gommo.net — deploy gateway ลูกค้าจำ base URL เดียว',
+      'Official hosts v2.api.gommo.net and api.gommo.net — one Bearer token for catalog, jobs, chat, and billing.',
+      'Host chính thức v2.api.gommo.net và api.gommo.net — một Bearer token cho catalog, jobs, chat và billing.',
+      'โฮสต์อย่างเป็นทางการ v2.api.gommo.net และ api.gommo.net — Bearer token เดียวสำหรับแคตตาล็อก งาน แชท และ billing',
     ),
   },
   {
     n: '02',
     title: m('Catalog is source of truth', 'Catalog là nguồn sự thật', 'แคตตาล็อกคือแหล่งความจริง'),
     desc: m(
-      'Never guess ratio, mode, or resolution — read GET /gateway/models before every job.',
-      'Không đoán ratio, mode hay resolution — đọc từ GET /gateway/models trước mỗi job.',
-      'ไม่เดา ratio mode resolution — อ่าน GET /gateway/models ก่อนทุกงาน',
+      'Never guess ratio, mode, or resolution — read POST v2.api.gommo.net/ai/models before every job.',
+      'Không đoán ratio, mode hay resolution — đọc POST v2.api.gommo.net/ai/models trước mỗi job.',
+      'ไม่เดา ratio mode resolution — อ่าน POST v2.api.gommo.net/ai/models ก่อนทุกงาน',
     ),
   },
   {
@@ -116,11 +116,11 @@ const routeNodes = computed(() => [
 ]);
 
 const codeSample = computed(() => {
-  const base = apiBase() || 'https://api.yourdomain.com';
-  return `$ curl ${base}/gateway/models?type=image
-$ curl -X POST ${base}/gateway/jobs \\
+  const v2 = GOMMO_V2_HOST;
+  return `$ curl -X POST ${v2}/ai/models?type=image
+$ curl -X POST ${v2}/ai/jobs/image/MODEL_ID \\
     -H "Authorization: Bearer $TOKEN" \\
-    -d '{"type":"image","model":"SLUG","ratio":"FROM_CATALOG"}'`;
+    -d "domain=79ai.net&prompt=Hello&ratio=FROM_CATALOG"`;
 });
 
 function jobTypeLabel(id: string): string {

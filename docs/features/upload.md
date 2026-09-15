@@ -7,39 +7,41 @@ description: Upload images and videos for use in media jobs
 
 Upload assets to Gommo storage before passing URLs into media jobs (e.g. image-to-video, edit workflows).
 
-## Endpoints
+## Endpoints (recommended)
 
-| Asset | Gateway REST | Proxy |
-|-------|--------------|-------|
-| Image | `POST /gateway/upload/image` | `POST /v2/ai/upload/image` |
-| Video | `POST /gateway/upload/video` | `POST /v2/ai/upload/video` |
+| Asset | URL |
+|-------|-----|
+| Image | `POST https://v2.api.gommo.net/ai/upload/image` |
+| Video | `POST https://v2.api.gommo.net/ai/upload/video` |
 
-Auth: `Authorization: Bearer {token}`.
-
-Mode B: **`domain` optional** — gateway uses env. You may pass multipart `domain` to override.
+Auth: `Authorization: Bearer {access_token}`. Form: `domain`, `project_id=default`, file field.
 
 ## Multipart fields
 
 | Type | Field name | Notes |
 |------|------------|-------|
 | Image | `file` | Optional `fileName` |
-| Video | `video_file` or `file` | Large files supported up to **50 MB** gateway limit |
+| Video | `video_file` or `file` | Respect upstream size limits |
 
-## Upload image (REST)
+## Upload image
 
 ```bash
-curl -X POST "http://localhost:3001/gateway/upload/image" \
+curl -X POST "https://v2.api.gommo.net/ai/upload/image" \
   -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "domain=79ai.net" \
+  -F "project_id=default" \
   -F "file=@photo.png"
 ```
 
-Response includes a URL to use in subsequent job `fields` (exact field name depends on the target model).
+Response includes a URL to use in subsequent job form fields (exact field name depends on the target model).
 
-## Upload video (REST)
+## Upload video
 
 ```bash
-curl -X POST "http://localhost:3001/gateway/upload/video" \
+curl -X POST "https://v2.api.gommo.net/ai/upload/video" \
   -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "domain=79ai.net" \
+  -F "project_id=default" \
   -F "video_file=@clip.mp4"
 ```
 
@@ -48,11 +50,11 @@ curl -X POST "http://localhost:3001/gateway/upload/video" \
 ```
 Upload asset  →  URL in response
        ↓
-List models (video/image type)
+POST v2…/ai/models?type=video
        ↓
-POST /gateway/jobs/video  with URL + prompt + ratio from catalog
+POST v2…/ai/jobs/video/{model_id}  with URL + prompt + ratio from catalog
        ↓
-wait: true  or  poll job
+Poll POST v2…/ai/jobs/{id}?media=video
 ```
 
 ## Portal UI
@@ -60,32 +62,15 @@ wait: true  or  poll job
 Manage uploads at [Files](/app/files/) (sidebar **Developer → Files**, badge **beta**):
 
 - Gommo album (images/videos) from library API
-- **Recent uploads** persist in browser `localStorage` on this device
-- **Copy URL** or **Copy fields** (JSON snippet for `POST /gateway/jobs/*`)
+- **Copy URL** for use in job form fields
 
-## Mode C / Direct
+## Optional: self-host gateway
 
-Proxy and direct calls use Gommo form fields:
-
-```
-access_token, domain, project_id=default, file or video_file
-```
-
-Direct upstream: `https://v2.api.gommo.net/ai/upload/image`.
-
-## Errors
-
-REST upload failures return structured errors:
-
-```json
-{ "success": false, "message": "…", "code": "UPSTREAM_ERROR" }
-```
-
-Check file size (50 MB proxy limit) and token validity.
+`POST {gateway}/gateway/upload/image` — multipart JSON wrapper. See [Upload reference](../reference/upload.md).
 
 ## Full API
 
-→ [Upload reference](../reference/upload.md) · [Media jobs](./media-jobs.md)
+→ [Upload reference](../reference/upload.md) · [Gommo public API](../reference/gommo-public-api.md)
 
 ## Next
 

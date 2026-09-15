@@ -9,24 +9,31 @@ Help us improve AI Gateway docs and API behavior.
 
 ## Before you report
 
-1. **Health check**
+1. **Reproduce on public API** — [Quickstart](./quickstart.md) or [Playground](/app/playground/).
+
+   ```bash
+   curl.exe -X POST "https://v2.api.gommo.net/ai/models?type=image" ^
+     -H "Authorization: Bearer %TOKEN%" ^
+     -H "Content-Type: application/x-www-form-urlencoded" ^
+     -d "type=image&domain=79ai.net"
+   ```
+
+2. **If using self-host gateway**, check health:
 
    ```bash
    curl http://localhost:3001/health
    ```
 
-2. **Reproduce minimally** — [Quickstart](./quickstart.md) or [Playground](/app/playground/).
-
-3. **Capture** — HTTP status, response body `{ success, message, code }`, gateway version/commit.
+3. **Capture** — HTTP status, response body, whether direct Gommo call behaves the same.
 
 ## What to include
 
 | Field | Example |
 |-------|---------|
-| **Environment** | local / Railway / Fly, Node version |
-| **Mode** | B REST / C proxy / direct upstream |
-| **Endpoint** | `POST /gateway/jobs/image` |
-| **Request** | Redact tokens — show JSON shape only |
+| **Environment** | direct Gommo / local gateway / Railway / Fly |
+| **Mode** | A Direct / B REST / C proxy |
+| **Endpoint** | `POST https://v2.api.gommo.net/ai/jobs/image/{slug}` |
+| **Request** | Redact tokens — show form/JSON shape only |
 | **Response** | Full error envelope |
 | **Expected** | What you expected instead |
 
@@ -44,7 +51,7 @@ Help us improve AI Gateway docs and API behavior.
 
 ## MCP vs HTTP
 
-If the issue involves **Cursor MCP** tools, note that separately from HTTP gateway — see [MCP & agents](./mcp/).
+If the issue involves **Cursor MCP** tools, note that separately from HTTP — see [MCP & agents](./mcp/).
 
 ## Next
 

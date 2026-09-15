@@ -1,59 +1,66 @@
 ---
-title: 'สูตร: Flow HTTP เอเจนต์'
-description: HTTP loop ขั้นต่ำสำหรับ script และ LLM agent
+title: 'Recipe: Agent HTTP flow'
+description: HTTP loop ขั้นต่ำสำหรับ scripts และ LLM agents
 ---
 
-# Flow HTTP เอเจนต์
+# Agent HTTP flow
 
-Loop **โหมด B** ขั้นต่ำสำหรับ automation — ไม่ต้องใช้ MCP
+loop **Gommo public API** ขั้นต่ำสำหรับ automation — ไม่ต้องใช้ MCP
 
 ## Flow
 
 ```mermaid
 flowchart LR
-  A[Login or token] --> B[GET /gateway/models]
-  B --> C[POST /gateway/jobs/type]
-  C --> D{wait?}
-  D -->|true| E[resultUrl in response]
-  D -->|false| F[GET /gateway/jobs/id]
-  F --> E
+  A[Login or token] --> B[POST v2…/ai/models]
+  B --> C[POST v2…/ai/jobs/type/slug]
+  C --> D[POST v2…/ai/jobs/id poll]
+  D --> E[result URL]
 ```
 
-## โครง script (PowerShell)
+## Script skeleton (PowerShell)
 
 ```powershell
-$base = 'http://localhost:3001'
-# 1. Token — login หรือ $env:TOKEN
-$h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/json' }
+$d = if ($env:GOMMO_API_DOMAIN) { $env:GOMMO_API_DOMAIN } else { '79ai.net' }
+$h = @{ Authorization = "Bearer $env:TOKEN" }
 
-# 2. Catalog
-$models = Invoke-RestMethod "$base/gateway/models?type=image" -Headers @{ Authorization = "Bearer $env:TOKEN" }
+# 1. Catalog
+$models = Invoke-RestMethod -Method POST `
+  -Uri "https://v2.api.gommo.net/ai/models?type=image" `
+  -Headers $h -ContentType "application/x-www-form-urlencoded" `
+  -Body "type=image&domain=$d"
 $m = $models.data[0]
 $slug = $m.model ?? $m.slug
 $ratio = $m.ratios[0]
 if ($ratio -is [pscustomobject]) { $ratio = $ratio.value }
 
-# 3. Job
-$job = Invoke-RestMethod -Method POST -Uri "$base/gateway/jobs/image" -Headers $h -Body (@{
-  modelSlug = $slug; wait = $true
-  fields = @{ prompt = 'A red apple'; ratio = $ratio }
-} | ConvertTo-Json -Depth 5)
+# 2. Create job
+$job = Invoke-RestMethod -Method POST `
+  -Uri "https://v2.api.gommo.net/ai/jobs/image/$slug" `
+  -Headers $h -ContentType "application/x-www-form-urlencoded" `
+  -Body "domain=$d&project_id=default&prompt=A red apple&ratio=$ratio"
 
-# 4. Output
-$job.data.resultUrl
+# 3. Poll (simplified)
+$jobId = $job.imageInfo.id_base
+for ($i = 1; $i -le 80; $i++) {
+  $poll = Invoke-RestMethod -Method POST `
+    -Uri "https://v2.api.gommo.net/ai/jobs/$jobId?media=image" `
+    -Headers $h -ContentType "application/x-www-form-urlencoded" `
+    -Body "domain=$d&project_id=default"
+  $url = $poll.imageInfo.result_url
+  if ($url) { Write-Host $url; break }
+  Start-Sleep -Seconds 3.5
+}
 ```
 
 ## จัดการข้อผิดพลาด
 
-Gateway คืน `{ "success": false, "message": "...", "code": "..." }` — agent ควรอ่าน `code` ก่อน retry
-
-รหัสที่พบบ่อย: `VALIDATION_ERROR`, `UNAUTHORIZED`, `UPSTREAM_ERROR`
+Gommo คืน JSON พร้อม `success`, `message`, `error` — agents ควรอ่านก่อน retry
 
 ## MCP vs HTTP
 
-**MCP tools** ของ Cursor (`gommo_*`) แยกจาก gateway นี้ สำหรับการเชื่อมต่อ production ใช้ HTTP — ดู [MCP & เอเจนต์](../mcp/)
+Cursor **MCP tools** (`gommo_*`) แยกจาก HTTP gateway production ใช้ HTTP public API — ดู [MCP & agents](../mcp/)
 
 ## ถัดไป
 
 - [งานรูปแรก](./image-job-wait.md)
-- [แนวปฏิบัติที่ดี](../best-practices/index.md)
+- [Best practices](../best-practices/index.md)

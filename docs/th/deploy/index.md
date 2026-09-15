@@ -153,7 +153,7 @@ Docs เป็น **static** — ไม่ serve โดย API process ใน pr
 
 | Feature | ใช้ `VITE_GATEWAY_URL` |
 |---------|------------------------|
-| Models catalog / compare | `GET /gateway/models` |
+| Models catalog / compare | Gommo public API (`POST v2…/ai/models`) หรือ portal proxy |
 | Sign in / sign up | `POST /gateway/auth/*` |
 | Dashboard `/app/*` | `POST /ai/me`, `/billing/*` |
 | Playground embed | `{API}/portal/playground.html?embed=1` (iframe + postMessage) |

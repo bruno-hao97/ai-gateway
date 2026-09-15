@@ -1,11 +1,15 @@
 ---
-title: 'สูตร: งานรูปแรก (wait)'
-description: Login ลิสต์โมเดล สร้างงานรูปด้วย wait true
+title: 'Recipe: งานรูปแรก'
+description: Login ลิสต์โมเดล สร้างงานรูปและ poll
 ---
 
-# งานรูปแรก (`wait: true`)
+# งานรูปแรก
 
-เซิร์ฟเวอร์ poll upstream ทุก **3.5s** สูงสุด **80** ครั้ง — ได้ `resultUrl` ใน response เดียว
+flow **Gommo public API** — ลิสต์โมเดล สร้างงาน poll ฝั่ง client
+
+::: tip Gateway ทางเลือก (dev)
+gateway self-host มี `wait: true` — HTTP round-trip เดียว production: poll client ตามด้านล่าง
+:::
 
 ## 1. Login
 
@@ -13,19 +17,22 @@ description: Login ลิสต์โมเดล สร้างงานรู
 $domain = if ($env:GOMMO_API_DOMAIN) { $env:GOMMO_API_DOMAIN } else { '79ai.net' }
 $loginBody = "email=YOU@example.com&password=YOUR_PASSWORD&domain=$domain"
 $login = Invoke-RestMethod -Method POST `
-  -Uri "http://localhost:3001/api/apps/go-mmo/auth/login" `
+  -Uri "https://api.gommo.net/api/apps/go-mmo/auth/login" `
   -ContentType "application/x-www-form-urlencoded" `
   -Body $loginBody
 $env:TOKEN = $login.access_token
-$h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/json' }
+$h = @{ Authorization = "Bearer $env:TOKEN" }
 ```
 
 ## 2. ลิสต์โมเดล — เลือก slug + ratio
 
 ```powershell
-$models = Invoke-RestMethod `
-  -Uri "http://localhost:3001/gateway/models?type=image" `
-  -Headers @{ Authorization = "Bearer $env:TOKEN" }
+$d = if ($env:GOMMO_API_DOMAIN) { $env:GOMMO_API_DOMAIN } else { '79ai.net' }
+$models = Invoke-RestMethod -Method POST `
+  -Uri "https://v2.api.gommo.net/ai/models?type=image" `
+  -Headers $h `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body "type=image&domain=$d"
 $m = $models.data[0]
 $slug = $m.model ?? $m.slug
 $ratio = $m.ratios[0]
@@ -34,30 +41,29 @@ Write-Host "model=$slug ratio=$ratio"
 ```
 
 ::: warning
-ใช้**เฉพาะ**ค่าจาก response แคตตาล็อก
+ใช้เฉพาะค่าจาก response แคตตาล็อก
 :::
 
 ## 3. สร้างงาน
 
 ```powershell
-$jobBody = @{
-  modelSlug = $slug
-  wait = $true
-  fields = @{
-    prompt = 'A cute cat, studio photo'
-    ratio = $ratio
-  }
-} | ConvertTo-Json -Depth 5
-
+$body = "domain=$d&project_id=default&prompt=A cute cat, studio photo&ratio=$ratio"
 $job = Invoke-RestMethod -Method POST `
-  -Uri "http://localhost:3001/gateway/jobs/image" `
-  -Headers $h -Body $jobBody
-$job.data.resultUrl
+  -Uri "https://v2.api.gommo.net/ai/jobs/image/$slug" `
+  -Headers $h `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body $body
+$jobId = $job.imageInfo.id_base ?? $job.data.id_base
+Write-Host "jobId=$jobId"
 ```
+
+## 4. Poll จนเสร็จ
+
+ดู [งาน async + poll](./job-poll-async.md) — interval **3.5s** สูงสุด **80** ครั้ง
 
 ## Playground
 
-Connection → List models → **Image job** → Run พร้อมเลือก **wait**
+Connection → List models → **Image job** → Run
 
 ## ถัดไป
 

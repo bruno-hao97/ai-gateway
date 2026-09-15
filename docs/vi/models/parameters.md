@@ -5,7 +5,7 @@ description: ratio, mode, resolution, duration — luôn lấy từ catalog mode
 
 # Parameters
 
-Model Gommo trả field hợp lệ trong **response list models**. Gateway không tự validate hay bịa giá trị — upstream từ chối nếu đoán.
+Model Gommo trả field hợp lệ trong **response list models**. Upstream từ chối giá trị đoán.
 
 ## Response (rút gọn)
 
@@ -24,7 +24,7 @@ Model Gommo trả field hợp lệ trong **response list models**. Gateway khôn
 }
 ```
 
-Tên field thay đổi theo model — **luôn** dùng mảng trong response của **slug** đó.
+Tên field thay đổi theo model — **luôn** dùng mảng trong response của **model id đó**.
 
 ## Field job thường gặp
 
@@ -35,20 +35,20 @@ Tên field thay đổi theo model — **luôn** dùng mảng trong response củ
 | `resolution` | `resolutions[]` | Kích thước output |
 | `duration` | catalog (video/music) | Độ dài — không đoán |
 | `prompt` | app của bạn | Prompt text |
-| `modelSlug` | field `model` hoặc `slug` | Bắt buộc khi create |
+| model id | `model`, `slug`, hoặc `id_base` | URL path khi create |
 
 ::: warning
-Không copy `ratio` / `mode` / `resolution` / `duration` từ docs, model khác, hoặc ví dụ — đọc từ **models list** của **slug** đó.
+Không copy `ratio` / `mode` / `resolution` / `duration` từ docs, model khác, hoặc ví dụ — đọc từ **models list của bạn** cho **model đó**.
 :::
 
 ## Tên field slug
 
-Upstream có thể dùng `model`, `slug`, `model_id`, hoặc `id`. Mode B REST cần **`modelSlug`** trong JSON — map từ field catalog trả về.
+Upstream có thể dùng `model`, `slug`, `model_id`, hoặc `id_base`. Dùng id từ catalog trong URL create: `POST …/ai/jobs/{type}/{model_id}`.
 
 ## Tool jobs
 
-Một số tool model dùng key khác (`url`, `image`, …). Kiểm tra `GET /gateway/models?type=…` hoặc RESPONSE trên [Playground](/vi/app/playground/).
+Một số tool model dùng key khác (`url`, `image`, …). Kiểm tra `POST …/ai/models?type=…` hoặc RESPONSE trên [Playground](/vi/app/playground/).
 
 ## Tiếp theo
 
-→ [Job types](./job-types.md) · [Media reference](../reference/media.md) · [Quickstart](../quickstart.md)
+→ [Job types](./job-types.md) · [Media & jobs reference](../reference/media.md) · [Quickstart](../quickstart.md)

@@ -1,25 +1,23 @@
 ---
 title: 'Recipe: Chat + stream'
-description: Agent chat and SSE streaming via gateway
+description: Agent chat and SSE streaming on Gommo platform API
 ---
 
 # Chat + stream
 
-`POST /gateway/chat` — upstream requires **non-empty `messages`**.
+`POST https://api.gommo.net/api/v2/chat` — upstream requires **non-empty `messages`**. Form body: `application/x-www-form-urlencoded`.
 
 ## Chat (JSON response)
 
 ```powershell
-$h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/json' }
-$body = @{
-  action = 'chat'
-  query = 'Say hello in one short sentence.'
-  messages = @(@{ role = 'user'; text = 'Say hello in one short sentence.' })
-} | ConvertTo-Json -Depth 5
+$domain = if ($env:GOMMO_API_DOMAIN) { $env:GOMMO_API_DOMAIN } else { '79ai.net' }
+$messages = '[{"role":"user","text":"Say hello in one short sentence."}]'
+$form = "action=chat&access_token=$env:TOKEN&domain=$domain&query=Say hello in one short sentence.&messages=$messages"
 
 Invoke-RestMethod -Method POST `
-  -Uri "http://localhost:3001/gateway/chat" `
-  -Headers $h -Body $body
+  -Uri "https://api.gommo.net/api/v2/chat" `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body $form
 ```
 
 Optional: pass `sessionId` from a prior response for multi-turn.
@@ -29,23 +27,22 @@ Optional: pass `sessionId` from a prior response for multi-turn.
 Use `curl -N` to read the stream on the terminal:
 
 ```powershell
-$body = @{
-  action = 'stream'
-  query = 'Tell a very short story.'
-  messages = @(@{ role = 'user'; text = 'Tell a very short story.' })
-} | ConvertTo-Json -Depth 5
+$domain = if ($env:GOMMO_API_DOMAIN) { $env:GOMMO_API_DOMAIN } else { '79ai.net' }
+$messages = '[{"role":"user","text":"Tell a very short story."}]'
+$form = "action=stream&access_token=$env:TOKEN&domain=$domain&query=Tell a very short story.&messages=$messages"
 
-curl.exe -N -X POST "http://localhost:3001/gateway/chat" `
-  -H "Authorization: Bearer $env:TOKEN" `
-  -H "Content-Type: application/json" `
-  -d $body
+curl.exe -N -X POST "https://api.gommo.net/api/v2/chat" `
+  -H "Content-Type: application/x-www-form-urlencoded" `
+  -d $form
 ```
-
-Gateway pipes SSE without buffering.
 
 ## Playground
 
 **Chat** panel → action **stream** → Run request.
+
+## Optional: self-host gateway
+
+`POST {gateway}/gateway/chat` with JSON `{ "action", "query", "messages" }` — gateway pipes SSE without buffering. See [Chat reference](../reference/chat.md).
 
 ## Next
 

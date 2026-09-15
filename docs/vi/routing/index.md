@@ -5,7 +5,7 @@ description: Model Gommo, upstream host và integration mode qua AI Gateway
 
 # Models & routing
 
-AI Gateway nằm giữa client và **hai upstream host Gommo**. Gateway không host model — bạn **route** request tới đúng host và mode (Direct, REST, hoặc Proxy).
+Tích hợp **khuyến nghị:** gọi thẳng **hai upstream host Gommo**. Tùy chọn: self-host AI Gateway (Mode B/C) cho JSON REST, portal billing, hoặc BYOK.
 
 ## Stack routing
 
@@ -42,7 +42,7 @@ Mọi tích hợp media đều theo thứ tự:
 1. **List models** — `type=image|video|music|…`
 2. **Chọn `modelSlug`** và field cho phép (`ratio`, `mode`, …) từ response
 3. **Create job** — không đoán tham số
-4. **Poll** — gateway (`wait: true`) hoặc client (`GET /gateway/jobs/:id`)
+4. **Poll** — client (`POST v2…/ai/jobs/{id}?media=…`) hoặc gateway tùy chọn (`wait: true`)
 
 Chi tiết catalog → [Models overview](../models/).
 
@@ -57,12 +57,12 @@ Chi tiết catalog → [Models overview](../models/).
 
 ## Map endpoint nhanh
 
-| Thao tác | Mode B | Mode C | Mode A |
-|----------|--------|--------|--------|
-| List models | `GET /gateway/models?type=` | `POST /v2/ai/models?type=` | `POST v2…/ai/models?type=` |
-| Create job | `POST /gateway/jobs/:type` | `POST /v2/ai/jobs/:type/:slug` | Như upstream |
-| Poll | `GET /gateway/jobs/:id?media=` | `POST /v2/ai/jobs/:id?media=` | Như upstream |
-| Chat | `POST /gateway/chat` | `POST /api/v2/chat` | `POST api…/api/v2/chat` |
+| Thao tác | Mode A (Direct) | Mode B (REST) | Mode C (Proxy) |
+|----------|-----------------|---------------|----------------|
+| List models | `POST v2…/ai/models?type=` | `GET /gateway/models?type=` | `POST /v2/ai/models?type=` |
+| Create job | `POST v2…/ai/jobs/:type/:slug` | `POST /gateway/jobs/:type` | `POST /v2/ai/jobs/:type/:slug` |
+| Poll | `POST v2…/ai/jobs/:id?media=` | `GET /gateway/jobs/:id?media=` | `POST /v2/ai/jobs/:id?media=` |
+| Chat | `POST api…/api/v2/chat` | `POST /gateway/chat` | `POST /api/v2/chat` |
 
 Bảng đầy đủ → [Endpoint map](./endpoint-map.md).
 

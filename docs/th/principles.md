@@ -1,101 +1,100 @@
 ---
 title: หลักการ
-description: หลักการออกแบบหลักของ AI Gateway
+description: หลักการหลักสำหรับเชื่อมต่อ Gommo public API
 ---
 
 # หลักการ
 
-หลักการหลักเมื่อสร้างบน AI Gateway — แพลตฟอร์ม **API** แบบ OpenRouter บน [Gommo](https://gommo.net) อ่านก่อนเลือก [โหมดการเชื่อมต่อ](./routing/integration-modes.md)
+หลักการหลักเมื่อสร้างบน [Gommo](https://gommo.net) — อ่านก่อน [เริ่มต้นใช้งาน](./quickstart.md) หรือ [โมเดล](./models/)
 
 ## ลำดับคำขอ
 
 ```
 แอปของคุณ
   │
-  ├─ Mode A (direct) ──► v2.api.gommo.net  (jobs · models · upload)
-  │                   └─► api.gommo.net    (login · chat · audio)
+  ├─ v2.api.gommo.net  ──► models · create/poll jobs · upload image/video
   │
-  └─ Mode B/C ──► AI Gateway (ทางเลือก)
-                    ├─► v2.api.gommo.net
-                    └─► api.gommo.net
+  └─ api.gommo.net     ──► login · /ai/me · chat · audio · job info
 ```
 
-## ทำไมต้อง AI Gateway?
+ทางเลือก: self-host [AI Gateway](./routing/integration-modes.md) (Mode B/C) สำหรับ JSON REST, billing portal, BYOK — ไม่จำเป็นสำหรับการเชื่อมต่อ Gommo โดยตรง
 
-Gommo มี **สอง upstream host** และหลายรูปแบบ auth (Bearer สำหรับ V2 jobs, form `access_token` สำหรับ platform API) AI Gateway ช่วยผู้ integrate:
+## สอง upstream host
 
-- **API deploy ได้ชุดเดียว** — ซ่อน URL upstream รวม env และ secret
-- **REST คาดเดาได้** — JSON in/out ข้อผิดพลาดมีโครงสร้าง poll ฝั่งเซิร์ฟเวอร์ทางเลือก (`wait: true`)
-- **ค่าเริ่มต้นปลอดภัย** — domain และ merchant credential อยู่บนเซิร์ฟเวอร์
+| Host | ใช้สำหรับ |
+|------|----------|
+| **`https://v2.api.gommo.net`** | Models, create/poll media jobs, upload |
+| **`https://api.gommo.net`** | Login, profile/credits, chat, platform audio |
+
+Auth: **`Authorization: Bearer <access_token>`** ผ่าน HTTPS form platform และ V2 ต้องมี **`domain`** (โดเมนลงทะเบียนบัญชีเดียวกัน)
 
 ## หลักการออกแบบ
 
-### 1. อินเทอร์เฟซรวม
+### 1. เรียก URL public ของ Gommo
 
-Client เรียกแค่ `{gateway}`:
+ผู้ integrate เรียก upstream host โดยตรง แผนที่ฉบับเต็ม → [Gommo public API](./reference/gommo-public-api.md)
 
-| Dev | Production |
-|-----|------------|
-| `http://localhost:3001` | `https://api.yourdomain.com` |
-
-การ map upstream อยู่ใน [โมเดล & routing](./routing/) — client Mode B/C ไม่ควร hard-code `v2.api.gommo.net` ในแอป
+| การดำเนินการ | URL |
+|-------------|-----|
+| ลิสต์โมเดล | `POST https://v2.api.gommo.net/ai/models?type={type}` |
+| สร้างงาน | `POST https://v2.api.gommo.net/ai/jobs/{type}/{model_id}` |
+| Poll งาน | `POST https://v2.api.gommo.net/ai/jobs/{id}?media={media}` |
+| Login | `POST https://api.gommo.net/api/apps/go-mmo/auth/login` |
+| Me / credits | `POST https://api.gommo.net/ai/me` |
 
 ### 2. ห้ามเดาพารามิเตอร์โมเดล
 
-`ratio`, `mode`, `resolution`, และ `duration` **ต้อง** มาจาก catalog โมเดล:
+`ratio`, `mode`, `resolution`, และ `duration` **ต้อง** มาจากแคตตาล็อกโมเดล:
 
 ```http
-GET /gateway/models?type=image
-Authorization: Bearer {user_token}
+POST https://v2.api.gommo.net/ai/models?type=image
+Authorization: Bearer {access_token}
+Content-Type: application/x-www-form-urlencoded
+
+type=image&domain=79ai.net
 ```
 
 การเดาค่าทำให้ upstream ปฏิเสธหรือคุณภาพผิดพลาด ดู [โมเดล](./models/)
 
 ### 3. งาน async, poll ชัดเจน
 
-งานมีเดีย Gommo ไม่ push webhook ไปแอป gateway:
+งานมีเดีย Gommo ไม่ push webhook ไปแอปโดยค่าเริ่มต้น client ต้อง poll:
 
-- สร้างงาน upstream
-- Poll ทางเลือกเมื่อ `wait: true` (ช่วง **3500ms**, สูงสุด **80** ครั้ง)
-- คืน `resultUrl` หรือ timeout error
+- ช่วง **3500 ms**
+- สูงสุด **80** ครั้ง (~5 นาที)
+- `POST …/ai/jobs/{id}?media=…` จนสถานะสุดท้าย
 
-Client ที่ตั้ง `wait: false` ต้อง poll `GET /gateway/jobs/:id?media=…` เองด้วยกฎเดียวกัน
+gateway self-host สามารถ poll ฝั่งเซิร์ฟเวอร์ (`wait: true`) — ดู [โหมดการเชื่อมต่อ](./routing/integration-modes.md)
 
-### 4. Domain อยู่บนเซิร์ฟเวอร์ (Mode B)
+### 4. Domain ในทุก form body
 
-`GOMMO_API_DOMAIN` ใน gateway `.env` ถูก inject เมื่อ client ไม่ส่ง `domain` ลด bug ฝั่ง client และ domain ลงทะเบียนสอดคล้อง
+ส่ง `domain` ตรงกับโดเมนลงทะเบียน (เช่น `79ai.net`, `vmedia`) โดเมนผิด → auth หรือ payment error
 
-Mode C (proxy) และ Mode A (direct) ยังต้องมี `domain` ใน form body — ใช้ค่าเดียวกับ domain ลงทะเบียนบัญชี Gommo
+docs portal multi-tenant อาจล็อก domain ต่อ dealer — ดู [Tenants](./routing/upstream-hosts.md)
 
-### 5. Merchant vs user credentials
+### 5. User vs merchant credentials
 
 | Credential | ที่อยู่ | ใช้สำหรับ |
 |------------|--------|-----------|
-| User `access_token` | Client Bearer / form | `/gateway/*`, proxy user routes |
-| `GOMMO_ACCESS_TOKEN` | Server env เท่านั้น | `/admin/*`, legacy PayOS fulfillment |
-| `ADMIN_API_KEY` | Server env เท่านั้น | ป้องกัน `/admin/*` |
+| User `access_token` | Client Bearer / form | ทุก user API call |
+| `GOMMO_ACCESS_TOKEN` | Server env เท่านั้น | Merchant ops, catalog translate warm |
+| `ADMIN_API_KEY` | Server env เท่านั้น | Self-hosted `/admin/*` |
 
 ห้ามเปิดเผย merchant หรือ admin secret ให้เบราว์เซอร์หรือแอปมือถือ
 
-### 6. Billing แยกจาก generation
+### 6. Billing บน platform auth host
 
-flow เติมเครดิตอยู่ที่ **`/billing/*`** ไม่ใช่ `/gateway` **ค่าเริ่มต้น:** Gommo `create_payment` + client `payment_sync` (โอน VietQR) **ทางเลือก legacy:** PayOS webhook → `sendBalances` ภายใน ดู [Billing & เครดิต](./guides/billing-credits.md)
+เติมเครดิตใช้ Gommo `create_payment` + `payment_sync` บน **`api.gommo.net`** site docs อาจ wrap billing ใต้ `/billing/*` เมื่อ self-host — ดู [Billing & เครดิต](./guides/billing-credits.md)
 
-### 7. ข้อผิดพลาดที่พึ่งพาได้
+### 7. ข้อผิดพลาด upstream
 
-REST routes คืน:
-
-```json
-{ "success": false, "message": "…", "code": "VALIDATION_ERROR" }
-```
-
-Code ทั่วไป: `UNAUTHORIZED`, `UPSTREAM_ERROR`, `RATE_LIMITED`, `NOT_CONFIGURED`, `INSUFFICIENT_CREDITS`
+Gommo คืน JSON พร้อม `message`, `success`, `error` ตรวจ HTTP status และ body — ไม่ retry credential เดิมเมื่อ auth ล้มเหลว
 
 ## สิ่งที่เรา optimize
 
-- **ความเร็ว integrator** — quickstart ในไม่กี่นาที playground ที่ [/th/app/playground/](/th/app/playground/)
-- **ความชัดเจนในการดำเนินงาน** — health check, structured logs, Docker deploy
-- **ความตรงกับ upstream** — proxy Mode C คง envelope Gommo เมื่อต้องการความเข้ากันได้แบบ drop-in
+- **ความเร็ว integrator** — [เริ่มต้นใช้งาน](./quickstart.md) ในไม่กี่นาที [Playground](/th/app/playground/) พร้อม URL public
+- **ความตรงกับแคตตาล็อก** — ไม่สร้าง enum เอง ลิสต์โมเดลก่อน
+- **host ชัดเจน** — v2 สำหรับมีเดีย api สำหรับ auth/chat/audio
 
 ## ถัดไป
 

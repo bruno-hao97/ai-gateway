@@ -365,7 +365,7 @@ defineExpose({ reload });
                 type="button"
                 class="or-files-card-btn"
                 :disabled="!item.mediaUrl && !item.thumbnailUrl"
-                :title="m('JSON fields for POST /gateway/jobs/*', 'JSON fields cho POST /gateway/jobs/*', 'JSON fields สำหรับ POST /gateway/jobs/*')"
+                :title="m('JSON fields for POST v2.api.gommo.net/ai/jobs/*', 'JSON fields cho POST v2.api.gommo.net/ai/jobs/*', 'JSON fields สำหรับ POST v2.api.gommo.net/ai/jobs/*')"
                 @click="copyJobFields(item)"
               >
                 {{

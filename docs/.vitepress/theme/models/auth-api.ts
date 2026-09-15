@@ -1,5 +1,5 @@
 import { apiBase } from './gateway-base';
-import { clearCachedMe } from './user-api';
+import { clearCachedMe, fetchMe } from './user-api';
 import { gommoClientDeviceFields } from './gommo-device';
 
 export const STORAGE_TOKEN = 'gw_access_token';
@@ -74,11 +74,25 @@ export function clearAuth(): void {
   clearCachedMe();
 }
 
+/** Persist token only after /ai/me confirms a real Gommo account. */
+export async function saveAndVerifyToken(token: string): Promise<void> {
+  const t = token.trim();
+  if (!t) throw new Error('Enter a token');
+  setStoredToken(t);
+  clearCachedMe();
+  try {
+    await fetchMe();
+  } catch (e) {
+    clearAuth();
+    throw e;
+  }
+}
+
 /**
  * One-time import from URL query (dev sync from 79ai Network tab).
  * ?access_token=...&device_id=... — params stripped from address bar after save.
  */
-export function importSessionFromUrl(): boolean {
+export async function importSessionFromUrl(): Promise<boolean> {
   if (typeof window === 'undefined') return false;
   const params = new URLSearchParams(window.location.search);
   const token = params.get('access_token')?.trim();
@@ -86,9 +100,12 @@ export function importSessionFromUrl(): boolean {
   let changed = false;
 
   if (token) {
-    setStoredToken(token);
-    clearCachedMe();
-    changed = true;
+    try {
+      await saveAndVerifyToken(token);
+      changed = true;
+    } catch {
+      clearAuth();
+    }
   }
   if (deviceId) {
     localStorage.setItem('gw_device_id', deviceId);
@@ -181,6 +198,7 @@ export async function loginWithEmail(email: string, password: string): Promise<s
   const token = extractToken(data);
   if (!token) throw new Error('No access_token in response');
   setStoredToken(token);
+  clearCachedMe();
   return token;
 }
 
@@ -213,5 +231,6 @@ export async function registerAccount(input: {
   const token = extractToken(data);
   if (!token) throw new Error('No access_token in response');
   setStoredToken(token);
+  clearCachedMe();
   return token;
 }

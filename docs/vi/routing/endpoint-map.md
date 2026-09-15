@@ -12,11 +12,11 @@ So sánh thao tác phổ biến.
 
 ## Media & jobs
 
-| Thao tác | Mode A | Mode B | Mode C |
-|----------|--------|--------|--------|
-| List models | `POST v2…/ai/models?type=` | `GET {gateway}/gateway/models?type=` | `POST {gateway}/v2/ai/models?type=` |
-| Create job | `POST v2…/ai/jobs/{type}/{slug}` | `POST {gateway}/gateway/jobs/{type}` | `POST {gateway}/v2/ai/jobs/{type}/{slug}` |
-| Poll | `POST v2…/ai/jobs/{id}?media=` | `GET {gateway}/gateway/jobs/{id}?media=` | `POST {gateway}/v2/ai/jobs/{id}?media=` |
+| Thao tác | Mode A (Direct) | Mode B (REST) | Mode C (Proxy) |
+|----------|-----------------|---------------|----------------|
+| List models | `POST https://v2.api.gommo.net/ai/models?type={type}` | `GET {gateway}/gateway/models?type={type}` | `POST {gateway}/v2/ai/models?type={type}` |
+| Create job | `POST https://v2.api.gommo.net/ai/jobs/{type}/{slug}` | `POST {gateway}/gateway/jobs/{type}` | `POST {gateway}/v2/ai/jobs/{type}/{slug}` |
+| Poll job | `POST https://v2.api.gommo.net/ai/jobs/{id}?media={media}` | `GET {gateway}/gateway/jobs/{id}?media={media}` | `POST {gateway}/v2/ai/jobs/{id}?media={media}` |
 
 **Job types:** `image`, `video`, `tts`, `music`, `avatar-lipsync`, `image-upscale`, `remove-bg`, …
 

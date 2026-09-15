@@ -1,23 +1,17 @@
 ---
 title: Audio & TTS
-description: Voice search and text-to-speech via /gateway/audio
+description: Voice search and text-to-speech on Gommo platform API
 ---
 
 # Audio & TTS
 
-Text-to-speech and voice discovery through Gommo's platform audio API. Unlike media V2 jobs, audio routes hit **`api.gommo.net`**.
+Text-to-speech and voice discovery through Gommo's platform audio API on **`https://api.gommo.net/ai/audio`**.
 
-## Endpoints (Mode B)
+## Endpoint
 
-| Operation | Method | Path |
-|-----------|--------|------|
-| Search voices | `POST` | `/gateway/audio/voices` |
-| Text-to-speech | `POST` | `/gateway/audio/tts` |
-| List history | `GET` | `/gateway/audio/lists` |
+All operations use **`POST https://api.gommo.net/ai/audio`** with form fields (`access_token` or Bearer, `domain`, `action_type`, …).
 
-Auth: `Authorization: Bearer {user_access_token}`.
-
-Proxy equivalent: `POST /ai/audio` with `action_type` form fields.
+Auth: `Authorization: Bearer {access_token}`.
 
 ## Voice providers
 
@@ -34,56 +28,35 @@ Search voices before TTS to get a valid `voice_id`.
 ## Search voices
 
 ```http
-POST /gateway/audio/voices
-Authorization: Bearer {token}
-Content-Type: application/json
+POST https://api.gommo.net/ai/audio
+Content-Type: application/x-www-form-urlencoded
 
-{
-  "server": "elevenlabs_cheap",
-  "page": 0
-}
+access_token=…&domain=79ai.net&action_type=search_voices&server=elevenlabs_cheap&page=0
 ```
 
-Pick `voice_id` from `data.voices[]`.
+Pick `voice_id` from response voices list.
 
 ## Text-to-speech
 
 ```http
-POST /gateway/audio/tts
-Authorization: Bearer {token}
-Content-Type: application/json
+POST https://api.gommo.net/ai/audio
+Content-Type: application/x-www-form-urlencoded
 
-{
-  "text": "Hello world",
-  "voice_id": "VOICE_ID_FROM_SEARCH",
-  "server": "elevenlabs_cheap",
-  "model": "eleven_multilingual_v2"
-}
+access_token=…&domain=79ai.net&action_type=tts&text=Hello world&voice_id=…&server=elevenlabs_cheap
 ```
 
-Success response includes **`data.fileUrl`** — direct link to generated audio.
-
-## Audio history
-
-```http
-GET /gateway/audio/lists
-Authorization: Bearer {token}
-```
-
-Returns previous TTS generations for the user.
+Success response includes **`fileUrl`** — direct link to generated audio.
 
 ## vs media `tts` job type
 
-Gommo also exposes `type=tts` under **V2 media jobs** (`/gateway/jobs/tts`). Use:
+Gommo also exposes `type=tts` under **V2 media jobs** (`POST v2…/ai/jobs/tts/{model_id}`). Use:
 
-- **`/gateway/audio/*`** — platform TTS with voice search (this page)
-- **`/gateway/jobs/tts`** — V2 job pipeline with model catalog and poll semantics
-
-See [Media jobs](./media-jobs.md) for async job flow.
+- **`/ai/audio`** — platform TTS with voice search (this page)
+- **V2 tts jobs** — job pipeline with model catalog and poll semantics
 
 ## Full API
 
-→ [Audio reference](../reference/audio.md) · [Endpoint map](../routing/endpoint-map.md)
+→ [Audio reference](../reference/audio.md) · [Gommo public API](../reference/gommo-public-api.md)
 
 ## Next
 

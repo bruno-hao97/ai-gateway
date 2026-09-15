@@ -1,21 +1,21 @@
 ---
 title: Media & jobs
-description: List models, create jobs, poll — REST, proxy, and direct
+description: List models, create jobs, poll — Gommo public API
 ---
 
 # Media & jobs
 
-**Public API (recommended):** [Gommo public API](./gommo-public-api.md) — `https://v2.api.gommo.net` for jobs/models/upload.
+**Recommended:** [Gommo public API](./gommo-public-api.md) — `https://v2.api.gommo.net` for models, jobs, upload.
 
-Poll interval: **3500ms**, max **80** attempts. Send `domain` in form body (e.g. `79ai.net`). Gateway Mode B optional for local dev (`wait: true` in JSON).
+Poll interval: **3500 ms**, max **80** attempts. Send **`domain`** in every form body (e.g. `79ai.net`). Auth: `Authorization: Bearer <access_token>`.
 
 ## Endpoint map
 
-| Operation | Gommo (Direct) | Gateway REST | Gateway proxy |
-|-----------|----------------|--------------|---------------|
-| List models | `POST https://v2.api.gommo.net/ai/models?type={type}` | `GET /gateway/models?type={type}` | `POST /v2/ai/models?type={type}` |
-| Create job | `POST https://v2.api.gommo.net/ai/jobs/{type}/{slug}` | `POST /gateway/jobs/{type}` | `POST /v2/ai/jobs/{type}/{slug}` |
-| Poll job | `POST https://v2.api.gommo.net/ai/jobs/{id}?media={media}` | `GET /gateway/jobs/{id}?media={media}` | `POST /v2/ai/jobs/{id}?media={media}` |
+| Operation | Gommo public API (recommended) | Optional self-host |
+|-----------|------------------------------|-------------------|
+| List models | `POST https://v2.api.gommo.net/ai/models?type={type}` | `{gateway}/gateway/models` or `{gateway}/v2/ai/models` |
+| Create job | `POST https://v2.api.gommo.net/ai/jobs/{type}/{model_id}` | `{gateway}/gateway/jobs/{type}` (JSON) |
+| Poll job | `POST https://v2.api.gommo.net/ai/jobs/{id}?media={media}` | `{gateway}/gateway/jobs/{id}` |
 
 **Job types:** `image`, `video`, `tts`, `music`, `avatar-lipsync`, `image-upscale`, `remove-bg`, `video-upscale`, `video-vfx`, `video-subtitle`, `video-cut`
 
@@ -25,96 +25,49 @@ Poll interval: **3500ms**, max **80** attempts. Send `domain` in form body (e.g.
 
 ## List models
 
-::: tip Public catalog
-`GET /gateway/models` does **not** require Bearer — browse models like OpenRouter. Optional user token or server-side fallback may apply. **Create job / poll** still require auth.
-
-Add `?lang=en` for English descriptions from `cache/catalog-descriptions.en.json` (warm with `npm run catalog:translate` using `GOMMO_ACCESS_TOKEN`). Runtime does not call external APIs unless `CATALOG_TRANSLATE_ON_REQUEST=true`.
-:::
-
 ::: code-group
 
-```bash [curl — REST (no auth)]
-curl.exe "http://localhost:3001/gateway/models?type=image"
-```
-
-```bash [curl — REST (with token)]
-curl.exe "http://localhost:3001/gateway/models?type=image" ^
-  -H "Authorization: Bearer %TOKEN%"
-```
-
-```powershell [PowerShell — REST]
-$h = @{ Authorization = "Bearer $env:TOKEN" }
-Invoke-RestMethod "http://localhost:3001/gateway/models?type=image" -Headers $h
-```
-
-```bash [curl — Direct]
+```bash [curl]
 curl.exe -X POST "https://v2.api.gommo.net/ai/models?type=image" ^
   -H "Authorization: Bearer %TOKEN%" ^
   -H "Content-Type: application/x-www-form-urlencoded" ^
-  -d "type=image&domain=%GOMMO_API_DOMAIN%"
+  -d "type=image&domain=79ai.net"
 ```
 
-```powershell [PowerShell — Proxy]
+```powershell [PowerShell]
 $d = if ($env:GOMMO_API_DOMAIN) { $env:GOMMO_API_DOMAIN } else { '79ai.net' }
+$h = @{ Authorization = "Bearer $env:TOKEN" }
 Invoke-RestMethod -Method POST `
-  -Uri "http://localhost:3001/v2/ai/models?type=image" `
-  -Headers @{ Authorization = "Bearer $env:TOKEN" } `
+  -Uri "https://v2.api.gommo.net/ai/models?type=image" `
+  -Headers $h `
   -ContentType "application/x-www-form-urlencoded" `
   -Body "type=image&domain=$d"
 ```
 
 :::
 
+Pick `model` / slug and allowed `ratio`, `mode`, `resolution` from the response — never guess.
+
 ---
 
 ## Create job
 
-### REST body
-
-```json
-{
-  "modelSlug": "flux-dev",
-  "wait": false,
-  "fields": {
-    "prompt": "A sunset over mountains",
-    "ratio": "16:9"
-  }
-}
-```
-
-- `wait: true` → gateway polls until done or timeout (~5 min).
-- `fields.ratio` (and `mode`, `resolution`, `duration`) **must** match the model catalog.
+`ratio`, `mode`, `resolution`, and `duration` **must** match the model catalog.
 
 ::: code-group
 
-```bash [curl — REST]
-curl.exe -X POST "http://localhost:3001/gateway/jobs/image" ^
-  -H "Authorization: Bearer %TOKEN%" -H "Content-Type: application/json" ^
-  -d "{\"modelSlug\":\"SLUG\",\"fields\":{\"prompt\":\"Hello\",\"ratio\":\"RATIO\"}}"
-```
-
-```powershell [PowerShell — REST]
-$body = @{
-  modelSlug = $slug
-  wait = $false
-  fields = @{ prompt = 'Hello'; ratio = $ratio }
-} | ConvertTo-Json -Depth 5
-Invoke-RestMethod -Method POST -Uri "http://localhost:3001/gateway/jobs/image" `
-  -Headers @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type'='application/json' } -Body $body
-```
-
-```bash [curl — Direct]
-curl.exe -X POST "https://v2.api.gommo.net/ai/jobs/image/SLUG" ^
+```bash [curl]
+curl.exe -X POST "https://v2.api.gommo.net/ai/jobs/image/MODEL_ID" ^
   -H "Authorization: Bearer %TOKEN%" ^
   -H "Content-Type: application/x-www-form-urlencoded" ^
-  -d "domain=%GOMMO_API_DOMAIN%&project_id=default&prompt=Hello&ratio=RATIO"
+  -d "domain=79ai.net&project_id=default&prompt=Hello&ratio=RATIO_FROM_CATALOG"
 ```
 
-```powershell [PowerShell — Proxy]
+```powershell [PowerShell]
 $d = if ($env:GOMMO_API_DOMAIN) { $env:GOMMO_API_DOMAIN } else { '79ai.net' }
 $form = "domain=$d&project_id=default&prompt=Hello&ratio=$ratio"
 Invoke-RestMethod -Method POST `
-  -Uri "http://localhost:3001/v2/ai/jobs/image/$slug" `
+  -Uri "https://v2.api.gommo.net/ai/jobs/image/$slug" `
   -Headers @{ Authorization = "Bearer $env:TOKEN" } `
   -ContentType "application/x-www-form-urlencoded" -Body $form
 ```
@@ -125,37 +78,43 @@ Invoke-RestMethod -Method POST `
 
 ## Poll job
 
+Repeat every **3500 ms**, max **80** times:
+
 ::: code-group
 
-```bash [curl — REST]
-curl.exe "http://localhost:3001/gateway/jobs/JOB_ID?media=image" ^
-  -H "Authorization: Bearer %TOKEN%"
-```
-
-```powershell [PowerShell — REST]
-Invoke-RestMethod "http://localhost:3001/gateway/jobs/$jobId?media=image" `
-  -Headers @{ Authorization = "Bearer $env:TOKEN" }
-```
-
-```bash [curl — Direct]
+```bash [curl]
 curl.exe -X POST "https://v2.api.gommo.net/ai/jobs/JOB_ID?media=image" ^
   -H "Authorization: Bearer %TOKEN%" ^
   -H "Content-Type: application/x-www-form-urlencoded" ^
-  -d "domain=%GOMMO_API_DOMAIN%"
+  -d "domain=79ai.net&project_id=default"
+```
+
+```powershell [PowerShell]
+$d = if ($env:GOMMO_API_DOMAIN) { $env:GOMMO_API_DOMAIN } else { '79ai.net' }
+Invoke-RestMethod -Method POST `
+  -Uri "https://v2.api.gommo.net/ai/jobs/$jobId?media=image" `
+  -Headers @{ Authorization = "Bearer $env:TOKEN" } `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body "domain=$d&project_id=default"
 ```
 
 :::
 
-On success: `data.resultUrl` or `raw.imageInfo.result_url`.
+On success: look for `result_url` / `file_url` in `imageInfo`, `videoInfo`, or equivalent in the response.
 
 ---
 
-## Envelope
+## Optional: self-host gateway (Mode B)
+
+JSON create with optional server-side poll:
 
 ```json
-{
-  "success": true,
-  "data": { "id_base": "...", "status": "PROCESSING" },
-  "raw": { "imageInfo": { "status": "...", "result_url": "https://..." } }
-}
+POST {gateway}/gateway/jobs/image
+{ "modelSlug": "…", "wait": true, "fields": { "prompt": "…", "ratio": "…" } }
 ```
+
+→ [Integration modes](../routing/integration-modes.md#mode-b-gateway-rest)
+
+## Response shape
+
+Gommo returns native JSON (`success`, `data`, `imageInfo` / `videoInfo`, …). Gateway Mode B wraps as `{ success, data, message, code }`.

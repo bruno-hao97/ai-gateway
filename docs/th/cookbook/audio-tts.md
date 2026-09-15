@@ -1,55 +1,49 @@
 ---
-title: 'สูตร: Audio TTS'
-description: ค้นหาเสียงและสร้างเสียงพูด
+title: 'Recipe: Audio TTS'
+description: ค้นหาเสียงและสร้าง speech
 ---
 
 # Audio TTS
 
-สองขั้น: **ค้นหาเสียง** → **สร้าง TTS**
+สองขั้น: **search voices** → **create TTS** ผ่าน `https://api.gommo.net/ai/audio`
 
-## 1. ค้นหาเสียง
+## 1. Search voices
 
 ```powershell
-$h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/json' }
-$body = @{ server = 'elevenlabs_cheap'; page = 0 } | ConvertTo-Json
-
+$body = "access_token=$env:TOKEN&domain=79ai.net&action_type=search_voices&server=elevenlabs_cheap&page=0"
 $voices = Invoke-RestMethod -Method POST `
-  -Uri "http://localhost:3001/gateway/audio/voices" `
-  -Headers $h -Body $body
+  -Uri "https://api.gommo.net/ai/audio" `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body $body
 $voiceId = $voices.data.voices[0].voice_id
 ```
 
-เซิร์ฟเวอร์: `elevenlabs_cheap` | `minimaxai_cheap` | `omnivoice_local`
+Servers: `elevenlabs_cheap` | `minimaxai_cheap` | `omnivoice_local`
 
-## 2. สร้าง TTS
+## 2. Create TTS
 
 ```powershell
-$ttsBody = @{
-  text = 'Hello from AI Gateway.'
-  voice_id = $voiceId
-  server = 'elevenlabs_cheap'
-  model = 'eleven_multilingual_v2'
-} | ConvertTo-Json
-
+$ttsBody = "access_token=$env:TOKEN&domain=79ai.net&action_type=tts&text=Hello from Gommo.&voice_id=$voiceId&server=elevenlabs_cheap"
 $tts = Invoke-RestMethod -Method POST `
-  -Uri "http://localhost:3001/gateway/audio/tts" `
-  -Headers $h -Body $ttsBody
-$tts.data.fileUrl
+  -Uri "https://api.gommo.net/ai/audio" `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body $ttsBody
+$tts.fileUrl
 ```
 
-## 3. ลิสต์ประวัติ (ทางเลือก)
+## 3. List history (ทางเลือก)
 
-```powershell
-Invoke-RestMethod `
-  -Uri "http://localhost:3001/gateway/audio/lists?projectId=default" `
-  -Headers @{ Authorization = "Bearer $env:TOKEN" }
-```
+ใช้ `action_type` ที่เหมาะสมบน endpoint `/ai/audio` เดียวกัน
+
+## ทางเลือก: gateway dev
+
+`POST http://localhost:3001/gateway/audio/voices` และ `/gateway/audio/tts` เมื่อ self-host
 
 ## Playground
 
-**Audio TTS** → Fetch voices → Run TTS **Audio lists** สำหรับประวัติ
+**Audio TTS** → Fetch voices → Run TTS
 
 ## ถัดไป
 
 - [อ้างอิงเสียง](../reference/audio.md)
-- [งาน TTS มีเดีย](./video-music-job.md) — gateway `/gateway/jobs/tts` vs platform `/gateway/audio/tts`
+- [TTS media job](./video-music-job.md) — V2 `type=tts` vs platform `/ai/audio`

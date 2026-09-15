@@ -35,9 +35,12 @@ Package ids include `basic-member`, `vip-member`, `ultra-member`, …
 `username` in the create body must match the Bearer token owner.
 
 ```powershell
-$me = Invoke-RestMethod `
-  -Uri "http://localhost:3001/ai/me" `
-  -Headers @{ Authorization = "Bearer $env:TOKEN" }
+$domain = if ($env:GOMMO_API_DOMAIN) { $env:GOMMO_API_DOMAIN } else { '79ai.net' }
+$meBody = "access_token=$env:TOKEN&domain=$domain"
+$me = Invoke-RestMethod -Method POST `
+  -Uri "https://api.gommo.net/ai/me" `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body $meBody
 $username = $me.username ?? $me.data.username
 Write-Host "username=$username"
 ```

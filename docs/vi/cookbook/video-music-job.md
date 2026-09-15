@@ -1,53 +1,49 @@
 ---
 title: 'Recipe: Video hoặc music job'
-description: List models và tạo video hoặc music job
+description: List models và tạo video/music jobs
 ---
 
 # Video hoặc music job
 
-Cùng shape REST với image — đổi `type` và poll `media`.
+Cùng pattern public API với image — đổi `type` và poll `media`.
 
 ## 1. List models
 
 ```powershell
+$h = @{ Authorization = "Bearer $env:TOKEN" }
+
 # Video
-Invoke-RestMethod `
-  -Uri "http://localhost:3001/gateway/models?type=video" `
-  -Headers @{ Authorization = "Bearer $env:TOKEN" }
+Invoke-RestMethod -Method POST `
+  -Uri "https://v2.api.gommo.net/ai/models?type=video" `
+  -Headers $h -ContentType "application/x-www-form-urlencoded" `
+  -Body "type=video&domain=79ai.net"
 
 # Music
-Invoke-RestMethod `
-  -Uri "http://localhost:3001/gateway/models?type=music" `
-  -Headers @{ Authorization = "Bearer $env:TOKEN" }
+Invoke-RestMethod -Method POST `
+  -Uri "https://v2.api.gommo.net/ai/models?type=music" `
+  -Headers $h -ContentType "application/x-www-form-urlencoded" `
+  -Body "type=music&domain=79ai.net"
 ```
 
-Parse `modelSlug` và catalog fields (`ratio`, `mode`, `duration`, …) từ response — **không đoán**.
+Parse model id và field catalog (`ratio`, `mode`, `duration`, …) từ response — **không đoán**.
 
 ## 2. Tạo music job (ví dụ)
 
 ```powershell
-$h = @{ Authorization = "Bearer $env:TOKEN"; 'Content-Type' = 'application/json' }
-$jobBody = @{
-  modelSlug = $slug
-  wait = $true
-  fields = @{
-    prompt = 'Upbeat electronic loop'
-    ratio = $ratio   # từ catalog nếu có
-  }
-} | ConvertTo-Json -Depth 5
-
+$body = "domain=79ai.net&project_id=default&prompt=Upbeat electronic loop&ratio=$ratio"
 Invoke-RestMethod -Method POST `
-  -Uri "http://localhost:3001/gateway/jobs/music" `
-  -Headers $h -Body $jobBody
+  -Uri "https://v2.api.gommo.net/ai/jobs/music/$slug" `
+  -Headers $h -ContentType "application/x-www-form-urlencoded" `
+  -Body $body
 ```
 
-Video: `POST /gateway/jobs/video` với models `type=video`.
+Video: `POST https://v2.api.gommo.net/ai/jobs/video/{model_id}` với models `type=video`.
 
 ## 3. Poll media
 
-| Loại job | `?media=` |
+| Job type | `?media=` |
 |----------|-----------|
-| `video`, `avatar-lipsync`, tool `video-*` | `video` |
+| `video`, `avatar-lipsync`, `video-*` tools | `video` |
 | `music` | `music` |
 | `image`, `image-upscale`, `remove-bg` | `image` |
 

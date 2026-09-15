@@ -24,8 +24,8 @@
     {
       code: 'VALIDATION_ERROR',
       http: 400,
-      recovery: 'Reload GET /gateway/models and use supported fields/enums only.',
-      recoveryVi: 'Gọi lại GET /gateway/models và chỉ dùng field/enum được catalog hỗ trợ.',
+      recovery: 'Reload POST v2.api.gommo.net/ai/models and use supported fields/enums only.',
+      recoveryVi: 'Gọi lại POST v2.api.gommo.net/ai/models và chỉ dùng field/enum được catalog hỗ trợ.',
     },
     {
       code: 'UNAUTHORIZED',
@@ -70,7 +70,7 @@
       'Authentication is present only in headers and the request uses HTTPS.',
       'Content-Type and serialization match the selected transport.',
       'Response is classified by HTTP status, success/ok, error_code — not message text.',
-      'Model id and options came from one fresh GET /gateway/models record.',
+      'Model id and options came from one fresh POST v2.api.gommo.net/ai/models record.',
       'Required user confirmation was captured before credit-consuming jobs.',
     ],
     vi: [
@@ -78,7 +78,7 @@
       'Auth chỉ ở headers và request dùng HTTPS.',
       'Content-Type và serialization khớp transport đã chọn.',
       'Phân loại response theo HTTP status, success/ok, error_code — không parse text.',
-      'Model id và option lấy từ một bản ghi GET /gateway/models mới.',
+      'Model id và option lấy từ một bản ghi POST v2.api.gommo.net/ai/models mới.',
       'Đã xác nhận với user trước job tốn credits.',
     ],
   };
@@ -89,8 +89,8 @@
       type: 'string',
       required: true,
       source: 'header',
-      description: 'Bearer access token from POST /gateway/auth/login.',
-      descriptionVi: 'Bearer access token từ POST /gateway/auth/login.',
+      description: 'Bearer access token from POST api.gommo.net/api/apps/go-mmo/auth/login.',
+      descriptionVi: 'Bearer access token từ POST api.gommo.net/api/apps/go-mmo/auth/login.',
       example: 'Bearer YOUR_ACCESS_TOKEN',
     },
     {
@@ -175,8 +175,8 @@
       auth: true,
       summary,
       overview: {
-        en: `Create an asynchronous ${jobType} generation job via gateway REST. Model slug and catalog fields go in JSON body.`,
-        vi: `Tạo job ${jobType} bất đồng bộ qua gateway REST. modelSlug và fields catalog nằm trong JSON body.`,
+        en: `Create an asynchronous ${jobType} job on v2.api.gommo.net (POST /ai/jobs/${jobType}/{modelSlug}). Optional dev proxy: POST /gateway/jobs/${jobType} (JSON).`,
+        vi: `Tạo job ${jobType} bất đồng bộ trên v2.api.gommo.net (POST /ai/jobs/${jobType}/{modelSlug}). Proxy dev tùy chọn: POST /gateway/jobs/${jobType} (JSON).`,
       },
       parameters: [
         {
@@ -193,8 +193,8 @@
           in: 'body',
           type: 'string',
           required: true,
-          description: 'Model slug from GET /gateway/models?type=' + jobType,
-          descriptionVi: 'Model slug từ GET /gateway/models?type=' + jobType,
+          description: 'Model slug from POST v2.api.gommo.net/ai/models?type=' + jobType,
+          descriptionVi: 'Model slug từ POST v2.api.gommo.net/ai/models?type=' + jobType,
           example: '<from_catalog>',
         },
         {
@@ -227,16 +227,18 @@
         },
       ],
       workflow: [
-        'Submit POST /gateway/jobs/' + jobType + ' with modelSlug and fields.',
-        'Capture public job id from data.id_base (or raw.*Info.id_base).',
-        'Poll GET /gateway/jobs/{id}?media=' + pollMedia + ' until terminal status.',
-        'Return resultUrl from data or handle structured error.',
+        'Submit POST v2.api.gommo.net/ai/jobs/' + jobType + '/{modelSlug} with domain and catalog fields.',
+        'Capture public job id from id_base (or *Info.id_base in response).',
+        'Poll POST v2.api.gommo.net/ai/jobs/{id_base}?media=' + pollMedia + ' until terminal status.',
+        'Return resultUrl from response or handle structured error.',
+        'Dev sandbox may use POST /gateway/jobs/' + jobType + ' (JSON) instead.',
       ],
       workflowVi: [
-        'Gửi POST /gateway/jobs/' + jobType + ' với modelSlug và fields.',
-        'Lấy job id public từ data.id_base (hoặc raw.*Info.id_base).',
-        'Poll GET /gateway/jobs/{id}?media=' + pollMedia + ' đến status terminal.',
-        'Trả resultUrl từ data hoặc xử lý lỗi có cấu trúc.',
+        'Gửi POST v2.api.gommo.net/ai/jobs/' + jobType + '/{modelSlug} với domain và fields catalog.',
+        'Lấy job id public từ id_base (hoặc *Info.id_base trong response).',
+        'Poll POST v2.api.gommo.net/ai/jobs/{id_base}?media=' + pollMedia + ' đến status terminal.',
+        'Trả resultUrl từ response hoặc xử lý lỗi có cấu trúc.',
+        'Sandbox dev có thể dùng POST /gateway/jobs/' + jobType + ' (JSON) thay thế.',
       ],
       pollMedia,
       aiPurpose: {
@@ -258,12 +260,12 @@
       contentTypes: ['application/json'],
       auth: false,
       summary: {
-        en: 'Browse models, prices, and capabilities for a job type.',
-        vi: 'Xem model, giá và capability theo loại job.',
+        en: 'Browse models, prices, and capabilities — POST v2.api.gommo.net/ai/models?type=…',
+        vi: 'Xem model, giá và capability — POST v2.api.gommo.net/ai/models?type=…',
       },
       overview: {
-        en: 'Public model catalog for a job type. Bearer optional when browsing.',
-        vi: 'Catalog model theo loại job. Bearer tùy chọn khi browse.',
+        en: 'Public model catalog for a job type on v2.api.gommo.net. Bearer optional when browsing. Dev proxy: GET /gateway/models?type=…',
+        vi: 'Catalog model theo loại job trên v2.api.gommo.net. Bearer tùy chọn khi browse. Proxy dev: GET /gateway/models?type=…',
       },
       parameters: [
         {
@@ -285,47 +287,55 @@
           example: 'en',
         },
       ],
-      workflow: ['Call before any create job.', 'Read slug, ratios, modes, prices from response.'],
-      workflowVi: ['Gọi trước mọi create job.', 'Đọc slug, ratios, modes, prices từ response.'],
+      workflow: [
+        'POST v2.api.gommo.net/ai/models?type=… before any create job.',
+        'Read slug, ratios, modes, prices from response.',
+        'Playground/dev may call GET /gateway/models?type=… via local proxy.',
+      ],
+      workflowVi: [
+        'POST v2.api.gommo.net/ai/models?type=… trước mọi create job.',
+        'Đọc slug, ratios, modes, prices từ response.',
+        'Playground/dev có thể gọi GET /gateway/models?type=… qua proxy local.',
+      ],
     },
     createJobEndpoint(
       'image',
       { en: 'Create AI image', vi: 'Tạo ảnh AI' },
       {
-        en: 'Create an AI image job through the gateway.',
-        vi: 'Tạo job ảnh AI qua gateway.',
+        en: 'Create an AI image job on v2.api.gommo.net.',
+        vi: 'Tạo job ảnh AI trên v2.api.gommo.net.',
       },
     ),
     createJobEndpoint(
       'video',
       { en: 'Create AI video', vi: 'Tạo video AI' },
       {
-        en: 'Create an AI video job through the gateway.',
-        vi: 'Tạo job video AI qua gateway.',
+        en: 'Create an AI video job on v2.api.gommo.net.',
+        vi: 'Tạo job video AI trên v2.api.gommo.net.',
       },
     ),
     createJobEndpoint(
       'avatar-lipsync',
       { en: 'Create face sync', vi: 'Tạo face sync' },
       {
-        en: 'Create a face-sync / lipsync job through the gateway.',
-        vi: 'Tạo job face-sync / lipsync qua gateway.',
+        en: 'Create a face-sync / lipsync job on v2.api.gommo.net.',
+        vi: 'Tạo job face-sync / lipsync trên v2.api.gommo.net.',
       },
     ),
     createJobEndpoint(
       'music',
       { en: 'Create AI music', vi: 'Tạo nhạc AI' },
       {
-        en: 'Create an AI music job through the gateway.',
-        vi: 'Tạo job nhạc AI qua gateway.',
+        en: 'Create an AI music job on v2.api.gommo.net.',
+        vi: 'Tạo job nhạc AI trên v2.api.gommo.net.',
       },
     ),
     createJobEndpoint(
       'tts',
       { en: 'Create text-to-speech', vi: 'Tạo text-to-speech' },
       {
-        en: 'Create a text-to-speech job through the gateway.',
-        vi: 'Tạo job text-to-speech qua gateway.',
+        en: 'Create a text-to-speech job on v2.api.gommo.net.',
+        vi: 'Tạo job text-to-speech trên v2.api.gommo.net.',
       },
     ),
     {
@@ -370,8 +380,8 @@
         vi: 'Poll trạng thái job async đến khi xong hoặc lỗi.',
       },
       overview: {
-        en: 'Poll async job status. Use id_base from create response, not internal task id.',
-        vi: 'Poll trạng thái job async. Dùng id_base từ create, không dùng task id nội bộ.',
+        en: 'Poll async job status on v2.api.gommo.net. Use id_base from create response, not internal task id. Dev proxy: GET /gateway/jobs/{id}?media=…',
+        vi: 'Poll trạng thái job async trên v2.api.gommo.net. Dùng id_base từ create, không dùng task id nội bộ. Proxy dev: GET /gateway/jobs/{id}?media=…',
       },
       parameters: [
         {
@@ -394,12 +404,14 @@
         },
       ],
       workflow: [
-        'Poll every 3.5s, max 80 attempts (~5 min).',
+        'Poll POST v2.api.gommo.net/ai/jobs/{id_base}?media=… every 3.5s, max 80 attempts (~5 min).',
         'Stop on success URL or terminal failure.',
+        'Dev sandbox may use GET /gateway/jobs/{id}?media=… instead.',
       ],
       workflowVi: [
-        'Poll mỗi 3.5s, tối đa 80 lần (~5 phút).',
+        'Poll POST v2.api.gommo.net/ai/jobs/{id_base}?media=… mỗi 3.5s, tối đa 80 lần (~5 phút).',
         'Dừng khi có URL thành công hoặc thất bại terminal.',
+        'Sandbox dev có thể dùng GET /gateway/jobs/{id}?media=… thay thế.',
       ],
     },
     {
@@ -768,8 +780,16 @@
           example: '[{ "role": "user", "content": "…" }]',
         },
       ],
-      workflow: ['Send POST /gateway/chat with action and messages.', 'Handle JSON or SSE stream response.'],
-      workflowVi: ['Gửi POST /gateway/chat với action và messages.', 'Xử lý response JSON hoặc SSE stream.'],
+      workflow: [
+        'Send POST api.gommo.net/api/v2/chat with action and messages.',
+        'Handle JSON or SSE stream response.',
+        'Dev proxy: POST /gateway/chat (optional).',
+      ],
+      workflowVi: [
+        'Gửi POST api.gommo.net/api/v2/chat với action và messages.',
+        'Xử lý response JSON hoặc SSE stream.',
+        'Proxy dev: POST /gateway/chat (tùy chọn).',
+      ],
       auth: true,
     },
     {
@@ -783,8 +803,8 @@
       contentTypes: ['multipart/form-data'],
       auth: true,
       overview: {
-        en: 'Upload reference image; use returned URL in job fields.',
-        vi: 'Upload ảnh tham chiếu; dùng URL trả về trong fields job.',
+        en: 'Upload reference image on v2.api.gommo.net (POST /ai/upload/image); use returned URL in job fields.',
+        vi: 'Upload ảnh tham chiếu trên v2.api.gommo.net (POST /ai/upload/image); dùng URL trả về trong fields job.',
       },
       parameters: [
         {
@@ -812,8 +832,8 @@
       contentTypes: ['multipart/form-data'],
       auth: true,
       overview: {
-        en: 'Upload video file; multipart field video_file or file.',
-        vi: 'Upload video; field multipart video_file hoặc file.',
+        en: 'Upload video on v2.api.gommo.net (POST /ai/upload/video); multipart field video_file or file.',
+        vi: 'Upload video trên v2.api.gommo.net (POST /ai/upload/video); field multipart video_file hoặc file.',
       },
       parameters: [
         {
@@ -841,8 +861,8 @@
       contentTypes: ['multipart/form-data'],
       auth: true,
       overview: {
-        en: 'Upload reference audio (mp3/wav) for avatar lip-sync and similar jobs.',
-        vi: 'Upload audio tham chiếu (mp3/wav) cho avatar lip-sync và job tương tự.',
+        en: 'Upload reference audio on v2.api.gommo.net (POST /ai/upload/audio) for avatar lip-sync and similar jobs.',
+        vi: 'Upload audio tham chiếu trên v2.api.gommo.net (POST /ai/upload/audio) cho avatar lip-sync và job tương tự.',
       },
       parameters: [
         {
@@ -870,8 +890,8 @@
       contentTypes: ['application/json'],
       auth: true,
       overview: {
-        en: 'Platform TTS (not media job). Returns audio file URL.',
-        vi: 'TTS platform (không phải media job). Trả URL file audio.',
+        en: 'Platform TTS on api.gommo.net (POST /ai/audio). Returns audio file URL. Dev proxy: POST /gateway/audio/tts.',
+        vi: 'TTS platform trên api.gommo.net (POST /ai/audio). Trả URL file audio. Proxy dev: POST /gateway/audio/tts.',
       },
       parameters: [
         {
@@ -888,8 +908,8 @@
           in: 'body',
           type: 'string',
           required: true,
-          description: 'From POST /gateway/audio/voices',
-          descriptionVi: 'Từ POST /gateway/audio/voices',
+          description: 'From POST api.gommo.net/ai/audio/voices (dev: POST /gateway/audio/voices)',
+          descriptionVi: 'Từ POST api.gommo.net/ai/audio/voices (dev: POST /gateway/audio/voices)',
           example: '…',
         },
         {
@@ -953,8 +973,8 @@
       contentTypes: ['application/json'],
       auth: false,
       overview: {
-        en: 'Exchange email/password for access_token.',
-        vi: 'Đổi email/password lấy access_token.',
+        en: 'Exchange email/password for access_token on api.gommo.net. Dev proxy: POST /gateway/auth/login.',
+        vi: 'Đổi email/password lấy access_token trên api.gommo.net. Proxy dev: POST /gateway/auth/login.',
       },
       parameters: [
         {
@@ -985,8 +1005,14 @@
           example: '79ai.net',
         },
       ],
-      workflow: ['POST credentials; save access_token from response.', 'Use token as Bearer for gateway calls.'],
-      workflowVi: ['POST credentials; lưu access_token từ response.', 'Dùng token làm Bearer cho gateway.'],
+      workflow: [
+        'POST credentials to api.gommo.net/api/apps/go-mmo/auth/login; save access_token.',
+        'Use token as Bearer on v2.api.gommo.net and api.gommo.net.',
+      ],
+      workflowVi: [
+        'POST credentials tới api.gommo.net/api/apps/go-mmo/auth/login; lưu access_token.',
+        'Dùng token làm Bearer trên v2.api.gommo.net và api.gommo.net.',
+      ],
       auth: false,
     },
     {

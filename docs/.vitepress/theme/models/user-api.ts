@@ -17,6 +17,7 @@ export const STORAGE_ME = 'gw_user_me';
 export interface MeResponse {
   success?: boolean;
   userInfo?: {
+    id_base?: string;
     name?: string;
     email?: string;
     username?: string;
@@ -236,6 +237,23 @@ function normalizeMeResponse(raw: Record<string, unknown>): MeResponse {
   };
 }
 
+/** True when Gommo returned a real account profile (same checks as billing identity). */
+export function isValidMeResponse(data: MeResponse | null | undefined): boolean {
+  if (!data || data.error || data.success === false) return false;
+  const u = data.userInfo;
+  if (!u) return false;
+  return Boolean(u.id_base?.trim() || u.email?.trim() || u.username?.trim());
+}
+
+export function assertValidMeResponse(data: MeResponse): void {
+  if (data.error || data.success === false) {
+    throw new Error(String(data.message || 'Could not load profile'));
+  }
+  if (!isValidMeResponse(data)) {
+    throw new Error(String(data.message || 'Invalid access token'));
+  }
+}
+
 export async function fetchMe(): Promise<MeResponse> {
   const token = getStoredToken();
   const domain = getStoredDomain();
@@ -250,9 +268,10 @@ export async function fetchMe(): Promise<MeResponse> {
   });
   const raw = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   const data = normalizeMeResponse(raw);
-  if (!res.ok || data.error) {
+  if (!res.ok) {
     throw new Error(String(data.message || 'Could not load profile'));
   }
+  assertValidMeResponse(data);
   setCachedMe(data);
   return data;
 }

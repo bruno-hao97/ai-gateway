@@ -5,7 +5,9 @@ description: Mode A Direct, Mode B REST, and Mode C Proxy — auth, domain, and 
 
 # Integration modes
 
-AI Gateway supports three ways to reach Gommo. All modes use the **same user token** and **same model catalog** — only the URL shape and ergonomics differ.
+Three ways to reach Gommo. **Mode A (Direct)** is recommended for production — call `v2.api.gommo.net` and `api.gommo.net` from your backend. Modes B/C are optional when you self-host this gateway.
+
+All modes use the **same user token** and **same model catalog** — only the URL shape and ergonomics differ.
 
 ## Quick comparison
 
@@ -17,7 +19,7 @@ AI Gateway supports three ways to reach Gommo. All modes use the **same user tok
 | Hides upstream URL | No | Yes | Yes |
 | Poll / wrap | Implement yourself | `wait: true` built-in | Raw Gommo envelope |
 | Response shape | Gommo native | `{ success, data, message, code }` | Gommo native |
-| Best for | Backend without gateway | New integrations | Legacy Gommo FE drop-in |
+| Best for | **Production apps** | Self-host dev, billing, BYOK | Legacy Gommo FE drop-in |
 
 `{gateway}` = `http://localhost:3001` (dev) or production API URL.
 
@@ -25,7 +27,7 @@ AI Gateway supports three ways to reach Gommo. All modes use the **same user tok
 
 ## Mode A — Direct Gommo {#mode-a-direct-gommo}
 
-Call upstream hosts directly from your trusted backend. No gateway in the path.
+**Recommended.** Call upstream hosts directly from your trusted backend. No gateway in the path.
 
 **V2 media jobs:**
 
@@ -41,22 +43,24 @@ domain={GOMMO_API_DOMAIN}&project_id=default&prompt=...&ratio=...
 
 ```http
 POST https://api.gommo.net/api/apps/go-mmo/auth/login
-POST https://api.gommo.net/api/apps/go-mmo/ai/me
+POST https://api.gommo.net/ai/me
 POST https://api.gommo.net/api/v2/chat
 POST https://api.gommo.net/ai/audio
 ```
 
-Use when you do not depend on the gateway — e.g. mobile app with its own backend, or internal service already integrated with Gommo.
+Use for mobile apps, SaaS backends, agents, and any integration that does not need self-hosted billing or BYOK.
 
 ::: warning You own polling
-Gommo does not webhook job completion. Implement poll (3.5s interval, ~80 attempts) or use Mode B `wait: true`.
+Gommo does not webhook job completion. Poll every **3.5s**, max **80** attempts — or use Mode B `wait: true` on a self-hosted gateway.
 :::
+
+→ [Gommo public API](../reference/gommo-public-api.md) · [Quickstart](../quickstart.md)
 
 ---
 
 ## Mode B — Gateway REST {#mode-b-gateway-rest}
 
-JSON API on `/gateway/*`. The gateway translates REST bodies to upstream form calls and optionally polls.
+**Optional.** JSON API on `/gateway/*` when you run this repo. The gateway translates REST bodies to upstream form calls and optionally polls.
 
 **Domain auto-fill:** if the client omits `domain`, the gateway injects `GOMMO_API_DOMAIN` from server env.
 
@@ -97,13 +101,13 @@ Errors:
 { "success": false, "message": "…", "code": "VALIDATION_ERROR" }
 ```
 
-Recommended for new scripts, SPAs (with CORS if cross-origin), and automation.
+Use for local dev, Gommo VietQR billing, BYOK, and automation that prefers JSON + `wait: true`.
 
 ---
 
 ## Mode C — Gateway proxy {#mode-c-gateway-proxy}
 
-Transparent pass-through — same paths as Gommo, but base URL is your gateway.
+**Optional.** Transparent pass-through — same paths as Gommo, but base URL is your gateway.
 
 | Mount on gateway | Upstream | Notes |
 |------------------|----------|-------|
@@ -150,4 +154,4 @@ All three modes:
 
 ## Next
 
-→ [Choosing a mode](./choosing-a-mode.md) · [Endpoint map](./endpoint-map.md) · [Models overview](../models/)
+→ [Choosing a mode](./choosing-a-mode.md) · [Endpoint map](./endpoint-map.md) · [Gommo public API](../reference/gommo-public-api.md)

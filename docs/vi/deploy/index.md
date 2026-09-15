@@ -121,7 +121,7 @@ Set khi chạy `npm run docs:build`. Giá trị được bake vào bundle static
 
 | Tính năng | Dùng `VITE_GATEWAY_URL` |
 |-----------|-------------------------|
-| Catalog / compare | `GET /gateway/models` |
+| Catalog / compare | Gommo public API (`POST v2…/ai/models`) hoặc portal proxy |
 | Đăng nhập / đăng ký | `POST /gateway/auth/*` |
 | Dashboard `/app/*` | `POST /ai/me`, `/billing/*` |
 | Playground embed | `{API}/portal/playground.html?embed=1` |

@@ -1,11 +1,11 @@
 ---
 title: Media jobs
-description: Async image, video, and music generation with optional server-side polling
+description: Async image, video, and music generation on Gommo V2
 ---
 
 # Media jobs
 
-Generate **images**, **videos**, **music**, and other media through Gommo V2 jobs. Jobs are **asynchronous** — create, then poll until complete.
+Generate **images**, **videos**, **music**, and other media through **Gommo V2** (`https://v2.api.gommo.net`). Jobs are **asynchronous** — create, then poll until complete.
 
 ## Supported job types
 
@@ -22,102 +22,74 @@ Generate **images**, **videos**, **music**, and other media through Gommo V2 job
 List available models for each type:
 
 ```http
-GET /gateway/models?type=image
-Authorization: Bearer {token}
+POST https://v2.api.gommo.net/ai/models?type=image
+Authorization: Bearer {access_token}
+Content-Type: application/x-www-form-urlencoded
+
+type=image&domain=79ai.net
 ```
 
 ## Typical flow
 
 ```
-1. GET  /gateway/models?type=image     → pick modelSlug + ratio/mode/…
-2. POST /gateway/jobs/image            → create job (optional wait: true)
-3. GET  /gateway/jobs/:id?media=image  → poll if wait: false
-4. Use resultUrl from completed job
+1. POST v2…/ai/models?type=image     → pick model id + ratio/mode/…
+2. POST v2…/ai/jobs/image/{model_id} → create job
+3. POST v2…/ai/jobs/{id}?media=image → poll until complete
+4. Use result URL from completed job
 ```
 
-## Create job (Mode B)
+## Create job
 
 ```http
-POST /gateway/jobs/image
-Authorization: Bearer {token}
-Content-Type: application/json
+POST https://v2.api.gommo.net/ai/jobs/image/{model_id}
+Authorization: Bearer {access_token}
+Content-Type: application/x-www-form-urlencoded
 
-{
-  "modelSlug": "flux-dev",
-  "wait": true,
-  "fields": {
-    "prompt": "A product on white background",
-    "ratio": "16:9",
-    "mode": "low",
-    "resolution": "2k"
-  }
-}
+domain=79ai.net&project_id=default&prompt=A product on white background&ratio=16:9&mode=low&resolution=2k
 ```
 
 ::: warning
-`ratio`, `mode`, `resolution`, and `duration` must come from **your** models list for **that** slug — not from docs or other models.
+`ratio`, `mode`, `resolution`, and `duration` must come from **your** models list for **that** model — not from docs or other models.
 :::
 
-## Server-side polling (`wait: true`)
+## Polling
 
-When `wait: true`, the gateway polls upstream for you:
-
-| Setting | Value |
-|---------|-------|
-| Interval | 3500 ms |
-| Max attempts | 80 (~4.7 min) |
-| Success | Returns `resultUrl` in response |
-| Timeout | Structured error with job id if available |
-
-When `wait: false`, the response includes a job id — your client must poll:
+Poll every **3500 ms**, max **80** attempts:
 
 ```http
-GET /gateway/jobs/{jobId}?media=image
-Authorization: Bearer {token}
+POST https://v2.api.gommo.net/ai/jobs/{id_base}?media=image
+Authorization: Bearer {access_token}
+Content-Type: application/x-www-form-urlencoded
+
+domain=79ai.net&project_id=default
 ```
 
-**Poll media** depends on job type: `image` | `video` | `music`.
+**Poll `media`:** `image` | `video` | `music` (match job type).
 
 ## Upload + job pipeline
 
 Many video/image workflows need an asset URL first:
 
 1. [Upload image or video](./upload.md) → get file URL
-2. Pass URL in job `fields` (field name from model catalog)
+2. Pass URL in job form (field name from model catalog)
 3. Create and poll job
 
-## Mode C (proxy)
+## Job status (auth host)
 
-Same flow with Gommo-native paths:
+Optional detail endpoints on **`api.gommo.net`**:
 
 ```
-POST /v2/ai/models?type=image
-POST /v2/ai/jobs/image/{modelSlug}
-POST /v2/ai/jobs/{id}?media=image
+POST https://api.gommo.net/ai/info/image/{id_base}
+POST https://api.gommo.net/ai/info/video/{id}
 ```
 
-Form body must include `domain` and `project_id=default`.
+## Optional: self-host gateway
 
-## Response envelope
-
-Mode B wraps upstream:
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": "...",
-    "status": "SUCCESS",
-    "resultUrl": "https://..."
-  }
-}
-```
-
-Mode C returns Gommo native shape (`raw.imageInfo`, etc.).
+JSON REST with `wait: true` at `{gateway}/gateway/jobs/*` — see [Integration modes](../routing/integration-modes.md). Proxy pass-through: `POST {gateway}/v2/ai/jobs/…` with form `domain`.
 
 ## Full API
 
-→ [Media & jobs reference](../reference/media.md) · [Models overview](../models/) · [Endpoint map](../routing/endpoint-map.md)
+→ [Media & jobs reference](../reference/media.md) · [Models overview](../models/) · [Gommo public API](../reference/gommo-public-api.md)
 
 ## Next
 

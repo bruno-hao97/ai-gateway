@@ -4,7 +4,7 @@ import { useRoute } from 'vitepress';
 import { useVitepressUrlSync } from '../composables/use-vitepress-url-sync';
 import type { PlaygroundPortalLocale } from '../models/playground-locale-bridge';
 import { useHybridLocale } from '../composables/use-hybrid-locale';
-import { getStoredToken, getStoredDomain, importSessionFromUrl, loginUrlWithRedirect } from '../models/auth-api';
+import { clearAuth, getStoredToken, getStoredDomain, importSessionFromUrl, loginUrlWithRedirect } from '../models/auth-api';
 import {
   fetchMe,
   fetchTopupOrders,
@@ -15,8 +15,10 @@ import {
   getEmail,
   getAvatarUrl,
   getUsername,
+  isValidMeResponse,
   type MeResponse,
   type TopupOrder,
+  clearCachedMe,
 } from '../models/user-api';
 import AppNavIcon from './AppNavIcon.vue';
 import AppChatPanel from './AppChatPanel.vue';
@@ -32,6 +34,7 @@ import ByokPanel from './ByokPanel.vue';
 import FilesPanel from './FilesPanel.vue';
 import ObservabilityPanel from './ObservabilityPanel.vue';
 import { activityHubHref, PROFILE_USAGE_PREVIEW_PERIOD } from '../models/activity-hub-url';
+import { GOMMO_V2_HOST } from '../models/gommo-hosts';
 import { formatApproxUsd } from '../models/invoice-buyer';
 import { PORTAL_LOW_CREDITS_THRESHOLD } from '../models/portal-credits';
 
@@ -76,7 +79,9 @@ const route = useRoute();
 const { isVi, prefix, locale: uiLocale, t } = useHybridLocale();
 
 const ready = ref(false);
-const me = ref<MeResponse | null>(getCachedMe());
+const cachedMe = getCachedMe();
+if (cachedMe && !isValidMeResponse(cachedMe)) clearCachedMe();
+const me = ref<MeResponse | null>(isValidMeResponse(cachedMe) ? cachedMe : null);
 const loadError = ref('');
 const copied = ref(false);
 const overviewUsageStats = ref<OverviewUsageStats>({
@@ -325,16 +330,11 @@ function profileSectionHref(section: ProfileSection): string {
 const curlSnippet = computed(() => {
   const t = token.value;
   if (!t) return '';
-  return `curl -X POST "${apiBaseDisplay.value}/gateway/jobs/image" \\
+  const domain = loginDomain.value || '79ai.net';
+  return `curl -X POST "${GOMMO_V2_HOST}/ai/jobs/image/MODEL_ID" \\
   -H "Authorization: Bearer ${t}" \\
-  -H "Content-Type: application/json" \\
-  -d '{"model":"MODEL_ID","prompt":"Hello"}'`;
-});
-
-const apiBaseDisplay = computed(() => {
-  if (import.meta.env.DEV) return 'http://localhost:3001';
-  const env = import.meta.env.VITE_GATEWAY_URL as string | undefined;
-  return env?.replace(/\/$/, '') || 'https://api.yourdomain.com';
+  -H "Content-Type: application/x-www-form-urlencoded" \\
+  -d "domain=${domain}&prompt=Hello"`;
 });
 
 function isActive(id: string): boolean {
@@ -422,12 +422,25 @@ function markTokenCopied() {
   }
 }
 
-async function refreshProfile() {
+function redirectToLogin() {
+  const returnPath = route.path + (typeof window !== 'undefined' ? window.location.search : '');
+  window.location.href = loginUrlWithRedirect(returnPath, prefix.value);
+}
+
+async function refreshProfile(): Promise<boolean> {
   loadError.value = '';
   try {
     me.value = await fetchMe();
+    return true;
   } catch (e) {
-    loadError.value = e instanceof Error ? e.message : String(e);
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!isPublicAppView()) {
+      clearAuth();
+      redirectToLogin();
+      return false;
+    }
+    loadError.value = msg;
+    return false;
   }
 }
 
@@ -526,18 +539,18 @@ async function loadProfileView() {
 }
 
 onMounted(async () => {
-  importSessionFromUrl();
+  await importSessionFromUrl();
   tokenCopiedEver.value = readTokenCopiedFlag();
   if (!getStoredToken()) {
     if (!isPublicAppView()) {
-      const returnPath = route.path + (typeof window !== 'undefined' ? window.location.search : '');
-      window.location.href = loginUrlWithRedirect(returnPath, prefix.value);
+      redirectToLogin();
       return;
     }
     ready.value = true;
     return;
   }
-  await refreshProfile();
+  const profileOk = await refreshProfile();
+  if (!profileOk) return;
   if (props.view === 'profile') {
     await loadProfileView();
   }
@@ -1013,9 +1026,9 @@ useVitepressUrlSync(syncDashboardFromLocation);
               <p class="or-app-panel-desc">
                 {{
                   t(
-                    'One session token for /gateway/* — snippets, health checks, and MCP on the Access token page.',
-                    'Một session token cho /gateway/* — snippet, health check và MCP trên trang Access token.',
-                    'Session token เดียวสำหรับ /gateway/* — snippet health check และ MCP ในหน้า Access token',
+                    'Gommo Bearer token for api.gommo.net and v2.api.gommo.net — snippets and MCP on the Access token page.',
+                    'Bearer token Gommo cho api.gommo.net và v2.api.gommo.net — snippet và MCP trên trang Access token.',
+                    'Gommo Bearer token สำหรับ api.gommo.net และ v2.api.gommo.net — snippet และ MCP ในหน้า Access token',
                   )
                 }}
               </p>

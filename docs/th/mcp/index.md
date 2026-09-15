@@ -19,7 +19,7 @@ Remote MCP ที่ `https://api.gommo.net/api/v2/gommo-mcp` — **10 tools `go
 | **Claude Desktop** | ✅ | [โฮสต์อื่น](./other-hosts.md) |
 | **Windsurf** | ✅ | [โฮสต์อื่น](./other-hosts.md) |
 | **VS Code / Zed** | ⚠️ ขึ้นกับ extension | [โฮสต์อื่น](./other-hosts.md) |
-| **แอป / backend** | HTTP ไม่ใช่ MCP | [`/gateway/*`](../routing/endpoint-map.md) |
+| **แอป / backend** | HTTP ไม่ใช่ MCP | [Gommo public API](../reference/gommo-public-api.md) · [Quickstart](../quickstart.md) |
 
 ## 10 tools เมื่อเชื่อมต่อ
 
@@ -57,11 +57,11 @@ Remote MCP ที่ `https://api.gommo.net/api/v2/gommo-mcp` — **10 tools `go
 
 ## MCP vs HTTP
 
-| | **79ai MCP** | **HTTP `/gateway/*`** |
-|---|-------------|----------------------|
+| | **79ai MCP** | **HTTP (Gommo public API)** |
+|---|-------------|---------------------------|
 | Cursor / Claude / IDE | ✅ | ❌ |
 | เว็บ / มือถือ / script | ❌ | ✅ |
-| ต้องรัน gateway | ❌ | ✅ (API deploy) |
+| ต้อง self-host gateway | ❌ | ❌ (เรียก `v2.api.gommo.net` / `api.gommo.net`) |
 
 token login เดียวกัน — สไตล์การเชื่อมต่อต่างกัน
 

@@ -63,14 +63,14 @@ OpenAI shim accepts standard `messages[]` + optional `stream: true`. Model forma
 | TTS | `POST api…/ai/audio` | `POST {gateway}/gateway/audio/tts` | `POST {gateway}/ai/audio` |
 | Lists | `GET api…/…` | `GET {gateway}/gateway/audio/lists` | via platform paths |
 
-## Auth (always via platform host)
+## Auth (platform host — Mode A recommended)
 
-| Operation | Mode A | Mode B/C |
-|-----------|--------|----------|
-| Login | `POST api…/api/apps/go-mmo/auth/login` | `POST {gateway}/api/apps/go-mmo/auth/login` |
-| Profile | `POST api…/api/apps/go-mmo/ai/me` | `POST {gateway}/api/apps/go-mmo/ai/me` |
+| Operation | Mode A (Direct) | Mode B/C (optional gateway) |
+|-----------|-----------------|------------------------------|
+| Login | `POST https://api.gommo.net/api/apps/go-mmo/auth/login` | `POST {gateway}/api/apps/go-mmo/auth/login` or `POST {gateway}/gateway/auth/login` (JSON) |
+| Profile | `POST https://api.gommo.net/ai/me` | `POST {gateway}/ai/me` |
 
-Login and `/ai/me` are **not** under `/gateway` — use the auth proxy path on the gateway.
+Call Gommo directly for login and `/ai/me`. Gateway JSON auth (`/gateway/auth/*`) is optional for self-host only.
 
 ## Domain field
 

@@ -5,7 +5,7 @@ description: ratio, mode, resolution, duration — always from the models catalo
 
 # Parameters
 
-Gommo models expose allowed fields in the **models list response**. AI Gateway does not validate or invent values — upstream rejects guesses.
+Gommo models expose allowed fields in the **models list response**. Upstream rejects guessed values.
 
 ## Response shape (simplified)
 
@@ -24,7 +24,7 @@ Gommo models expose allowed fields in the **models list response**. AI Gateway d
 }
 ```
 
-Field names vary by model — **always** use arrays returned in the response for **that** slug.
+Field names vary by model — **always** use arrays returned in the response for **that** model id.
 
 ## Common job fields
 
@@ -35,19 +35,19 @@ Field names vary by model — **always** use arrays returned in the response for
 | `resolution` | `resolutions[]` | Output size |
 | `duration` | catalog (video/music) | Length — never guess |
 | `prompt` | your app | Text prompt |
-| `modelSlug` | `model` or `slug` field | Required on create |
+| model id | `model`, `slug`, or `id_base` | URL path on create |
 
 ::: warning
-Do not copy `ratio` / `mode` / `resolution` / `duration` from docs, other models, or examples — read them from **your** models list for **that** slug.
+Do not copy `ratio` / `mode` / `resolution` / `duration` from docs, other models, or examples — read them from **your** models list for **that** model.
 :::
 
 ## Slug field names
 
-Upstream may use `model`, `slug`, `model_id`, or `id`. Mode B REST expects **`modelSlug`** in the JSON body — map from the catalog field your list returns.
+Upstream may use `model`, `slug`, `model_id`, or `id_base`. Use the id from the catalog in the create URL: `POST …/ai/jobs/{type}/{model_id}`.
 
 ## Tool jobs
 
-Some tool models expect different input keys (`url`, `image`, …). Check `GET /gateway/models?type=…` or the RESPONSE panel in [Playground](/app/playground/).
+Some tool models expect different input keys (`url`, `image`, …). Check `POST …/ai/models?type=…` or the RESPONSE panel in [Playground](/app/playground/).
 
 ## Next
 

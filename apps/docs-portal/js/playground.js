@@ -5227,7 +5227,7 @@ async function fetchModelsForType(type, { statusEl, force = false } = {}) {
       const data = await apiFetch(
         `/gateway/models?${params}`,
         { headers: optionalAuthHeaders() },
-        publicApiLabel('GET', `/ai/models?${params}`),
+        publicApiLabel('POST', `/ai/models?${params}`),
       );
       const models = normalizeModels(data);
       setStoredModels(type, data);
@@ -6387,7 +6387,7 @@ $('btnLogin').addEventListener('click', async () => {
           ...loginDevicePayload(),
         }),
       },
-      'POST /gateway/auth/login',
+      'POST api.gommo.net/api/apps/go-mmo/auth/login',
     );
     const token = extractAccessToken(data);
     if (!token) {

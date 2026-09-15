@@ -25,7 +25,7 @@ Giúp cải thiện docs và hành vi API AI Gateway.
 |--------|-------|
 | **Environment** | local / Railway / Fly, phiên bản Node |
 | **Mode** | B REST / C proxy / direct upstream |
-| **Endpoint** | `POST /gateway/jobs/image` |
+| **Endpoint** | `POST https://v2.api.gommo.net/ai/jobs/image/{model_id}` (hoặc `{gateway}/gateway/jobs/image` khi dev) |
 | **Request** | Che token — chỉ shape JSON |
 | **Response** | Envelope lỗi đầy đủ |
 | **Expected** | Kỳ vọng của bạn |
