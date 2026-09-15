@@ -9,6 +9,8 @@ description: Hybrid Bring Your Own Key — key provider cho chat, Gommo account 
 BYOK **chưa sẵn sàng production**. Dùng cho dev, staging hoặc gateway self-host khi bạn chấp nhận giới hạn bên dưới. Billing, fallback và hành vi provider có thể đổi mà không cần major version.
 :::
 
+**Deploy production:** xem [BYOK production checklist](/vi/guides/byok-production.md) (encryption key, volume, smoke test).
+
 **BYOK** trên gateway này là **hybrid** — khác OpenRouter (chỉ chat BYOK):
 
 | Workload | Auth / billing | Bạn cần làm |

@@ -9,6 +9,8 @@ description: Hybrid Bring Your Own Key — provider keys for chat, Gommo account
 BYOK is **not production-complete**. Use it for dev, staging, or self-hosted gateways where you accept the limits below. Billing, fallback, and provider behavior may change without a major version bump.
 :::
 
+**Production deploy:** follow the [BYOK production checklist](/guides/byok-production.md) (encryption key, persistent volumes, smoke test).
+
 **BYOK** (Bring Your Own Key) on this gateway is **hybrid** — unlike OpenRouter-style chat-only BYOK:
 
 | Workload | Auth / billing | Your setup |

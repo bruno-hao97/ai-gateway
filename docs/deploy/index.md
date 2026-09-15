@@ -107,6 +107,8 @@ fly certs add api.yourdomain.com
 | `ADMIN_RATE_LIMIT_MAX` | Default 30/min/IP for `/admin` |
 | `BILLING_RATE_LIMIT_MAX` | Default 60/min/IP for `/billing` |
 | Billing | Default Gommo VietQR needs no extra env; optional PayOS legacy — see [Billing](../guides/billing-credits.md) |
+| `BYOK_ENCRYPTION_KEY` | **Required** when `BYOK_ENABLED` and `NODE_ENV=production` — `npm run byok:generate-key` |
+| `BYOK_STORE_FILE` | Persistent volume — see [BYOK production](../guides/byok-production.md) |
 
 Full template: `.env.example` in repo root.
 

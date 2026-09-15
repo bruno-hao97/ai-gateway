@@ -33,3 +33,6 @@ jobs:
 
       - name: Observability store tests
         run: npm run test:observability
+
+      - name: BYOK production guard tests
+        run: npm run test:byok

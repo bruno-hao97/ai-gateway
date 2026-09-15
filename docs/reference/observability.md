@@ -142,7 +142,7 @@ For reliable job notifications in production **today**:
 2. Poll job status client-side (3.5s interval, ~80 attempts) as documented in [integration modes](../routing/integration-modes.md), **and optionally**
 3. Add a beta webhook as a **secondary** signal — including background delivery for `wait: false` when webhooks are configured.
 
-Background delivery has the same limits as gateway poll (no retry queue, single-instance file store). Prefer `wait: true` or client poll for production-critical flows.
+Background delivery retries webhook POSTs (configurable) and persists async poll jobs to disk (single-instance file store). Prefer `wait: true` or client poll for production-critical flows.
 
 ## UI
 

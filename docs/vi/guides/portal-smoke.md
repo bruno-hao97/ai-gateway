@@ -68,7 +68,7 @@ Xem [Activity hub](./activity-hub.md). Kiểm tra nhanh:
 
 ## BYOK (`/app/byok/`)
 
-Xem [BYOK reference](/vi/reference/byok.md). Kiểm tra nhanh:
+Xem [BYOK reference](/vi/reference/byok.md) và [BYOK production checklist](/vi/guides/byok-production.md). Kiểm tra nhanh:
 
 - [ ] Lưu key → message xanh (không flash cả trang; chỉ **Refreshing…**)
 - [ ] Test / Xóa có confirm

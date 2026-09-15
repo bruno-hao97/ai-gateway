@@ -20,6 +20,7 @@ import {
   isPayOsConfigured,
   isPortalEnabled,
 } from './config.js';
+import { assertByokProductionConfig } from './services/byokProductionGuard.js';
 import { resumeBackgroundPollQueue } from './services/observabilityJobBackground.js';
 import { gatewayCors } from './middleware/cors.js';
 import { adminRateLimit, billingRateLimit, gatewayRateLimit } from './middleware/rateLimit.js';
@@ -56,6 +57,7 @@ app.get('/health', (_req, res) => {
       payosConfigured: isPayOsConfigured(),
       byokEnabled: isByokEnabled(),
       byokBeta: isByokBeta(),
+      byokEncryptionConfigured: isByokEnabled() ? Boolean(config.byok.encryptionKey) : false,
     },
   });
 });
@@ -93,6 +95,8 @@ app.use((err: unknown, _req: express.Request, res: express.Response, next: expre
   console.error('[gateway]', message);
   sendError(res, 500, 'Internal server error', 'INTERNAL_ERROR');
 });
+
+assertByokProductionConfig();
 
 app.listen(config.port, () => {
   const portal = isPortalEnabled() ? ` · portal http://localhost:${config.port}/portal/` : '';

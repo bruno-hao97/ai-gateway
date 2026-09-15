@@ -88,6 +88,8 @@ fly certs add api.yourdomain.com
 | `GATEWAY_PORTAL` | `true` bật portal prod (cẩn thận) |
 | Rate limit vars | Xem [Best practices](../best-practices/) |
 | Billing | Gommo VietQR mặc định không cần env thêm; PayOS legacy tùy chọn — xem [Billing](../guides/billing-credits.md) |
+| `BYOK_ENCRYPTION_KEY` | **Bắt buộc** khi `BYOK_ENABLED` và `NODE_ENV=production` — `npm run byok:generate-key` |
+| `BYOK_STORE_FILE` | Volume persistent — xem [BYOK production](../guides/byok-production.md) |
 
 Template: `.env.example` ở root repo.
 

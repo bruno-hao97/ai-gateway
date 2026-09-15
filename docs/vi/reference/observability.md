@@ -141,7 +141,7 @@ So sánh với `X-Gateway-Signature` (constant-time).
 2. Poll client (3.5s, ~80 lần) như [integration modes](../routing/integration-modes.md), **tuỳ chọn**
 3. Thêm webhook beta như tín hiệu **phụ** — gồm delivery nền cho `wait: false` khi đã cấu hình webhook.
 
-Delivery nền cùng giới hạn poll gateway (không retry queue, file store single-instance). Production quan trọng vẫn nên `wait: true` hoặc poll client.
+Delivery nền có retry webhook POST (cấu hình) và persist job poll async trên disk (single-instance). Production quan trọng vẫn nên `wait: true` hoặc poll client.
 
 ## UI
 

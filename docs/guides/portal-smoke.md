@@ -68,7 +68,7 @@ See [Activity hub](./activity-hub.md) for URL params. Quick pass:
 
 ## BYOK (`/app/byok/`)
 
-See [BYOK reference](/reference/byok.md). Quick pass:
+See [BYOK reference](/reference/byok.md) and [BYOK production checklist](/guides/byok-production.md). Quick pass:
 
 - [ ] Save key → green message (no full-page flash; **Refreshing…** only)
 - [ ] Test / Delete with confirm
