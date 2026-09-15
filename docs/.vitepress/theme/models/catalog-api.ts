@@ -619,12 +619,47 @@ export function monthGroupLabel(ts: number, localeOrVi: CatalogLang | boolean = 
   return new Date(ts).toLocaleDateString(tag, { month: 'long', year: 'numeric' });
 }
 
+const CATALOG_JOB_TYPE_LABELS: Record<string, [string, string, string]> = {
+  image: ['Image', 'Image', 'รูป'],
+  video: ['Video', 'Video', 'วิดีโอ'],
+  music: ['Music', 'Music', 'เพลง'],
+  tts: ['TTS', 'TTS', 'TTS'],
+  'avatar-lipsync': ['Avatar', 'Avatar', 'อวาตาร์'],
+  'image-upscale': ['Upscale image', 'Upscale image', 'Upscale รูป'],
+  'remove-bg': ['Remove BG', 'Remove BG', 'ลบพื้นหลัง'],
+  'video-upscale': ['Upscale video', 'Upscale video', 'Upscale วิดีโอ'],
+  'video-vfx': ['Video VFX', 'Video VFX', 'เอฟเฟกต์วิดีโอ'],
+  'video-subtitle': ['Subtitles', 'Subtitles', 'คำบรรยาย'],
+  'video-cut': ['Video cut', 'Video cut', 'ตัดวิดีโอ'],
+};
+
+const INPUT_MODALITY_LABELS: Record<string, [string, string, string]> = {
+  image: ['Image', 'Image', 'ภาพ'],
+  video: ['Video', 'Video', 'วิดีโอ'],
+  audio: ['Audio', 'Audio', 'เสียง'],
+  text: ['Text', 'Text', 'ข้อความ'],
+};
+
+export function catalogJobTypeLabel(id: JobTypeId | string, lang: CatalogLang): string {
+  const triple = CATALOG_JOB_TYPE_LABELS[id];
+  if (!triple) return id;
+  return pickMsg(lang, triple[0], triple[1], triple[2]);
+}
+
+export function inputModalityLabel(id: string, lang: CatalogLang): string {
+  const triple = INPUT_MODALITY_LABELS[id];
+  if (!triple) return id;
+  return pickMsg(lang, triple[0], triple[1], triple[2]);
+}
+
 export interface ComparePreset {
   id: string;
   titleEn: string;
   titleVi: string;
+  titleTh: string;
   descEn: string;
   descVi: string;
+  descTh: string;
   jobType?: JobTypeId;
   group?: 'media' | 'tools';
   sort: SortKey;
@@ -635,8 +670,10 @@ export const COMPARE_PRESETS: ComparePreset[] = [
     id: 'cheap-image',
     titleEn: 'Cheapest image',
     titleVi: 'Image rẻ nhất',
+    titleTh: 'ภาพราคาถูกที่สุด',
     descEn: 'Lowest credit picks for high-volume image jobs.',
     descVi: 'Model image tiêu tốn ít credits.',
+    descTh: 'โมเดลภาพที่ใช้เครดิตน้อยสำหรับงานปริมาณมาก',
     jobType: 'image',
     sort: 'credits-asc',
   },
@@ -644,8 +681,10 @@ export const COMPARE_PRESETS: ComparePreset[] = [
     id: 'video-new',
     titleEn: 'Newest video',
     titleVi: 'Video mới nhất',
+    titleTh: 'วิดีโอใหม่ล่าสุด',
     descEn: 'Recently added video models from the catalog.',
     descVi: 'Model video mới trên catalog.',
+    descTh: 'โมเดลวิดีโอที่เพิ่มล่าสุดจากแคตตาล็อก',
     jobType: 'video',
     sort: 'newest',
   },
@@ -653,8 +692,10 @@ export const COMPARE_PRESETS: ComparePreset[] = [
     id: 'tts-value',
     titleEn: 'TTS value',
     titleVi: 'TTS tiết kiệm',
+    titleTh: 'TTS คุ้มค่า',
     descEn: 'Compact text-to-speech models sorted by credits.',
     descVi: 'Model TTS sắp theo credits.',
+    descTh: 'โมเดล TTS เรียงตามเครดิต',
     jobType: 'tts',
     sort: 'credits-asc',
   },
@@ -662,8 +703,10 @@ export const COMPARE_PRESETS: ComparePreset[] = [
     id: 'tools',
     titleEn: 'Tools',
     titleVi: 'Tools',
+    titleTh: 'เครื่องมือ',
     descEn: 'Upscale, remove background, subtitles, and other tools.',
     descVi: 'Upscale, xóa nền, phụ đề và tool khác.',
+    descTh: 'Upscale ลบพื้นหลัง ซับไตเติล และเครื่องมืออื่น',
     group: 'tools',
     sort: 'name-asc',
   },
@@ -673,26 +716,26 @@ export interface CompareRow {
   key: string;
   labelEn: string;
   labelVi: string;
+  labelTh: string;
   valueA: string;
   valueB: string;
   diff?: boolean;
 }
 
 export function buildCompareRows(a: CatalogModel, b: CatalogModel, lang: CatalogLang): CompareRow[] {
-  const L = (en: string, vi: string) => (lang === 'vi' ? vi : en);
   const desc = (m: CatalogModel) => modelDescription(m, lang) || '—';
   const mods = (m: CatalogModel) =>
     modelInputModalities(m)
-      .map((id) => INPUT_MODALITIES.find((x) => x.id === id)?.label ?? id)
+      .map((id) => inputModalityLabel(id, lang))
       .join(', ') || '—';
-  const typeLabel = (m: CatalogModel) =>
-    JOB_TYPES.find((t) => t.id === m.jobType)?.label ?? m.jobType;
+  const typeLabel = (m: CatalogModel) => catalogJobTypeLabel(m.jobType, lang);
 
   const rows: Array<Omit<CompareRow, 'diff'> & { rawA?: string; rawB?: string }> = [
     {
       key: 'credits',
       labelEn: 'Credits',
       labelVi: 'Credits',
+      labelTh: 'เครดิต',
       valueA: a.creditsLabel,
       valueB: b.creditsLabel,
       rawA: String(a.credits ?? ''),
@@ -702,6 +745,7 @@ export function buildCompareRows(a: CatalogModel, b: CatalogModel, lang: Catalog
       key: 'type',
       labelEn: 'Job type',
       labelVi: 'Loại job',
+      labelTh: 'ประเภทงาน',
       valueA: typeLabel(a),
       valueB: typeLabel(b),
       rawA: a.jobType,
@@ -711,6 +755,7 @@ export function buildCompareRows(a: CatalogModel, b: CatalogModel, lang: Catalog
       key: 'provider',
       labelEn: 'Provider',
       labelVi: 'Provider',
+      labelTh: 'ผู้ให้บริการ',
       valueA: a.provider || '—',
       valueB: b.provider || '—',
       rawA: a.provider,
@@ -720,6 +765,7 @@ export function buildCompareRows(a: CatalogModel, b: CatalogModel, lang: Catalog
       key: 'description',
       labelEn: 'Description',
       labelVi: 'Mô tả',
+      labelTh: 'คำอธิบาย',
       valueA: desc(a),
       valueB: desc(b),
     },
@@ -727,6 +773,7 @@ export function buildCompareRows(a: CatalogModel, b: CatalogModel, lang: Catalog
       key: 'ratios',
       labelEn: 'Ratios',
       labelVi: 'Ratios',
+      labelTh: 'อัตราส่วน',
       valueA: formatFieldList(a.ratios),
       valueB: formatFieldList(b.ratios),
       rawA: a.ratios.join('|'),
@@ -736,6 +783,7 @@ export function buildCompareRows(a: CatalogModel, b: CatalogModel, lang: Catalog
       key: 'modes',
       labelEn: 'Modes',
       labelVi: 'Modes',
+      labelTh: 'โหมด',
       valueA: formatFieldList(a.modes),
       valueB: formatFieldList(b.modes),
       rawA: a.modes.join('|'),
@@ -745,6 +793,7 @@ export function buildCompareRows(a: CatalogModel, b: CatalogModel, lang: Catalog
       key: 'resolutions',
       labelEn: 'Resolutions',
       labelVi: 'Resolutions',
+      labelTh: 'ความละเอียด',
       valueA: formatFieldList(a.resolutions),
       valueB: formatFieldList(b.resolutions),
       rawA: a.resolutions.join('|'),
@@ -754,6 +803,7 @@ export function buildCompareRows(a: CatalogModel, b: CatalogModel, lang: Catalog
       key: 'durations',
       labelEn: 'Durations',
       labelVi: 'Durations',
+      labelTh: 'ความยาว',
       valueA: formatFieldList(a.durations),
       valueB: formatFieldList(b.durations),
       rawA: a.durations.join('|'),
@@ -763,6 +813,7 @@ export function buildCompareRows(a: CatalogModel, b: CatalogModel, lang: Catalog
       key: 'modalities',
       labelEn: 'Input',
       labelVi: 'Input',
+      labelTh: 'อินพุต',
       valueA: mods(a),
       valueB: mods(b),
       rawA: mods(a),
@@ -772,6 +823,7 @@ export function buildCompareRows(a: CatalogModel, b: CatalogModel, lang: Catalog
       key: 'added',
       labelEn: 'Added',
       labelVi: 'Thêm',
+      labelTh: 'เพิ่มเมื่อ',
       valueA: formatRelativeTime(a.sortDate, lang) || '—',
       valueB: formatRelativeTime(b.sortDate, lang) || '—',
     },
@@ -779,6 +831,7 @@ export function buildCompareRows(a: CatalogModel, b: CatalogModel, lang: Catalog
       key: 'slug',
       labelEn: 'Slug',
       labelVi: 'Slug',
+      labelTh: 'Slug',
       valueA: a.slug,
       valueB: b.slug,
       rawA: a.slug,

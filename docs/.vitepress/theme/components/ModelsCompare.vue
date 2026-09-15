@@ -8,7 +8,9 @@ import {
   JOB_TYPES,
   applyComparePreset,
   buildCompareRows,
+  catalogJobTypeLabel,
   catalogProviders,
+  inputModalityLabel,
   fetchAllModels,
   findCatalogModel,
   formatRelativeTime,
@@ -105,7 +107,7 @@ const presetCards = computed(() =>
 );
 
 function compareRowLabel(row: (typeof compareRows.value)[number]): string {
-  return m(row.labelEn, row.labelVi, row.labelEn);
+  return m(row.labelEn, row.labelVi, row.labelTh);
 }
 
 function syncUrl() {
@@ -243,9 +245,9 @@ onMounted(() => {
           class="or-compare-preset"
           @click="onPresetClick(preset)"
         >
-          <strong>{{ m(preset.titleEn, preset.titleVi, preset.titleEn) }}</strong>
+          <strong>{{ m(preset.titleEn, preset.titleVi, preset.titleTh) }}</strong>
           <span class="or-compare-preset-desc">{{
-            m(preset.descEn, preset.descVi, preset.descEn)
+            m(preset.descEn, preset.descVi, preset.descTh)
           }}</span>
           <span v-if="examples" class="or-compare-preset-examples">{{ examples }}</span>
         </button>
@@ -404,7 +406,9 @@ onMounted(() => {
         <div class="or-compare-modal-filters">
           <select v-model="modalJobType" class="or-select">
             <option value="all">{{ m('All types', 'Mọi loại', 'ทุกประเภท') }}</option>
-            <option v-for="t in JOB_TYPES" :key="t.id" :value="t.id">{{ t.label }}</option>
+            <option v-for="t in JOB_TYPES" :key="t.id" :value="t.id">
+              {{ catalogJobTypeLabel(t.id, catalogLang) }}
+            </option>
           </select>
           <select v-model="modalProvider" class="or-select">
             <option value="">{{ m('All providers', 'Mọi provider', 'ทุก provider') }}</option>
@@ -412,7 +416,9 @@ onMounted(() => {
           </select>
           <select v-model="modalModality" class="or-select">
             <option value="all">{{ m('All inputs', 'Mọi input', 'ทุก input') }}</option>
-            <option v-for="m in INPUT_MODALITIES" :key="m.id" :value="m.id">{{ m.label }}</option>
+            <option v-for="mod in INPUT_MODALITIES" :key="mod.id" :value="mod.id">
+              {{ inputModalityLabel(mod.id, catalogLang) }}
+            </option>
           </select>
         </div>
 
